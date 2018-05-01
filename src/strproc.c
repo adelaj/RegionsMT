@@ -42,7 +42,7 @@ bool empty_handler(const char *str, size_t len, void *Ptr, void *Context)
     (void) str;
     (void) len;
     struct handler_context *context = Context;
-    if (context) bit_set((uint8_t *) Ptr + context->offset, context->bit_pos);
+    if (context) uint8_bit_set((uint8_t *) Ptr + context->offset, context->bit_pos);
     return 1;
 }
 
@@ -87,7 +87,7 @@ bool bool_handler(const char *str, size_t len, void *Ptr, void *Context)
     struct bool_handler_context *context = Context;
     if (context) 
     {
-        (res ? bit_set : bit_reset)((uint8_t *) Ptr, context->bit_pos);
+        (res ? uint8_bit_set : uint8_bit_reset)((uint8_t *) Ptr, context->bit_pos);
         return empty_handler(str, len, Ptr, context->context);
     }
     return 1;

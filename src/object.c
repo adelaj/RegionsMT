@@ -509,7 +509,7 @@ struct program_object *program_object_from_xml(struct xml_node *sch, const char 
                     *stack.frame[0].obj = (struct program_object) { .prologue = sch->prologue, .epilogue = sch->epilogue, .dispose = sch->dispose, .context = calloc(1, sch->sz) };
                     if (!stack.frame[0].obj->context) goto error;
                                      
-                    size_t attb_cnt = BYTE_CNT(sch->att_cnt);
+                    size_t attb_cnt = UINT8_CNT(sch->att_cnt);
                     if (!array_test(&attb.buff, &attb.cap, 1, 0, 0, ARG_SIZE(attb_cnt))) goto error;
                     memset(attb.buff, 0, attb_cnt);
 
@@ -543,7 +543,7 @@ struct program_object *program_object_from_xml(struct xml_node *sch, const char 
                         stack.frame[dep] = (struct frame) { .obj = &stack.frame[dep - 1].obj->dsc[stack.frame[dep - 1].obj->dsc_cnt], .node = nod, .anc = anc };
                         stack.frame[dep - 1].obj->dsc_cnt++;
 
-                        size_t attb_cnt = BYTE_CNT(nod->att_cnt);
+                        size_t attb_cnt = UINT8_CNT(nod->att_cnt);
                         if (!array_test(&attb.buff, &attb.cap, 1, 0, 0, ARG_SIZE(attb_cnt))) goto error;
                         memset(attb.buff, 0, attb_cnt), stp = OFF_LB, upd = 0;
                     }
@@ -602,7 +602,7 @@ struct program_object *program_object_from_xml(struct xml_node *sch, const char 
 
                 if (ind + 1)
                 {
-                    if (!bit_test(attb.buff, ind)) bit_set(attb.buff, ind), stp++, upd = 0;
+                    if (!uint8_bit_test_set(attb.buff, ind)) stp++, upd = 0;
                     else errm = ERR_DUP, halt = 1;
                 }
                 else errm = ERR_ATT, halt = 1;

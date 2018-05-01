@@ -58,8 +58,6 @@ static void gsl_error_a(const char *reason, const char * file, int line, int gsl
     return;
 }
 
-_Static_assert(sizeof(size_t) == sizeof(uintptr_t), "Sizes of types 'size_t' and 'uintptr_t' should be equal!");
-
 bool categorical_run(const char *path_phen, const char *path_gen, struct log *log)
 {
     uint8_t *gen = NULL;
@@ -85,7 +83,7 @@ bool categorical_run(const char *path_phen, const char *path_gen, struct log *lo
 
     uint64_t start = get_time();
     size_t ini_rpl = 1000000, rpl = ini_rpl;
-    double x = maver_adj(gen, phen, snp_cnt, phen_cnt, &rpl, 10, 1. + 1.e-7, rng, TEST_TYPE_CODOMINANT);
+    double x = maver_adj(gen, phen, snp_cnt, phen_cnt, phen_ucnt, &rpl, 10, 1. + 1.e-7, rng, TEST_TYPE_CODOMINANT);
  
     log_message_var(log, &MESSAGE_VAR_GENERIC(MESSAGE_TYPE_INFO), "Adjusted P-value for density: %f; count of replications: %zu / %zu.\n", x, rpl, ini_rpl);
     log_message(log, &MESSAGE_INFO_TIME_DIFF(start, get_time(), "Adjusted P-value computation").base);

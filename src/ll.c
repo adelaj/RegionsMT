@@ -47,19 +47,19 @@ void *double_lock_execute(spinlock_handle *p_spinlock, double_lock_callback init
 
 void bit_set_interlocked(volatile uint8_t *arr, size_t bit)
 {
-    __atomic_or_fetch(arr + (bit >> 3), 1 << (bit & 7), __ATOMIC_ACQ_REL);
+    __atomic_or_fetch(arr + bit / CHAR_BIT, 1 << bit % CHAR_BIT, __ATOMIC_ACQ_REL);
 }
 
 void bit_reset_interlocked(volatile uint8_t *arr, size_t bit)
 {
-    __atomic_and_fetch(arr + (bit >> 3), ~(1 << (bit & 7)), __ATOMIC_ACQ_REL);
+    __atomic_and_fetch(arr + bit / CHAR_BIT, ~(1 << bit % CHAR_BIT), __ATOMIC_ACQ_REL);
 }
 
 void bit_set2_interlocked(volatile uint8_t *arr, size_t bit)
 {
-    uint8_t pos = bit & 7;
-    if (pos < 7) __atomic_or_fetch(arr + (bit >> 3), 3u << pos, __ATOMIC_ACQ_REL);
-    else __atomic_or_fetch((volatile uint16_t *) (arr + (bit >> 3)), 0x180, __ATOMIC_ACQ_REL);
+    uint8_t pos = bit % CHAR_BIT;
+    if (pos < CHAR_BIT - 1) __atomic_or_fetch(arr + bit / CHAR_BIT, 3u << pos, __ATOMIC_ACQ_REL);
+    else __atomic_or_fetch((volatile uint16_t *) (arr + bit / CHAR_BIT), 3u << (CHAR_BIT - 1), __ATOMIC_ACQ_REL);
 }
 
 void size_inc_interlocked(volatile size_t *mem)
@@ -74,7 +74,7 @@ void size_dec_interlocked(volatile size_t *mem)
 
 uint32_t uint32_bit_scan_reverse(uint32_t x)
 {
-    return x ? ((sizeof(unsigned) << 3) - __builtin_clz((unsigned) x) - 1) : UINT_MAX;
+    return x ? ((sizeof(unsigned) * CHAR_BIT) - __builtin_clz((unsigned) x) - 1) : UINT_MAX;
 }
 
 uint32_t uint32_bit_scan_forward(uint32_t x)
@@ -163,19 +163,19 @@ void *double_lock_execute(spinlock_handle *p_spinlock, double_lock_callback init
 
 void bit_set_interlocked(volatile uint8_t *arr, size_t bit)
 {
-    _InterlockedOr8((volatile char *) (arr + (bit >> 3)), 1 << (bit & 7));
+    _InterlockedOr8((volatile char *) (arr + bit / CHAR_BIT), 1 << bit % CHAR_BIT);
 }
 
 void bit_reset_interlocked(volatile uint8_t *arr, size_t bit)
 {
-    _InterlockedAnd8((volatile char *) (arr + (bit >> 3)), ~(1 << (bit & 7)));
+    _InterlockedAnd8((volatile char *) (arr + bit / CHAR_BIT), ~(1 << bit % CHAR_BIT));
 }
 
 void bit_set2_interlocked(volatile uint8_t *arr, size_t bit)
 {
-    uint8_t pos = bit & 7;
-    if (pos < 7) _InterlockedOr8((volatile char *) (arr + (bit >> 3)), 3u << pos);
-    else _InterlockedOr16((volatile short *) (arr + (bit >> 3)), 0x180);
+    uint8_t pos = bit % CHAR_BIT;
+    if (pos < CHAR_BIT - 1) _InterlockedOr8((volatile char *) (arr + bit / CHAR_BIT), 3u << pos);
+    else _InterlockedOr16((volatile short *) (arr + bit / CHAR_BIT), 3u << (CHAR_BIT - 1));
 }
 
 uint32_t uint32_bit_scan_reverse(uint32_t x)
@@ -361,9 +361,9 @@ void size_dec_interlocked_p(volatile void *mem, const void *arg)
 
 uint8_t bit_get2_acquire(volatile uint8_t *arr, size_t bit)
 {
-    uint8_t pos = bit & 7;
-    if (pos < 7) return (uint8_load_acquire(arr + (bit >> 3)) >> pos) & 3;
-    else return (uint16_load_acquire((uint16_t *) (arr + (bit >> 3))) >> 7) & 3;
+    uint8_t pos = bit % CHAR_BIT;
+    if (pos < CHAR_BIT - 1) return (uint8_load_acquire(arr + bit / CHAR_BIT) >> pos) & 3;
+    else return (uint16_load_acquire((uint16_t *) (arr + bit / CHAR_BIT)) >> (CHAR_BIT - 1)) & 3;
 }
 
 bool bit_test2_acquire(volatile uint8_t *arr, size_t bit)
@@ -378,9 +378,9 @@ bool bit_test2_acquire_p(volatile void *arr, const void *p_bit)
 
 bool bit_test_range_acquire(volatile uint8_t *arr, size_t cnt)
 {
-    size_t div = cnt >> 3, rem = cnt & 7;
+    size_t div = cnt / CHAR_BIT, rem = cnt % CHAR_BIT;
     for (size_t i = 0; i < div; i++) 
-        if (uint8_load_acquire(arr + i) != 0xff) return 0;
+        if (uint8_load_acquire(arr + i) != UINT8_MAX) return 0;
     if (rem)
     {
         uint8_t msk = (1u << rem) - 1;
@@ -396,12 +396,12 @@ bool bit_test_range_acquire_p(volatile void *arr, const void *p_cnt)
 
 bool bit_test2_range_acquire(volatile uint8_t *arr, size_t cnt)
 {
-    size_t div = cnt >> 3, rem = cnt & 7;
+    size_t div = cnt / CHAR_BIT, rem = cnt % CHAR_BIT;
     for (size_t i = 0; i < div; i++) 
-        if ((uint8_load_acquire(arr + i) & 0x55) != 0x55) return 0;
+        if ((uint8_load_acquire(arr + i) & BIT_TEST2_MASK) != BIT_TEST2_MASK) return 0;
     if (rem)
     {
-        uint8_t msk = ((1u << rem) - 1) & 0x55;
+        uint8_t msk = ((1u << rem) - 1) & BIT_TEST2_MASK;
         return (uint8_load_acquire(arr + div) & msk) == msk;
     }
     return 1;
@@ -431,21 +431,6 @@ uint8_t uint8_bit_scan_reverse(uint8_t x)
 uint8_t uint8_bit_scan_forward(uint8_t x)
 {
     return (uint8_t) uint32_bit_scan_forward((uint8_t) x);
-}
-
-bool size_bit_test(size_t val, uint8_t bit)
-{
-    return !!(val & ((size_t) 1 << bit));
-}
-
-void size_bit_set(size_t *p_val, uint8_t bit)
-{
-    *p_val |= ((size_t) 1 << bit);
-}
-
-void size_bit_reset(size_t *p_val, uint8_t bit)
-{
-    *p_val &= ~((size_t) 1 << bit);
 }
 
 size_t size_add_sat(size_t a, size_t b)
@@ -485,36 +470,6 @@ bool size_cmp_asc(const void *A, const void *B, void *thunk)
     return *(size_t *) A > *(size_t *) B;
 }
 
-bool bit_test(uint8_t *arr, size_t bit)
-{
-    return !!(arr[bit >> 3] & (1 << (bit & 7)));
-}
-
-void bit_set(uint8_t *arr, size_t bit)
-{
-    arr[bit >> 3] |= 1 << (bit & 7);
-}
-
-void bit_reset(uint8_t *arr, size_t bit)
-{
-    arr[bit >> 3] &= ~(1 << (bit & 7));
-}
-
-bool bit_test_size(size_t *arr, size_t bit)
-{
-    return size_bit_test(arr[bit / SIZE_BIT], (uint8_t) (bit % SIZE_BIT));
-}
-
-void bit_set_size(size_t *arr, size_t bit)
-{
-    size_bit_set(arr + (bit / SIZE_BIT), (uint8_t) (bit % SIZE_BIT));
-}
-
-void bit_reset_size(size_t *arr, size_t bit)
-{
-    size_bit_reset(arr + (bit / SIZE_BIT), (uint8_t) (bit % SIZE_BIT));
-}
-
 int flt64_stable_cmp_dsc(const void *a, const void *b, void *thunk)
 {
     (void) thunk;
@@ -545,3 +500,50 @@ uint32_t uint32_fused_mul_add(uint32_t *p_res, uint32_t m, uint32_t a)
     *p_res = res.lo;
     return res.hi;
 }
+
+#define DECLARE_BIT_TEST(TYPE, PREFIX) \
+    bool PREFIX ## _bit_test(TYPE *arr, size_t bit) \
+    { \
+        return !!(arr[bit / (CHAR_BIT * sizeof(TYPE))] & ((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)))); \
+    }
+
+#define DECLARE_BIT_TEST_SET(TYPE, PREFIX) \
+    bool PREFIX ## _bit_test_set(TYPE *arr, size_t bit) \
+    { \
+        size_t ind = bit / (CHAR_BIT * sizeof(TYPE)); \
+        uint8_t msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)); \
+        if (arr[ind] & msk) return 1; \
+        arr[ind] |= msk; \
+        return 0; \
+    }
+
+#define DECLARE_BIT_TEST_RESET(TYPE, PREFIX) \
+    bool PREFIX ## _bit_test_reset(TYPE *arr, size_t bit) \
+    { \
+        size_t ind = bit / (CHAR_BIT * sizeof(TYPE)); \
+        uint8_t msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)); \
+        if (arr[ind] & msk) \
+        { \
+            arr[ind] &= ~msk; \
+            return 1; \
+        } \
+        return 0; \
+    }
+
+#define DECLARE_BIT_SET(TYPE, PREFIX) \
+    void PREFIX ## _bit_set(TYPE *arr, size_t bit) \
+    { \
+        arr[bit / (CHAR_BIT * sizeof(TYPE))] |= (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)); \
+    }
+
+#define DECLARE_BIT_RESET(TYPE, PREFIX) \
+    void PREFIX ## _bit_reset(TYPE *arr, size_t bit) \
+    { \
+        arr[bit / (CHAR_BIT * sizeof(TYPE))] &= ~((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE))); \
+    }
+
+DECLARE_BIT_TEST(uint8_t, uint8)
+DECLARE_BIT_TEST_SET(uint8_t, uint8)
+DECLARE_BIT_TEST_RESET(uint8_t, uint8)
+DECLARE_BIT_SET(uint8_t, uint8)
+DECLARE_BIT_RESET(uint8_t, uint8)

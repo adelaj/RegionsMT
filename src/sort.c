@@ -92,7 +92,7 @@ void ranks_unique_from_pointers_impl(size_t *rnk, const uintptr_t *ptr, uintptr_
         rnk[(ptr[i] - base) / sz] = tmp;
     }
     rnk[(ptr[cnt - 1] - base) / sz] = ucnt;
-    *p_cnt = ucnt;
+    *p_cnt = ucnt + 1;
 }
 
 size_t *ranks_unique_from_pointers(const uintptr_t *ptr, uintptr_t base, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
@@ -127,10 +127,10 @@ void ranks_from_pointers_inplace_impl(uintptr_t *restrict ptr, uintptr_t base, s
     {
         size_t j = i;
         uintptr_t k = (ptr[i] - base) / sz;
-        while (!bit_test(bits, j))
+        while (!uint8_bit_test(bits, j))
         {
             uintptr_t l = (ptr[k] - base) / sz;
-            bit_set(bits, j);
+            uint8_bit_set(bits, j);
             ptr[k] = j;
             j = k;
             k = l;
@@ -141,7 +141,7 @@ void ranks_from_pointers_inplace_impl(uintptr_t *restrict ptr, uintptr_t base, s
 bool ranks_from_pointers_inplace(uintptr_t *restrict ptr, uintptr_t base, size_t cnt, size_t sz)
 {
     uint8_t *restrict bits = NULL;
-    if (!array_init(&bits, NULL, BYTE_CNT(cnt), sizeof(*bits), 0, ARRAY_STRICT | ARRAY_CLEAR)) return 0;
+    if (!array_init(&bits, NULL, UINT8_CNT(cnt), sizeof(*bits), 0, ARRAY_STRICT | ARRAY_CLEAR)) return 0;
     ranks_from_pointers_inplace_impl(ptr, base, cnt, sz, bits);
     free(bits);
     return 1;
@@ -165,14 +165,14 @@ void orders_apply_impl(uintptr_t *restrict ord, size_t cnt, size_t sz, void *res
 {
     for (size_t i = 0; i < cnt; i++)
     {
-        if (bit_test(bits, i)) continue;
+        if (uint8_bit_test(bits, i)) continue;
         size_t k = ord[i];
         if (k == i) continue;
-        bit_set(bits, i);
+        uint8_bit_set(bits, i);
         memcpy(swp, (char *) arr + i * sz, sz);
         for (size_t j = i;;)
         {
-            while (k < cnt && bit_test(bits, k)) k = ord[k];
+            while (k < cnt && uint8_bit_test(bits, k)) k = ord[k];
             memcpy((char *) arr + j * sz, (char *) arr + k * sz, sz);
             if (k >= cnt)
             {
@@ -181,7 +181,7 @@ void orders_apply_impl(uintptr_t *restrict ord, size_t cnt, size_t sz, void *res
             }
             j = k;
             k = ord[j];
-            bit_set(bits, j);
+            uint8_bit_set(bits, j);
             if (k == i)
             {
                 memcpy((char *) arr + j * sz, swp, sz);
@@ -195,7 +195,7 @@ void orders_apply_impl(uintptr_t *restrict ord, size_t cnt, size_t sz, void *res
 bool orders_apply(uintptr_t *restrict ord, size_t cnt, size_t sz, void *restrict arr)
 {
     uint8_t *bits = NULL;
-    if (!array_init(&bits, NULL, BYTE_CNT(cnt), sizeof(*bits), 0, ARRAY_STRICT | ARRAY_CLEAR)) return 0;
+    if (!array_init(&bits, NULL, UINT8_CNT(cnt), sizeof(*bits), 0, ARRAY_STRICT | ARRAY_CLEAR)) return 0;
     orders_apply_impl(ord, cnt, sz, arr, bits, Alloca(sz));
     free(bits);
     return 1;
