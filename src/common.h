@@ -5,7 +5,7 @@
 //#endif
 
 #ifdef _MSC_BUILD
-#   if !(defined __GNUC__ || defined __clang__)
+#   if !(defined __GNUC__ || defined __clang__) // In the case of the clang usage
 //      Suppressing some MSVS warnings
 #       pragma warning(disable : 4116) // "Unnamed type definition in parentheses"
 #       pragma warning(disable : 4200) // "Zero-sized array in structure/union"
@@ -47,7 +47,7 @@
     (sizeof(ARR) / sizeof((ARR)[0]))
 
 // Length of string literal (without null-terminator)
-#define strlenof(STR) \
+#define lengthof(STR) \
     (countof((STR)) - 1)
 
 // Helper macros evaluating and inserting the count of arguments
@@ -55,28 +55,18 @@
     { __VA_ARGS__ }, countof(((T []) { __VA_ARGS__ }))
 #define ARG(T, ...) \
     ((T []) { __VA_ARGS__ }), countof(((T []) { __VA_ARGS__ }))
-#define ARG_SIZE(...) \
-    ARG(size_t, __VA_ARGS__)
 
-// Convert value (which is often represented by a macro) to string literal
+// Convert value (which is often represented by a macro) to the string literal
 #define TOSTRING_EXPAND(Z) #Z
 #define TOSTRING(Z) TOSTRING_EXPAND(Z)
 
-#define STRI(STR) { STR, strlenof(STR) }
-#define ARRI(ARR) { ARR, countof(ARR) }
+#define STRC(STR) (STR), lengthof(STR)
+#define STRI(STR) { STRC(STR) }
+#define ARRC(ARR) (ARR), countof(ARR)
+#define ARRI(ARR) { ARRC(ARR) }
 
 // In the case of compound literal extra parentheses should be added
 #define CLII(...) ARRI((__VA_ARGS__))
-
-// Common value for sizes of temporary string and buffer used for formatting messages.
-// The size should be adequate to handle all format string appearing in the program. 
-// If this size is too small, some messages may become truncated, but no buffer overflows will occur.
-// Warning! 'TEMP_STR' should be an explicit number in order to be used with 'TOSTRING' macro.
-#define TEMP_STR 255
-#define TEMP_BUFF (TEMP_STR + 1)
-#define TEMP_BUFF_LARGE (TEMP_BUFF << 1)
-
-_Static_assert(TEMP_BUFF > TEMP_STR, "'TEMP_BUFF' must be greater than 'TEMP_STR'!");
 
 // Common value for the size of temporary buffer used for file writing
 #define BLOCK_WRITE 4096

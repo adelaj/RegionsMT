@@ -7,7 +7,7 @@
 double log_fact(size_t n)
 {
     gsl_sf_result res;
-    if (n < UINT_MAX) 
+    if (n <= UINT_MAX) 
     {
         if (gsl_sf_lnfact_e((unsigned) n, &res) == GSL_SUCCESS) return res.val;
     }
@@ -22,9 +22,7 @@ double log_choose(size_t n, size_t m)
 {
     if (m > n) return nan(__func__);
     if (m == n || !m) return 0.;
-    return m > (n >> 1) ? // Addition here may be not associative
-        log_fact(n) - log_fact(n - m) - log_fact(m) : 
-        log_fact(n) - log_fact(m) - log_fact(n - m);
+    return m > (n >> 1) ? log_fact(n) - log_fact(n - m) - log_fact(m) : log_fact(n) - log_fact(m) - log_fact(n - m); // Addition here may be not associative
 }
 
 double pdf_hypergeom(size_t k, size_t n1, size_t n2, size_t t)
@@ -52,7 +50,7 @@ double gamma_inc_Q(double a, double x)
 
 double cdf_gamma_Q(double x, double a, double b)
 {
-    if (x <= 0.) return 1.0;
+    if (x <= 0.) return 1.;
     double y = x / b;
     return y < a ? 1. - gamma_inc_P(a, y) : gamma_inc_Q(a, y);
 }

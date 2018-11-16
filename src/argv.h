@@ -9,19 +9,31 @@
 #include "log.h"
 #include "strproc.h"
 
-struct par {
-    ptrdiff_t offset; // Offset of the field
-    void *context; // Third argument of the handler
-    read_callback handler;
-    bool option;
+enum par_mode {
+    PAR_VALUED = 0,
+    PAR_OPTION,
+    PAR_VALUED_OPTION
 };
 
-typedef bool (*par_selector_callback)(struct par *, char *, size_t, void *);
-bool argv_parse(par_selector_callback, par_selector_callback, void *, void *, char **, size_t, char ***, size_t *, struct log *);
+struct par {
+    void *ptr, *context; // Third argument of the handler
+    read_callback handler;
+    enum par_mode mode;
+};
+
+typedef bool (*par_selector_callback)(struct par *, const char *, size_t, void *, void *, bool);
+bool argv_parse(par_selector_callback, void *, void *, char **, size_t, char ***, size_t *, struct log *);
 
 struct tag {
     struct strl name;
     size_t id;
+};
+
+struct par_sch {
+    size_t off;
+    void *context; // Third argument of the handler
+    read_callback handler;
+    enum par_mode mode;
 };
 
 struct argv_par_sch {
@@ -34,10 +46,9 @@ struct argv_par_sch {
         size_t stag_cnt;
     };
     struct {
-        struct par *par;
-        size_t par_cnt;
+        struct par_sch *par_sch;
+        size_t par_sch_cnt;
     };
 };
 
-bool argv_par_selector_long(struct par *, char *, size_t len, void *);
-bool argv_par_selector_shrt(struct par *, char *, size_t len, void *);
+bool argv_par_selector(struct par *, const char *, size_t len, void *, void *, bool);

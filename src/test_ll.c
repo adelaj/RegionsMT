@@ -5,8 +5,6 @@
 #include <math.h>
 #include <string.h>
 
-DECLARE_PATH
-
 bool test_ll_generator_a(void *dst, size_t *p_context, struct log *log)
 {
     (void) log;
@@ -20,11 +18,11 @@ bool test_ll_generator_a(void *dst, size_t *p_context, struct log *log)
         { 1., 1., 0, 0, 0 },
         { 0., -1., -1, 1, -1 },
         { -1., -1., 0, 0, 0 },
-        { NaN, 0., 0, 0, 1 },
-        { 0., NaN, 0, 0, -1 },
-        { NaN, NaN, 0, 0, 0 },
-        { NaN, nan("Test"), 0, 0, 0 },
-        { nan("Test"), NaN, 0, 0, 0 },
+        { nan(__func__), 0., 0, 0, 1 },
+        { 0., nan(__func__), 0, 0, -1 },
+        { nan(__func__), nan(__func__), 0, 0, 0 },
+        { nan(__func__), nan("Test"), 0, 0, 0 },
+        { nan("Test"), nan(__func__), 0, 0, 0 },
         { nan("Test"), nan("Test"), 0, 0, 0 },
         { DBL_MIN, DBL_MAX, 1, 1, 1 },
         { DBL_MAX, DBL_MIN, -1, -1, -1 },
@@ -45,8 +43,7 @@ static int flt64_stable_cmp_dsc_test(double *p_a, double *p_b, void *context)
 
 static int flt64_stable_cmp_dsc_abs_test(double *p_a, double *p_b, void *context)
 {
-    double a = fabs(*p_a), b = fabs(*p_b);
-    return flt64_stable_cmp_dsc_test(&a, &b, context);
+    return flt64_stable_cmp_dsc_test(&(double) { fabs(*p_a) }, &(double) { fabs(*p_b) }, context);
 }
 
 static int flt64_stable_cmp_dsc_nan_test(double *p_a, double *p_b, void *context)
@@ -81,6 +78,7 @@ bool test_ll_a_3(void *In, struct log *log)
 
 bool test_ll_generator_b(void *dst, size_t *p_context, struct log *log)
 {
+    (void) log;
     struct test_ll_b data[] = {
         { 0b0, UINT32_MAX, UINT32_MAX },
         { 0b1, 0, 0 },
@@ -110,50 +108,56 @@ bool test_ll_generator_b(void *dst, size_t *p_context, struct log *log)
 
 bool test_ll_b(void *In, struct log *log)
 {
+    (void) log;
     struct test_ll_b *in = In;
     uint32_t res_bsr = uint32_bit_scan_reverse(in->a), res_bsf = uint32_bit_scan_forward(in->a);
     if (res_bsr != in->res_bsr || res_bsf != in->res_bsf) return 0;
     return 1;
 }
 
-#if 0
-void test_ll_2_perf(struct log *log)
+static int sign(double x) 
+{
+    return (0. < x) - (x < 0.);
+}
+
+void test_ll_perf(struct log *log)
 {
     struct { double a, b; int res; } in[] = {
         { 1. , -1, -1 },
-    { -1., 1, 1 },
-    { 1., 0., -1 },
-    { 0., 1., 1 },
-    { -1., 0., 1 },
-    { 0., -1., -1 },
-    { 0., 0., 0 },
-    { 1., 1., 0 },
-    { -1., -1., 0 },
-    { NaN, 0., 1 },
-    { 0., NaN, -1 },
-    { NaN, NaN, 0 },
-    { NaN, nan("zzz"), 0 },
-    { NaN, DBL_MAX, 1 },
-    { nan("zzz"), NaN, 0 },
-    { DBL_MAX, NaN, -1 },
-    { nan("zzz"), nan("zzz"), 0 },
-    { DBL_MIN, DBL_MAX, 1 },
-    { DBL_MAX, DBL_MIN, -1 },
-    { 0, DBL_EPSILON, 1 },
-    { DBL_EPSILON, 0, -1 },
+        { -1., 1, 1 },
+        { 1., 0., -1 },
+        { 0., 1., 1 },
+        { -1., 0., 1 },
+        { 0., -1., -1 },
+        { 0., 0., 0 },
+        { 1., 1., 0 },
+        { -1., -1., 0 },
+        { nan(__func__), 0., 1 },
+        { 0., nan(__func__), -1 },
+        { nan(__func__), nan(__func__), 0 },
+        { nan(__func__), nan("zzz"), 0 },
+        { nan(__func__), DBL_MAX, 1 },
+        { nan("zzz"), nan(__func__), 0 },
+        { DBL_MAX, nan(__func__), -1 },
+        { nan("zzz"), nan("zzz"), 0 },
+        { DBL_MIN, DBL_MAX, 1 },
+        { DBL_MAX, DBL_MIN, -1 },
+        { 0, DBL_EPSILON, 1 },
+        { DBL_EPSILON, 0, -1 },
     };
 
-    int cnt = 0;
+    volatile int cnt = 0;
     uint64_t start = get_time();
     for (size_t j = 0; j < 4096 * (USHRT_MAX + 1); j++)
     {
         for (size_t i = 0; i < countof(in); i++)
         {
-            cnt += flt64_stable_cmp_dsc_nan_test(&in[i].a, &in[i].b, NULL);
+            cnt += sign(in[i].a);
+            //cnt += flt64_stable_cmp_dsc_nan_test(&in[i].a, &in[i].b, NULL);
         }
     }
     printf("Sum: %d\n", cnt);
-    log_message(log, &MESSAGE_INFO_TIME_DIFF(start, get_time(), "Branched comparison").base);
+    log_message_time_diff(log, CODE_METRIC, MESSAGE_INFO, start, get_time(), "Branched comparison took");
 
     cnt = 0;
     start = get_time();
@@ -161,12 +165,15 @@ void test_ll_2_perf(struct log *log)
     {
         for (size_t i = 0; i < countof(in); i++)
         {
-            cnt += flt64_stable_cmp_dsc_nan(&in[i].a, &in[i].b, NULL);
+            cnt += flt64_sign(in[i].a);
+            //cnt += flt64_stable_cmp_dsc_nan(&in[i].a, &in[i].b, NULL);
         }
     }
     printf("Sum: %d\n", cnt);
-    log_message(log, &MESSAGE_INFO_TIME_DIFF(start, get_time(), "SIMD comparison").base);
+    log_message_time_diff(log, CODE_METRIC, MESSAGE_INFO, start, get_time(), "SIMD comparison took");
 }
+
+#if 0
 
 struct memory_chunk {
     void *ptr;

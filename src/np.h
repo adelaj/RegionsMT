@@ -13,7 +13,7 @@
 #   include <crtdbg.h>
 
 #   include <malloc.h>
-#   define Alloca(SIZE) _alloca((SIZE))
+#   define Alloca(SIZE) (_alloca((SIZE)))
 
 #   include <errno.h>
 typedef errno_t Errno_t;
@@ -39,11 +39,15 @@ typedef int Errno_t;
 #include <stdio.h>
 #include <time.h>
 
+bool aligned_alloca_chk(size_t, size_t, size_t);
+#define aligned_alloca(SZ, ALIGN) ((void *) ((((uintptr_t) Alloca((SZ) + (ALIGN) - 1) + (ALIGN) - 1) / (ALIGN)) * (ALIGN)))
+
 // Aligned memory allocation/deallocation
 void *Aligned_alloc(size_t, size_t);
 void Aligned_free(void *);
 
-// Long file operations
+// File operations
+int Fclose(FILE *); // Tolerant to the 'NULL' and 'std*' streams
 int Fseeki64(FILE *, int64_t, int);
 int64_t Ftelli64(FILE *);
 
@@ -55,9 +59,12 @@ Errno_t Localtime_s(struct tm *result, const time_t *time);
 int Stricmp(const char *, const char *);
 int Strnicmp(const char *, const char *, size_t);
 size_t Strnlen(const char *, size_t);
+size_t Strchrnul(const char *, int);
+void *Memrchr(void const *, int, size_t);
 
+bool file_is_tty(FILE *);
 int64_t file_get_size(FILE *);
-size_t get_processor_count();
-size_t get_page_size();
-size_t get_process_id();
-uint64_t get_time();
+size_t get_processor_count(void);
+size_t get_page_size(void);
+size_t get_process_id(void);
+uint64_t get_time(void);

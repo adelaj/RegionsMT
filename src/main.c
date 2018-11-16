@@ -2,16 +2,129 @@
 #include "main.h"
 #include "argv.h"
 #include "memory.h"
-#include "test.h"
 #include "utf8.h"
 
 #include "module_categorical.h"
+#include "module_lde.h"
 
 #include <stdlib.h>
 #include <string.h>
 
-DECLARE_PATH
+#include <math.h>
+#include <float.h>
 
+#include <gsl/gsl_sf.h>
+#include "gslsupp.h"
+
+#include "sort.h"
+
+#ifndef TEST_DEACTIVATE
+
+#   include "test.h"
+#   include "test_ll.h"
+#   include "test_np.h"
+#   include "test_sort.h"
+#   include "test_utf8.h"
+
+static bool test_main(struct log *log)
+{
+    const struct test_group group_arr[] = {
+        {
+            NULL,
+            sizeof(struct test_ll_a),
+            CLII((test_generator_callback[]) {
+                test_ll_generator_a,
+            }),
+            CLII((test_callback[]) {
+                test_ll_a_1,
+                test_ll_a_2,
+                test_ll_a_3
+            })
+        },
+        {
+            NULL,
+            sizeof(struct test_ll_a),
+            CLII((test_generator_callback[]) {
+                test_ll_generator_b,
+            }),
+            CLII((test_callback[]) {
+                test_ll_b,
+            })
+        },
+        {
+            test_np_disposer_a,
+            sizeof(struct test_np_a),
+            CLII((test_generator_callback[]) {
+                test_np_generator_a,
+            }),
+            CLII((test_callback[]) {
+                test_np_a,
+            })
+        },
+        {
+            test_sort_disposer_a,
+            sizeof(struct test_sort_a),
+            CLII((test_generator_callback[]) {
+                test_sort_generator_a_1,
+                test_sort_generator_a_2,
+                test_sort_generator_a_3
+            }),
+            CLII((test_callback[]) {
+                test_sort_a,
+            })
+        },
+        {
+            test_sort_disposer_b,
+            sizeof(struct test_sort_b),
+            CLII((test_generator_callback[]) {
+                test_sort_generator_b_1
+            }),
+            CLII((test_callback[]) {
+                test_sort_b_1,
+                test_sort_b_2
+            })
+        },
+        {
+            test_sort_disposer_c,
+            sizeof(struct test_sort_c),
+            CLII((test_generator_callback[]) {
+                test_sort_generator_c_1
+            }),
+            CLII((test_callback[]) {
+                test_sort_c_1,
+                test_sort_c_2
+            })
+        },
+        {
+            NULL,
+            sizeof(struct test_utf8),
+            CLII((test_generator_callback[]) {
+                test_utf8_generator,
+            }),
+            CLII((test_callback[]) {
+                test_utf8_len,
+                test_utf8_encode,
+                test_utf8_decode,
+                test_utf16_encode,
+                test_utf16_decode
+            })
+        }
+    };
+    log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Test mode triggered!\n");
+    return test(group_arr, countof(group_arr), log);
+}
+
+#else
+
+static bool test_main(struct log *log)
+{
+    log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Test mode deactivated!\n");
+    return 1;
+}
+
+#endif
+
+// Main routine arguments management
 struct main_args main_args_default()
 {
     struct main_args res = { .thread_cnt = get_processor_count() };
@@ -22,9 +135,9 @@ struct main_args main_args_default()
 struct main_args main_args_override(struct main_args args_hi, struct main_args args_lo)
 {
     struct main_args res = { .log_path = args_hi.log_path ? args_hi.log_path : args_lo.log_path };
+    if (res.log_path && !strcmp(res.log_path, "stderr")) res.log_path = NULL;
     memcpy(res.bits, args_hi.bits, UINT8_CNT(MAIN_ARGS_BIT_CNT));
-    if (uint8_bit_test(args_hi.bits, MAIN_ARGS_BIT_POS_THREAD_CNT))
-        res.thread_cnt = args_hi.thread_cnt;
+    if (uint8_bit_test(args_hi.bits, MAIN_ARGS_BIT_POS_THREAD_CNT)) res.thread_cnt = args_hi.thread_cnt;
     else
     {
         res.thread_cnt = args_lo.thread_cnt;
@@ -33,11 +146,7 @@ struct main_args main_args_override(struct main_args args_hi, struct main_args a
     return res;
 }
 
-///////////////////////////////////////////////////////////////////////////////
-//
-//  Main routine (see below for actual entry point)
-//
-
+// Main routine (see below for actual entry point)
 static int Main(int argc, char **argv) 
 {
     /*const char *strings[] = {
@@ -64,14 +173,15 @@ static int Main(int argc, char **argv)
     struct argv_par_sch argv_par_sch =
     {
         CLII((struct tag[]) { { STRI("help"), 0 }, { STRI("log"), 1 }, { STRI("test"), 2 }, { STRI("threads"), 3 }}),
-        CLII((struct tag[]) { { STRI("C"), 4 }, { STRI("T"), 2 }, { STRI("h"), 0 }, { STRI("l"), 1 }, { STRI("t"), 3 } }),
-        CLII((struct par[])
+        CLII((struct tag[]) { { STRI("C"), 4 }, { STRI("L"), 5 }, { STRI("T"), 2 }, { STRI("h"), 0 }, { STRI("l"), 1 }, { STRI("t"), 3 } }),
+        CLII((struct par_sch[])
         {
             { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_HELP }, empty_handler, 1 },
             { offsetof(struct main_args, log_path), NULL, p_str_handler, 0 },
             { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_TEST }, empty_handler, 1 },
             { offsetof(struct main_args, thread_cnt), &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_THREAD_CNT }, size_handler, 0 },
             { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CAT }, empty_handler, 1 },
+            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_LDE }, empty_handler, 1 },
         })
     };
 
@@ -254,38 +364,59 @@ static int Main(int argc, char **argv)
     //for (size_t i = 0; i < (size_t) argc; i++) fprintf(stderr, "%s\n", argv[i]);
     //fclose(f);
 
+    printf("%0#.*s", 5, "abcdef");
+    
+    struct style style = {
+        .ttl = { INIT_ENV_COL(FG_GREEN), INIT_ENV_COL(FG_RED), INIT_ENV_COL(FG_YELLOW), INIT_ENV_COL(FG_MAGENTA), INIT_ENV_COL(FG_CYAN) },
+        .ts = INIT_ENV_COL(FG_BR_BLACK),
+        .src = INIT_ENV_COL(FG_BR_BLACK),
+        .str = INIT_ENV_COL(FG_BR_MAGENTA),
+        .num = INIT_ENV_COL(FG_BR_CYAN),
+        .time = INIT_ENV_COL(FG_BR_YELLOW),
+        .squo = INIT_ENV_SQUO,
+        .dquo = INIT_ENV_DQUO
+    };
+
     struct log log;
-    if (log_init(&log, NULL, BLOCK_WRITE))
+    if (log_init(&log, NULL, 1, 0, style, NULL))
     {
-        size_t input_cnt = 0;
-        char **input = NULL;
+        size_t pos_cnt;
+        char **pos_arr;
         struct main_args main_args = { 0 };
-        if (argv_parse(argv_par_selector_long, argv_par_selector_shrt, &argv_par_sch, &main_args, argv, argc, &input, &input_cnt, &log))
+        if (argv_parse(argv_par_selector, &argv_par_sch, &main_args, argv, argc, &pos_arr, &pos_cnt, &log))
         {
             main_args = main_args_override(main_args, main_args_default());
             if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_HELP))
             {
-                // Help code
-                log_message_generic(&log, CODE_METRIC, MESSAGE_TYPE_INFO, "Help mode triggered!\n");
+                // Help mode
+                log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Help mode triggered!\n");
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_TEST))
             {
-                log_message_generic(&log, CODE_METRIC, MESSAGE_TYPE_INFO, "Test mode triggered!\n");
-                test(&log);
+                test_main(&log);
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CAT))
             {
-                if (input_cnt >= 2) categorical_run(input[0], input[1], &log);
+                if (pos_cnt >= 6)
+                {
+                    size_t rpl = (size_t) strtoull(pos_arr[4], NULL, 10);
+                    uint64_t seed = (uint64_t) strtoull(pos_arr[5], NULL, 10);
+                    categorical_run(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], rpl, seed, &log);
+                }
+            }
+            else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LDE))
+            {
+                if (pos_cnt >= 2) lde_run(pos_arr[0], pos_arr[1], &log);
             }
             else
             {
-                if (!input_cnt) log_message_generic(&log, CODE_METRIC, MESSAGE_TYPE_NOTE, "No input data specified.\n");
+                if (!pos_cnt) log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "No input data specified.\n");
                 else
                 {
                     
                 }
             }
-            free(input);
+            free(pos_arr);
         }
         log_close(&log);
     }
@@ -337,7 +468,7 @@ int wmain(int argc, wchar_t **wargv)
     
     int main_res = EXIT_FAILURE;
 
-    // Translating UTF-16 command-line parameters into UTF-8
+    // Translating UTF-16 command-line parameters to UTF-8
     char **argv;
     if (array_init(&argv, NULL, argc, sizeof(*argv), 0, ARRAY_STRICT))
     {
@@ -349,11 +480,8 @@ int wmain(int argc, wchar_t **wargv)
             uint8_t context = 0;
             for (; *word; word++)
             {
-                if (utf16_decode((uint16_t) *word, &val, NULL, NULL, &context))
-                {
-                    if (!context) base_cnt += utf8_len(val);
-                }
-                else break;
+                if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) break;
+                if (!context) base_cnt += utf8_len(val);
             }
             if (*word) break;
             else base_cnt++;
@@ -372,16 +500,13 @@ int wmain(int argc, wchar_t **wargv)
                     uint8_t context = 0;
                     for (; *word; word++)
                     {
-                        if (utf16_decode((uint16_t) *word, &val, NULL, NULL, &context))
+                        if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) break;
+                        if (!context)
                         {
-                            if (!context)
-                            {
-                                uint8_t len;
-                                utf8_encode(val, (uint8_t *) byte, &len);
-                                byte += len;
-                            }
+                            uint8_t len;
+                            utf8_encode(val, (uint8_t *) byte, &len);
+                            byte += len;
                         }
-                        else break;
                     }
                     if (*word) break;
                     else *(byte++) = '\0';

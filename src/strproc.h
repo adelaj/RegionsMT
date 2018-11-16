@@ -12,9 +12,13 @@ struct strl {
     size_t len;
 };
 
+struct text_metric {
+    uint64_t byte;
+    size_t col, row;
+};
+
 // Functions to be used as 'stable_cmp_callback' and 'cmp_callback' (see sort.h)
 int char_cmp(const void *, const void *, void *);
-int str_strl_stable_cmp_len(const void *, const void *, void *);
 int str_strl_stable_cmp(const void *, const void *, void *);
 int str_off_stable_cmp(const void *, const void *, void *);
 bool str_off_cmp(const void *, const void *, void *);
@@ -24,9 +28,16 @@ typedef bool (*write_callback)(char *, size_t *, void *, void *); // Functional 
 typedef union { read_callback read; write_callback write; } rw_callback;
 
 struct handler_context {
-    ptrdiff_t offset;
+    size_t offset;
     size_t bit_pos;
 };
+
+bool str_to_uint64(const char *, char **, uint64_t *);
+bool str_to_uint32(const char *, char **, uint32_t *);
+bool str_to_uint16(const char *, char **, uint16_t *);
+bool str_to_uint8(const char *, char **, uint8_t *);
+bool str_to_size(const char *, char **, size_t *);
+bool str_to_flt64(const char *, char **, double *);
 
 // Functions to be used as 'read_callback'
 // If the second argument is 'SIZE_MAX', it is considered undefined

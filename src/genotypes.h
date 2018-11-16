@@ -5,7 +5,7 @@
 struct snp {
     size_t *pos; // length = snp_cnt
     uint8_t *all; // length = (snp_cnt + 3) / 4
-    ptrdiff_t *name_off; // length = snp_cnt
+    size_t *name_off; // length = snp_cnt
     struct {        
         char *name; // length = snp_name_sz
         size_t name_sz; 
@@ -14,7 +14,7 @@ struct snp {
 };
 
 struct phenotype {
-    ptrdiff_t *name_off;
+    size_t *name_off;
     struct {        
         char *name;
         size_t name_sz;        

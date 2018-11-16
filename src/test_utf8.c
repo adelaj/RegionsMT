@@ -4,8 +4,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-DECLARE_PATH
-
 #define UTF8I(...) INIT(uint8_t, __VA_ARGS__)
 #define UTF16I(...) INIT(uint16_t, __VA_ARGS__)
 
@@ -17,13 +15,12 @@ enum utf8_test_obituary {
     UTF8_TEST_OBITUARY_UTF16_LEN,
     UTF8_TEST_OBITUARY_UTF16_ENCODE,
     UTF8_TEST_OBITUARY_UTF16_DECODE,
-    UTF8_TEST_OBITUARY_UTF16_INTERNAL
+    UTF8_TEST_OBITUARY_UTF16_INTERNAL,
 };
 
-static bool message_utf8_test(char *buff, size_t *p_buff_cnt, void *Context)
+static bool log_message_error_utf8_test(struct log *restrict log, struct code_metric code_metric, enum utf8_test_obituary obituary)
 {
-    enum utf8_test_obituary obituary = *(enum utf8_test_obituary *) Context;
-    const char *str[] = { 
+    static const char *str[] = {
         "Incorrect length of the UTF-8 byte sequence",
         "Incorrect UTF-8 byte sequence",
         "Incorrect Unicode value of the UTF-8 byte sequence",
@@ -33,42 +30,33 @@ static bool message_utf8_test(char *buff, size_t *p_buff_cnt, void *Context)
         "Incorrect Unicode value of the UTF-16 word sequence",
         "Internal error"
     };
-    if (obituary >= countof(str)) return 0;
-    int tmp = snprintf(buff, *p_buff_cnt, "%s!\n", str[obituary]);
-    if (tmp < 0) return 0;
-    *p_buff_cnt = (size_t) tmp;
-    return 1;
-}
-
-static bool log_message_error_utf8_test(struct log *restrict log, struct code_metric code_metric, enum utf8_test_obituary obituary)
-{
-    return log_message(log, code_metric, MESSAGE_TYPE_ERROR, message_utf8_test, &obituary);
+    return log_message_fmt(log, code_metric, MESSAGE_ERROR, "%s!\n", str[obituary]);
 }
 
 bool test_utf8_generator(void *dst, size_t *p_context, struct log *log)
 {
     (void) log;
-    struct test_utf8 data[] = {
+    const struct test_utf8 data[] = {
         { 0x0, UTF8I('\0'), UTF16I(0) },
         { 0x3F, UTF8I('?'), UTF16I(0x3F) },
         { 0x40, UTF8I('@'), UTF16I(0x40) },
-        { 0x7F, UTF8I('\x7F'), UTF16I(0x7F)},
-        { 0x80, UTF8I('\xC2', '\x80'), UTF16I(0x80)},
-        { 0x3FF, UTF8I('\xCF', '\xBF'), UTF16I(0x3FF) },
-        { 0x400, UTF8I('\xD0', '\x80'), UTF16I(0x400) },
-        { 0x7FF, UTF8I('\xDF', '\xBF'), UTF16I(0x7FF)},
-        { 0x800, UTF8I('\xE0', '\xA0', '\x80'), UTF16I(0x800) },
-        { 0x3FFF, UTF8I('\xE3', '\xBF', '\xBF'), UTF16I(0x3FFF) },
-        { 0x4000, UTF8I('\xE4', '\x80', '\x80'), UTF16I(0x4000) },
-        { 0xFFFF, UTF8I('\xEF', '\xBF', '\xBF'), UTF16I(0xFFFF) },
-        { 0x10000, UTF8I('\xF0', '\x90', '\x80', '\x80'), UTF16I(0xD800, 0xDC00) },
-        { 0x10ffff, UTF8I('\xF4', '\x8F', '\xBF', '\xBF'), UTF16I(0xDBFF, 0xDFFF) }, // Last valid UTF-16 code
-        { 0x110000, UTF8I('\xF4', '\x90', '\x80', '\x80') },
-        { 0x1FFFFF, UTF8I('\xF7', '\xBF', '\xBF', '\xBF') },
-        { 0x200000, UTF8I('\xF8', '\x88', '\x80', '\x80', '\x80') },
-        { 0x3FFFFFF, UTF8I('\xFB', '\xBF', '\xBF', '\xBF', '\xBF') },
-        { 0x4000000, UTF8I('\xFC', '\x84', '\x80', '\x80', '\x80', '\x80') },
-        { 0x7FFFFFFF, UTF8I('\xFD', '\xBF', '\xBF', '\xBF', '\xBF', '\xBF') }
+        { 0x7F, UTF8I(0x7F), UTF16I(0x7F)},
+        { 0x80, UTF8I(0xC2, 0x80), UTF16I(0x80)},
+        { 0x3FF, UTF8I(0xCF, 0xBF), UTF16I(0x3FF) },
+        { 0x400, UTF8I(0xD0, 0x80), UTF16I(0x400) },
+        { 0x7FF, UTF8I(0xDF, 0xBF), UTF16I(0x7FF)},
+        { 0x800, UTF8I(0xE0, 0xA0, 0x80), UTF16I(0x800) },
+        { 0x3FFF, UTF8I(0xE3, 0xBF, 0xBF), UTF16I(0x3FFF) },
+        { 0x4000, UTF8I(0xE4, 0x80, 0x80), UTF16I(0x4000) },
+        { 0xFFFF, UTF8I(0xEF, 0xBF, 0xBF), UTF16I(0xFFFF) },
+        { 0x10000, UTF8I(0xF0, 0x90, 0x80, 0x80), UTF16I(0xD800, 0xDC00) },
+        { 0x10ffff, UTF8I(0xF4, 0x8F, 0xBF, 0xBF), UTF16I(0xDBFF, 0xDFFF) }, // Last valid UTF-16 code
+        { 0x110000, UTF8I(0xF4, 0x90, 0x80, 0x80) },
+        { 0x1FFFFF, UTF8I(0xF7, 0xBF, 0xBF, 0xBF) },
+        { 0x200000, UTF8I(0xF8, 0x88, 0x80, 0x80, 0x80) },
+        { 0x3FFFFFF, UTF8I(0xFB, 0xBF, 0xBF, 0xBF, 0xBF) },
+        { 0x4000000, UTF8I(0xFC, 0x84, 0x80, 0x80, 0x80, 0x80) },
+        { 0x7FFFFFFF, UTF8I(0xFD, 0xBF, 0xBF, 0xBF, 0xBF, 0xBF) }
     };    
     memcpy(dst, data + *p_context, sizeof(*data));
     if (++*p_context >= countof(data)) *p_context = 0;
@@ -97,8 +85,8 @@ bool test_utf8_encode(void *In, struct log *log)
 bool test_utf8_decode(void *In, struct log *log)
 {
     struct test_utf8 *restrict in = In;
-    uint8_t byte[UTF8_COUNT], context = 0, len, ind = 0;
-    uint32_t val;
+    uint8_t byte[UTF8_COUNT], context = 0, len = 0, ind = 0;
+    uint32_t val = 0;
     for (; ind < in->utf8_len; ind++)
         if (!utf8_decode(in->utf8[ind], &val, byte, &len, &context)) break;
     if (ind < in->utf8_len) log_message_error_utf8_test(log, CODE_METRIC, UTF8_TEST_OBITUARY_UTF8_INTERNAL);
@@ -136,8 +124,8 @@ bool test_utf16_decode(void *In, struct log *log)
     if (in->val < UTF8_BOUND)
     {
         uint16_t word[UTF16_COUNT];
-        uint8_t context = 0, len, ind = 0;
-        uint32_t val;
+        uint8_t context = 0, len = 0, ind = 0;
+        uint32_t val = 0;
         for (; ind < in->utf16_len; ind++)
             if (!utf16_decode(in->utf16[ind], &val, word, &len, &context)) break;
         if (ind < in->utf16_len) log_message_error_utf8_test(log, CODE_METRIC, UTF8_TEST_OBITUARY_UTF16_INTERNAL);
@@ -146,7 +134,7 @@ bool test_utf16_decode(void *In, struct log *log)
             if (len != in->utf16_len || in->val != val) log_message_error_utf8_test(log, CODE_METRIC, UTF8_TEST_OBITUARY_UTF16_DECODE);
             else
             {
-                uint8_t ind = 0;
+                ind = 0;
                 for (ind = 0; ind < len; ind++)
                     if (in->utf16[ind] != word[ind]) break;
                 if (ind < len) log_message_error_utf8_test(log, CODE_METRIC, UTF8_TEST_OBITUARY_UTF16_DECODE);

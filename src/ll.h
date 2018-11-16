@@ -47,8 +47,8 @@ bool size_test_acquire_p(volatile void *, const void *);
 // Gets two bits starting from the position specified by 2nd argument 
 uint8_t bit_get2_acquire(volatile uint8_t *, size_t);
 
-#define BIT_TEST2_MASK ((uint8_t) (0x5555555555555555ull))
-_Static_assert((uint8_t) (BIT_TEST2_MASK | (BIT_TEST2_MASK << 1)) == UINT8_MAX, "Wrong constant provided!");
+#define BIT_TEST2_MASK (0x5555555555555555ull & UINT8_MAX)
+_Static_assert(((BIT_TEST2_MASK | (BIT_TEST2_MASK << 1)) & UINT8_MAX) == UINT8_MAX, "Wrong constant provided!");
 
 // Tests if two bits starting from the position specified by 2nd argument are set 
 bool bit_test2_acquire(volatile uint8_t *, size_t);
@@ -68,6 +68,7 @@ size_t size_sum(size_t *, size_t *, size_t);
 size_t size_mul(size_t *, size_t, size_t);
 uint8_t uint8_bit_scan_reverse(uint8_t);
 uint8_t uint8_bit_scan_forward(uint8_t);
+size_t size_log2_ceiling(size_t);
 uint32_t uint32_bit_scan_reverse(uint32_t);
 uint32_t uint32_bit_scan_forward(uint32_t);
 uint32_t uint32_pop_cnt(uint32_t);
@@ -77,8 +78,8 @@ size_t size_pop_cnt(size_t);
 size_t size_add_sat(size_t, size_t);
 size_t size_sub_sat(size_t, size_t);
 
-int size_cmp_stable_dsc(const void *, const void *, void *);
-int size_cmp_stable_asc(const void *, const void *, void *);
+int size_stable_cmp_dsc(const void *, const void *, void *);
+int size_stable_cmp_asc(const void *, const void *, void *);
 bool size_cmp_dsc(const void *, const void *, void *);
 bool size_cmp_asc(const void *, const void *, void *);
 
@@ -86,16 +87,18 @@ bool size_cmp_asc(const void *, const void *, void *);
 #define NIBBLE_CNT(BIT) TYPE_CNT(BIT, CHAR_BIT * sizeof(uint8_t) >> 1)
 #define UINT8_CNT(BIT) TYPE_CNT(BIT, CHAR_BIT * sizeof(uint8_t))
 
-_Static_assert(sizeof(double) == sizeof(uint64_t), "The size of 'double' should  be exactly 64 bits!");
-#define NaN (((union { double val; uint64_t bin; }) { .bin = UINT64_MAX }).val)
-
 int flt64_stable_cmp_dsc(const void *, const void *, void *);
+int flt64_stable_cmp_asc(const void *, const void *, void *);
 int flt64_stable_cmp_dsc_abs(const void *, const void *, void *);
+int flt64_stable_cmp_asc_abs(const void *, const void *, void *);
 int flt64_stable_cmp_dsc_nan(const void *, const void *, void *);
+int flt64_stable_cmp_asc_nan(const void *, const void *, void *);
+int flt64_sign(double x);
 
 uint32_t uint32_fused_mul_add(uint32_t *, uint32_t, uint32_t);
 
 #define SIZE_BIT (sizeof(size_t) * CHAR_BIT)
+#define UINT32_BIT (sizeof(uint32_t) * CHAR_BIT)
 bool uint8_bit_test(uint8_t *, size_t);
 bool uint8_bit_test_set(uint8_t *, size_t);
 bool uint8_bit_test_reset(uint8_t *, size_t);

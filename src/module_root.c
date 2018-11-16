@@ -1,18 +1,24 @@
 #include "np.h"
 #include "main.h"
+#include "memory.h"
 
 #include "module_root.h"
 
-struct module_root_context {
-    struct main_args base;
-};
+#include <stdlib.h>
 
-struct module_root_in {
-    struct main_args *main_args;
-    struct log *main_log;
-};
+void module_root_context_dispose(void *Context)
+{
+    
+    free(Context);
+}
 
-#if 0
+void module_root_out_dispose(struct module_root_out *out)
+{
+    log_multiple_close(out->thread_log, out->thread_cnt);
+    log_close(&out->log);
+    free(out->thread_log);
+    free(out);
+}
 
 bool module_root_prologue(void *In, void **p_Out, void *Context)
 {
@@ -21,58 +27,58 @@ bool module_root_prologue(void *In, void **p_Out, void *Context)
     context->base = main_args_override(context->base, *in->main_args);
 
     struct module_root_out *out = *p_Out = calloc(1, sizeof(*out));
-    if (!out) ;
+    if (!out) log_message_crt(in->main_log, CODE_METRIC, MESSAGE_ERROR, errno);
+    else
+    {
+        out->initime = get_time();
+        size_t thread_cnt = out->thread_cnt = context->base.thread_cnt;
+        if (!array_init(&out->thread_log, NULL, thread_cnt, sizeof(*out->thread_log), 0, ARRAY_STRICT | ARRAY_CLEAR)) log_message_crt(in->main_log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else
+        {
+            if (log_init(&out->log, context->base.log_path, BLOCK_WRITE, 0, (struct style) { 0 }, in->main_log) &&
+                log_multiple_init(out->thread_log, thread_cnt, NULL, BLOCK_WRITE, 0, (struct style) { 0 }, in->main_log))
+            {
 
-    out->initime = getTime();
-    
-    if (context->)
-    log_init(out->log, );
-
-    if (in && in->logFile) logFile = in->logFile;
-    else if (context && context->logFile) logFile = context->logFile;
+            }
+            log_multiple_close(out->thread_log, out->thread_cnt);
+            log_close(&out->log);
+        }
         
+/*
+            if (context->)
+                log_init(out->log, );
 
-    if (in && bitTest(in->bits, FRAMEWORKCONTEXT_BIT_POS_THREADCOUNT)) threadCount = in->threadCount;
-    else if (context && bitTest(context->bits, FRAMEWORKCONTEXT_BIT_POS_THREADCOUNT)) threadCount = context->threadCount;
+        if (in && in->logFile) logFile = in->logFile;
+        else if (context && context->logFile) logFile = context->logFile;
 
-    if (!threadCount || threadCount > threadCountDef)
-    {
-        logMsg(FRAMEWORK_META(out)->log, strings[STR_FR_WT], strings[STR_FN], threadCount, threadCountDef);
-        threadCount = threadCountDef;
-    }
 
-    FRAMEWORK_META(out)->tasks = &out->tasksInfo;
-    FRAMEWORK_META(out)->out = &out->outInfo;
-    FRAMEWORK_META(out)->pnum = &out->pnumInfo;
+        if (in && bitTest(in->bits, FRAMEWORKCONTEXT_BIT_POS_THREADCOUNT)) threadCount = in->threadCount;
+        else if (context && bitTest(context->bits, FRAMEWORKCONTEXT_BIT_POS_THREADCOUNT)) threadCount = context->threadCount;
 
-    FRAMEWORK_META(out)->pool = threadPoolCreate(threadCount, 0, sizeof(threadStorage));
-    if (!FRAMEWORK_META(out)->pool) goto ERR(Pool);
+        if (!threadCount || threadCount > threadCountDef)
+        {
+            logMsg(FRAMEWORK_META(out)->log, strings[STR_FR_WT], strings[STR_FN], threadCount, threadCountDef);
+            threadCount = threadCountDef;
+        }
 
-    if (mysql_library_init(0, NULL, NULL)) goto ERR(MySQL); // This should be done only once
-    else bitSet(out->bits, FRAMEWORKOUT_BIT_POS_MYSQL);
+        FRAMEWORK_META(out)->tasks = &out->tasksInfo;
+        FRAMEWORK_META(out)->out = &out->outInfo;
+        FRAMEWORK_META(out)->pnum = &out->pnumInfo;
 
-    for (;;)
-    {
-        return 1;
+        FRAMEWORK_META(out)->pool = threadPoolCreate(threadCount, 0, sizeof(threadStorage));
+        if (!FRAMEWORK_META(out)->pool) goto ERR(Pool);
 
-        ERR() :
-            strerror_s(tempbuff, sizeof tempbuff, errno);
-        logMsg(in->logDef, strings[STR_FR_EG], strings[STR_FN], tempbuff);
-        break;
+        if (mysql_library_init(0, NULL, NULL)) goto ERR(MySQL); // This should be done only once
+        else bitSet(out->bits, FRAMEWORKOUT_BIT_POS_MYSQL);
+*/
 
-        ERR(Pool) :
-            logMsg(FRAMEWORK_META(out)->log, strings[STR_FR_EG], strings[STR_FN], strings[STR_M_THP]);
-        break;
-
-        ERR(MySQL) :
-            logMsg(FRAMEWORK_META(out)->log, strings[STR_FR_EG], strings[STR_FN], strings[STR_M_SQL]);
-        break;
     }
 
     return 0;
 }
 
-bool frameworkEpilogue(frameworkIn *in, frameworkOut *out, frameworkContext *context)
+/*
+bool frameworkEpilogue(void *In, void *Out, void *Context)
 {
     const char *strings[] =
     {
@@ -122,4 +128,4 @@ bool frameworkEpilogue(frameworkIn *in, frameworkOut *out, frameworkContext *con
     return 1;
 }
 
-#endif
+*/

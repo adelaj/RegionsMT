@@ -8,8 +8,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-DECLARE_PATH
-
 enum argv_status {
     ARGV_WARNING_MISSING_VALUE_LONG = 0,
     ARGV_WARNING_MISSING_VALUE_SHRT,
@@ -21,128 +19,161 @@ enum argv_status {
     ARGV_WARNING_UNEXPECTED_VALUE_SHRT,
     ARGV_WARNING_INVALID_PAR_LONG,
     ARGV_WARNING_INVALID_PAR_SHRT,
-    ARGV_MAX
+    ARGV_WARNING_INVALID_UTF,
 };
 
 struct argv_context {
+    char *name_str, *val_str;
+    size_t name_len, val_len, ind;
     enum argv_status status;
-    char *str, *par;
-    size_t len, ind;
 };
 
-static bool message_argv(char *buff, size_t *p_buff_cnt, void *Context)
+static bool message_argv(char *buff, size_t *p_cnt, void *Context, struct style style)
 {
-    const char *fmt0[] = {
+    const char *fmt[] = {
         "Expected a value for",
-        "Unable to handle the value \"%s\" of",
+        "Unable to handle the value %s%s%.*s%s%s of",
         "Unable to handle",
         "Unused value of",
-        "Invalid name",
-        "Invalid character"
+        "Invalid %s",
+        "Invalid UTF-8 byte sequence at the byte %s%zu%s of",
     };
-    const char *fmt1[] = {
-        " the command-line parameter %c%.*s%c no. %zu!\n",
-        " %c%.*s%c in the command-line parameter no. %zu!\n"
-    };
-    const char *str[] = { "the command-line parameter ", "" };
     struct argv_context *context = Context;
-    if (context->status >= ARGV_MAX) return 0;
-    size_t cnt = 0, len = *p_buff_cnt;
-    for (unsigned i = 0; i < 2; i++)
+    size_t cnt = 0, len = *p_cnt;
+    bool squo = context->status & 1;
+    for (unsigned i = 0;; i++)
     {
-        int tmp;
-        size_t ind;
-        char quote;
+        size_t tmp = len;
         switch (i)
         {
         case 0:
-            ind = context->status / 2;
             switch (context->status)
             {
             case ARGV_WARNING_UNHANDLED_PAR_LONG:
             case ARGV_WARNING_UNHANDLED_PAR_SHRT:
-                tmp = snprintf(buff + cnt, len, fmt0[ind], context->par);
+                if (!print_fmt(buff + cnt, &tmp, fmt[context->status / 2], ENV(style.str, DQUO(style.dquo, INTP(context->val_len), context->val_str)))) return 0;
                 break;
             case ARGV_WARNING_INVALID_PAR_LONG:
+                if (!print_fmt(buff + cnt, &tmp, fmt[context->status / 2], "name")) return 0;
+                break;
             case ARGV_WARNING_INVALID_PAR_SHRT:
-                ind = context->status - ARGV_WARNING_INVALID_PAR_LONG / 2;
+                if (!print_fmt(buff + cnt, &tmp, fmt[context->status / 2], "character")) return 0;
+                break;
+            case ARGV_WARNING_INVALID_UTF:
+                if (!print_fmt(buff + cnt, &tmp, fmt[context->status / 2], context->name_len + 1)) return 0;
+                break;
             default:
-                tmp = snprintf(buff + cnt, len, fmt0[ind]);
+                if (!print_fmt(buff + cnt, &tmp, "%s", fmt[context->status / 2])) return 0;
             }
             break;
         case 1:
-            quote = context->status & 1 ? '\'' : '\"';
-            ind = 0;
             switch (context->status)
             {
             case ARGV_WARNING_INVALID_PAR_LONG:
             case ARGV_WARNING_INVALID_PAR_SHRT:
-                ind = 1;
+                if (!print_fmt(buff + cnt, &tmp, " %s%s%.*s%s%s in", ENV(style.str, QUO(style.squo, style.dquo, squo, INTP(context->name_len), context->name_str)))) return 0;
+                break;
+            default:
+                tmp = 0;
             }
-            tmp = snprintf(buff + cnt, len, fmt1[ind], quote, (int) context->len, context->str, quote, context->ind);
             break;
+        case 2:
+            print(buff + cnt, &tmp, STRC(" the command-line parameter"));
+            break;
+        case 3:
+            switch (context->status)
+            {
+            default:
+                if (!print_fmt(buff + cnt, &tmp, " %s%s%.*s%s%s", ENV(style.str, QUO(style.squo, style.dquo, squo, INTP(context->name_len), context->name_str)))) return 0;
+                break;
+            case ARGV_WARNING_INVALID_PAR_LONG:
+            case ARGV_WARNING_INVALID_PAR_SHRT:
+            case ARGV_WARNING_INVALID_UTF:
+                tmp = 0;
+            }
+            break;
+        case 4:
+            if (!print_fmt(buff + cnt, &tmp, " no. %s%zu%s!\n", ENV(style.num, context->ind))) return 0;
         }
-        if (tmp < 0) return 0;
-        len = size_sub_sat(len, (size_t) tmp);
-        cnt = size_add_sat(cnt, (size_t) tmp);
+        cnt = size_add_sat(cnt, tmp);
+        if (i == 4) break;
+        len = size_sub_sat(len, tmp);
     }
-    *p_buff_cnt = cnt;
+    *p_cnt = cnt;
     return 1;
 }
 
-static bool log_message_warning_argv(struct log *restrict log, struct code_metric code_metric, char *str, size_t len, size_t ind, enum argv_status status, char *par)
+static bool log_message_warning_argv(struct log *restrict log, struct code_metric code_metric, char *name_str, size_t name_len, char *val_str, size_t val_len, size_t ind, enum argv_status status)
 {
-    return log_message(log, code_metric, MESSAGE_TYPE_WARNING, message_argv, &(struct argv_context) { .status = status, .str = str, .len = len, .ind = ind, .par = par });
+    return log_message(log, code_metric, MESSAGE_WARNING, message_argv, &(struct argv_context) { .status = status, .name_str = name_str, .val_str = val_str, .name_len = name_len, .val_len = val_len, .ind = ind });
 }
 
-bool argv_parse(par_selector_callback selector_long, par_selector_callback selector_shrt, void *context, void *res, char **argv, size_t argv_cnt, char ***p_input, size_t *p_input_cnt, struct log *log)
+static bool utf8_decode_len(char *str, size_t tot, size_t *p_len)
 {
-    struct par par;
+    uint32_t val; // Never used
+    uint8_t len = 0, context = 0;
+    size_t ind = 0;
+    for (; ind < tot; ind++)
+    {
+        if (!utf8_decode(str[ind], &val, NULL, &len, &context)) break;
+        if (context) continue;
+        *p_len = len;
+        return 1;
+    }
+    *p_len = ind;
+    return 0;
+}
+
+bool argv_parse(par_selector_callback selector, void *context, void *res, char **argv, size_t argc, char ***p_arr, size_t *p_cnt, struct log *log)
+{
+    struct par par = { 0 };
     char *str = NULL;
-    size_t input_cnt = 0, len = 0;
-    bool halt = 0;
-    int8_t capture = 0;
-    for (size_t i = 1; i < argv_cnt; i++)
+    size_t cnt = 0, len = 0;
+    bool halt = 0, succ = 1;
+    int capture = 0;
+    *p_arr = NULL;
+    *p_cnt = 0;
+    for (size_t i = 1; i < argc; i++)
     {
         if (!halt)
         {
+            bool hyph = argv[i][0] == '-';
             if (capture)
             {
-                if (par.handler && !par.handler(argv[i], SIZE_MAX, (char *) res + par.offset, par.context))
-                    log_message_warning_argv(log, CODE_METRIC, str, len, i, capture > 0 ? ARGV_WARNING_UNHANDLED_PAR_LONG : ARGV_WARNING_UNHANDLED_PAR_SHRT, argv[i]);
+                bool shrt = capture < 0;
                 capture = 0;
+                if (par.mode != PAR_VALUED_OPTION || !hyph)
+                {
+                    size_t tmp = strlen(argv[i]);
+                    if (par.handler && !par.handler(argv[i], tmp, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, argv[i], tmp, i - 1, shrt ? ARGV_WARNING_UNHANDLED_PAR_SHRT : ARGV_WARNING_UNHANDLED_PAR_LONG);
+                    continue;
+                }
+                else if (par.handler && !par.handler(NULL, 0, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, shrt ? ARGV_WARNING_UNHANDLED_OPT_SHRT : ARGV_WARNING_UNHANDLED_OPT_LONG);
             }
-            else if (argv[i][0] == '-')
+            if (hyph)
             {
                 if (argv[i][1] == '-') // Long mode
                 {
                     str = argv[i] + 2;
-                    if (!*str) // halt on '--'
+                    if (!*str) // halt on "--"
                     {
                         halt = 1;
                         continue;
                     }
-                    char *tmp = strchr(str, '=');
-                    len = tmp ? (size_t) (tmp - str) : SIZE_MAX;
-                    if (!selector_long(&par, str, len, context))
-                        log_message_warning_argv(log, CODE_METRIC, str, len, i, ARGV_WARNING_INVALID_PAR_LONG, NULL);
+                    len = Strchrnul(str, '=');
+                    if (!selector(&par, str, len, res, context, 0)) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, ARGV_WARNING_INVALID_PAR_LONG);
                     else
                     {
-                        if (par.option)
+                        if (par.mode == PAR_OPTION)
                         {
-                            if (tmp) 
-                                log_message_warning_argv(log, CODE_METRIC, str, len, i, ARGV_WARNING_UNEXPECTED_VALUE_LONG, NULL);
-                            if (par.handler && !par.handler(NULL, SIZE_MAX, (char *) res + par.offset, par.context))
-                                log_message_warning_argv(log, CODE_METRIC, str, len, i, ARGV_WARNING_UNHANDLED_OPT_LONG, NULL);
+                            if (str[len]) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, ARGV_WARNING_UNEXPECTED_VALUE_LONG);
+                            if (par.handler && !par.handler(NULL, 0, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, ARGV_WARNING_UNHANDLED_OPT_LONG);
                         }
+                        else if (!str[len]) capture = 1;
                         else
                         {
-                            if (tmp)
-                            {
-                                if (par.handler && !par.handler(argv[i] + len + 1, SIZE_MAX, (char *) res + par.offset, par.context))
-                                    log_message_warning_argv(log, CODE_METRIC, str, len, i, ARGV_WARNING_UNHANDLED_PAR_LONG, argv[i] + len + 1);
-                            }
-                            else capture = 1;
+                            size_t tmp = strlen(str + len + 1);
+                            if (par.handler && !par.handler(str + len + 1, tmp, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, str + len + 1, tmp, i, ARGV_WARNING_UNHANDLED_PAR_LONG);
                         }
                     }
                 }
@@ -152,32 +183,23 @@ bool argv_parse(par_selector_callback selector_long, par_selector_callback selec
                     for (size_t k = 1; argv[i][k];) // Inner loop for handling multiple option-like parameters
                     {
                         str = argv[i] + k;
-                        uint8_t utf8_len;
-                        uint32_t utf8_val; // Never used
-                        if (!utf8_decode_once((uint8_t *) str, tot, &utf8_val, &utf8_len))
-                            log_message_generic(log, CODE_METRIC, MESSAGE_TYPE_ERROR, "Incorrect UTF-8 byte sequence at the command-line parameter no. %zu (byte: %zu)!\n", i, k + utf8_len + 1);
+                        if (!utf8_decode_len(str, tot, &len)) log_message_warning_argv(log, CODE_METRIC, NULL, k + len, NULL, 0, i, ARGV_WARNING_INVALID_UTF);
                         else
                         {
-                            len = utf8_len;
-                            if (!selector_shrt(&par, str, len, context))
-                                log_message_warning_argv(log, CODE_METRIC, str, len, i, ARGV_WARNING_INVALID_PAR_SHRT, NULL);
+                            if (!selector(&par, str, len, res, context, 1)) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, ARGV_WARNING_INVALID_PAR_SHRT);
                             else
                             {
-                                if (par.option) // Parameter expects value
+                                if (par.mode != PAR_OPTION) // Parameter expects value
                                 {
-                                    if (par.handler && !par.handler(NULL, SIZE_MAX, (char *) res + par.offset, par.context))
-                                        log_message_warning_argv(log, CODE_METRIC, str, len, i, ARGV_WARNING_UNHANDLED_OPT_SHRT, NULL);
-                                }
-                                else
-                                {
-                                    if (str[len]) // Executing valued parameter handler
+                                    if (!str[len]) capture = -1;
+                                    else
                                     {
-                                        if (par.handler && !par.handler(str + len, SIZE_MAX, (char *) res + par.offset, par.context))
-                                            log_message_warning_argv(log, CODE_METRIC, str, len, i, ARGV_WARNING_UNHANDLED_PAR_SHRT, str + len);
+                                        size_t tmp = strlen(str + len);
+                                        if (par.handler && !par.handler(str + len, tmp, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, str + len, tmp, i, ARGV_WARNING_UNHANDLED_PAR_SHRT);
                                     }
-                                    else capture = -1;
                                     break; // Exiting from the inner loop
-                                }                                
+                                }
+                                else if (par.handler && !par.handler(NULL, 0, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, ARGV_WARNING_UNHANDLED_OPT_SHRT);
                             }
                             if ((k += len) > tot) break;
                         }                     
@@ -186,51 +208,40 @@ bool argv_parse(par_selector_callback selector_long, par_selector_callback selec
                 continue;
             }            
         }
-        if (!array_test(p_input, p_input_cnt, sizeof(**p_input), 0, 0, ARG_SIZE(input_cnt, 1))) log_message_crt(log, CODE_METRIC, MESSAGE_TYPE_ERROR, errno);
+        if (!array_test(p_arr, p_cnt, sizeof(**p_arr), 0, 0, cnt, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
-            (*p_input)[input_cnt++] = argv[i]; // Storing input file path
+            (*p_arr)[cnt++] = argv[i]; // Storing positional parameters
             continue;
-        }       
-        goto error;
+        }
+        succ = 0;
+        break;
     }
-    if (capture) log_message_warning_argv(log, CODE_METRIC, str, len, argv_cnt - 1, capture > 0 ? ARGV_WARNING_MISSING_VALUE_LONG : ARGV_WARNING_MISSING_VALUE_SHRT, NULL);
-    if (!array_test(p_input, p_input_cnt, sizeof(**p_input), 0, ARRAY_REDUCE, ARG_SIZE(input_cnt))) log_message_crt(log, CODE_METRIC, MESSAGE_TYPE_ERROR, errno);
-    else return 1;
-
-error:
-    free(*p_input);
-    *p_input = NULL;
-    *p_input_cnt = 0;
+    if (succ)
+    {
+        if (capture && par.mode == PAR_VALUED) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, argc - 1, capture > 0 ? ARGV_WARNING_MISSING_VALUE_LONG : ARGV_WARNING_MISSING_VALUE_SHRT);
+        if (!array_test(p_arr, p_cnt, sizeof(**p_arr), 0, ARRAY_REDUCE, cnt)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else return 1;
+    }
+    free(*p_arr);
+    *p_cnt = 0;
     return 0;    
 }
 
-bool argv_par_selector_long(struct par *par, char *str, size_t len, void *Context)
+bool argv_par_selector(struct par *par, const char *str, size_t len, void *res, void *Context, bool shrt)
 {
     struct argv_par_sch *context = Context;
-    size_t id = binary_search(str, context->ltag, sizeof(*context->ltag), context->ltag_cnt, len + 1 ? str_strl_stable_cmp_len : str_strl_stable_cmp, &len);
-    if (id + 1)
+    struct tag *tag = NULL;
+    size_t cnt = 0, ind;
+    if (shrt) tag = context->stag, cnt = context->stag_cnt;
+    else tag = context->ltag, cnt = context->ltag_cnt;
+    if (binary_search(&ind, str, tag, cnt, sizeof(*tag), str_strl_stable_cmp, &len, 0))
     {
-        id = context->ltag[id].id;
-        if (id < context->par_cnt)
+        size_t id = tag[ind].id;
+        if (id < context->par_sch_cnt)
         {
-            *par = context->par[id];
-            return 1;
-        }
-    }
-    return 0;
-}
-
-bool argv_par_selector_shrt(struct par *par, char *str, size_t len, void *Context)
-{
-    struct argv_par_sch *context = Context;
-    size_t id = binary_search(str, context->stag, sizeof(*context->stag), context->stag_cnt, str_strl_stable_cmp_len, &len);
-    if (id + 1)
-    {
-        id = context->stag[id].id;
-        if (id < context->par_cnt)
-        {
-            *par = context->par[id];
+            struct par_sch par_sch = context->par_sch[id];
+            *par = (struct par) { .ptr = (char *) res + par_sch.off, .context = par_sch.context, .handler = par_sch.handler, .mode = par_sch.mode };
             return 1;
         }
     }

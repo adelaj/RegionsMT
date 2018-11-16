@@ -23,18 +23,47 @@ bool utf8_is_overlong(uint32_t utf8_val, uint8_t utf8_len)
     return 0;
 }
 
-bool utf8_is_invalid(uint32_t utf8_val, uint8_t utf8_len)
+bool utf8_is_valid(uint32_t utf8_val, uint8_t utf8_len)
 {
-    return utf8_val >= UTF8_BOUND || utf8_is_overlong(utf8_val, utf8_len);
+    return utf8_val <= UTF8_BOUND && !utf8_is_overlong(utf8_val, utf8_len);
 }
 
-bool utf8_is_whitespace(uint32_t utf8_val, uint8_t utf8_len)
+bool utf8_is_whitespace(uint32_t utf8_val)
 {
-    if (utf8_len == 1) return utf8_val == 0x20 || utf8_val == 0xa || utf8_val == 0x9 || utf8_val == 0xd;
+    return utf8_val == 0x20 || utf8_val == '\n' || utf8_val == '\r' || utf8_val == 0x9;
+}
+
+bool utf8_is_whitespace_len(uint32_t utf8_val, uint8_t utf8_len)
+{
+    if (utf8_len == 1) utf8_is_whitespace(utf8_val);
     return 0;
 }
 
-bool utf8_is_xml_name_start_char(uint32_t utf8_val, uint8_t utf8_len)
+bool utf8_is_xml_char(uint32_t utf8_val)
+{
+    return utf8_val == 0x9 || utf8_val == '\n' || utf8_val == '\r' ||
+        (0x20 <= utf8_val && utf8_val <= 0xd7ff) ||
+        (0xe000 <= utf8_val && utf8_val <= 0xfffd) ||
+        (0x10000 <= utf8_val && utf8_val <= 0x10ffff);
+}
+
+bool utf8_is_xml_char_len(uint32_t utf8_val, uint8_t utf8_len)
+{
+    switch (utf8_len)
+    {
+    case 1:
+        return utf8_val == 0x9 || utf8_val == '\n' || utf8_val == '\r' || 0x20 <= utf8_val;
+    case 2:
+        return 1;
+    case 3:
+        return utf8_val <= 0xd7ff || (0xe000 <= utf8_val && utf8_val <= 0xfffd);
+    case 4:
+        return utf8_val <= 0x10ffff;
+    }
+    return 0;
+}
+
+bool utf8_is_xml_name_start_char_len(uint32_t utf8_val, uint8_t utf8_len)
 {
     switch (utf8_len)
     {
@@ -62,9 +91,9 @@ bool utf8_is_xml_name_start_char(uint32_t utf8_val, uint8_t utf8_len)
     return 0;
 }
 
-bool utf8_is_xml_name_char(uint32_t utf8_val, uint8_t utf8_len)
+bool utf8_is_xml_name_char_len(uint32_t utf8_val, uint8_t utf8_len)
 {
-    if (utf8_is_xml_name_start_char(utf8_val, utf8_len)) return 1;
+    if (utf8_is_xml_name_start_char_len(utf8_val, utf8_len)) return 1;
     switch (utf8_len)
     {
     case 1:
@@ -80,10 +109,15 @@ bool utf8_is_xml_name_char(uint32_t utf8_val, uint8_t utf8_len)
 void utf8_encode(uint32_t utf8_val, uint8_t *restrict utf8_byte, uint8_t *restrict p_utf8_len)
 {
     uint8_t mode = (uint8_t) uint32_bit_scan_reverse(utf8_val);
-    if (mode <= 6 || mode == UINT8_MAX) utf8_byte[0] = (uint8_t) utf8_val, *p_utf8_len = 1;
+    if (mode <= 6 || mode == UINT8_MAX)
+    {
+        utf8_byte[0] = (uint8_t) utf8_val;
+        if (p_utf8_len) *p_utf8_len = 1;
+    }
     else
     {
-        uint8_t utf8_len = *p_utf8_len = (mode + 4) / 5;
+        uint8_t utf8_len = (mode + 4) / 5;
+        if (p_utf8_len) *p_utf8_len = utf8_len;
         for (uint8_t i = utf8_len; i > 1; utf8_byte[--i] = 128 | (utf8_val & 63), utf8_val >>= 6);
         utf8_byte[0] = (uint8_t) ((((1u << (utf8_len + 1)) - 1) << (8 - utf8_len)) | utf8_val);
     }
@@ -132,30 +166,16 @@ bool utf8_decode(uint8_t byte, uint32_t *restrict p_utf8_val, uint8_t *restrict 
     return 0;
 }
 
-// Decodes first UTF-8 character in the string and returns its Unicode value and number of bytes
-bool utf8_decode_once(uint8_t *restrict str, size_t len, uint32_t *restrict p_utf8_val, uint8_t *restrict p_utf8_len)
-{
-    size_t ind = 0;
-    uint8_t utf8_context = 0;
-    for (; ind < len; ind++)
-    {
-        if (!utf8_decode(str[ind], p_utf8_val, NULL, p_utf8_len, &utf8_context)) break;
-        if (!utf8_context) return 1;
-    }
-    if (p_utf8_len) *p_utf8_len = (uint8_t) ind;
-    return 0;
-}
-
 void utf16_encode(uint32_t utf16_val, uint16_t *restrict utf16_word, uint8_t *restrict p_utf16_len)
 {
     if (utf16_val < 0x10000)
     {
-        *p_utf16_len = 1;
+        if (p_utf16_len) *p_utf16_len = 1;
         utf16_word[0] = (uint16_t) utf16_val;
     }
     else
     {
-        *p_utf16_len = 2;
+        if (p_utf16_len) *p_utf16_len = 2;
         utf16_val -= 0x10000;
         utf16_word[0] = (uint16_t) (0xd800 | ((utf16_val >> 10) & 0x3ff));
         utf16_word[1] = (uint16_t) (0xdc00 | (utf16_val & 0x3ff));

@@ -14,8 +14,8 @@ struct generic_cmp_thunk {
 
 static bool generic_cmp(const void *A, const void *B, void *Thunk)
 {
-    struct generic_cmp_thunk *restrict thunk = Thunk;
-    const void **restrict a = (void *) A, **restrict b = (void *) B;
+    struct generic_cmp_thunk *thunk = Thunk;
+    const void **a = (void *) A, **b = (void *) B;
     int res = thunk->cmp(*a, *b, thunk->context);
     if (res > 0 || (!res && *a > *b)) return 1;
     return 0;
@@ -54,7 +54,7 @@ uintptr_t *orders_stable_unique(const void *arr, size_t *p_cnt, size_t sz, stabl
     if (cnt) tmp = res[0], res[ucnt++] = (tmp - (uintptr_t) arr) / sz;
     for (size_t i = 1; i < cnt; i++)
         if (cmp((const void *) res[i], (const void *) tmp, context) > 0) tmp = res[i], res[ucnt++] = (tmp - (uintptr_t) arr) / sz;
-    if (array_test(&res, p_cnt, sizeof(*res), 0, ARRAY_REDUCE, ARG_SIZE(ucnt))) return res;
+    if (array_test(&res, p_cnt, sizeof(*res), 0, ARRAY_REDUCE, ucnt)) return res;
 
     free(res);
     *p_cnt = 0;
@@ -79,7 +79,7 @@ size_t *ranks_from_orders(const uintptr_t *ord, size_t cnt)
     return ranks_from_pointers(ord, 0, cnt, 1);
 }
 
-// Warning! 'ptr' may contain pointers to the 'rnk' array (i.e. 'rnk' = 'base').
+// Warning! 'ptr' may contain pointers to the 'rnk' array (i. e. 'rnk' = 'base').
 void ranks_unique_from_pointers_impl(size_t *rnk, const uintptr_t *ptr, uintptr_t base, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
 {
     size_t cnt = *p_cnt;
@@ -201,11 +201,16 @@ bool orders_apply(uintptr_t *restrict ord, size_t cnt, size_t sz, void *restrict
     return 1;
 }
 
-static void swap(void *a, void *b, void *swp, size_t sz)
+static void swap(void *restrict a, void *restrict b, void *restrict swp, size_t sz)
 {
     memcpy(swp, a, sz);
     memcpy(a, b, sz);
     memcpy(b, swp, sz);
+}
+
+static void lin_sort_stub(void *restrict arr, size_t tot, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t cutoff)
+{
+    (void) arr, (void) tot, (void) sz, (void) cmp, (void) context, (void) swp, (void) cutoff;
 }
 
 static void insertion_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t cutoff)
@@ -227,11 +232,33 @@ static void insertion_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_c
     }
 }
 
-static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t cutoff)
+typedef void (*lin_sort_callback)(void *restrict, size_t, size_t, cmp_callback, void *, void *restrict, size_t);
+typedef void (*sort_callback)(void *restrict, size_t, size_t, cmp_callback, void *, void *restrict, size_t, lin_sort_callback);
+
+static size_t comb_sort_gap_impl(size_t tot, size_t sz)
 {
-    uint8_t frm = 0;
-    struct { size_t a, b; } stk[SIZE_BIT];
-    size_t a = 0, b = tot - sz;
+    size_t gap = (size_t) (.8017118471377937539 * (tot / sz)); // Magic constant suggested by 'ksort.h'. Generally any positive value < 1.0 is acceptable 
+    if (gap == 9 || gap == 10) gap = 11;
+    return gap * sz;
+}
+
+static void comb_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t lin_cutoff, lin_sort_callback lin_sort)
+{
+    size_t gap = comb_sort_gap_impl(tot, sz);
+    for (bool flag = 0;; flag = 0, gap = comb_sort_gap_impl(gap, sz))
+    {
+        for (size_t i = 0, j = gap; i < tot - gap; i += sz, j += sz)
+            if (cmp((char *) arr + i, (char *) arr + j, context)) swap((char *) arr + i, (char *) arr + j, swp, sz), flag = 1;
+        if (gap == sz) return;
+        if (!flag || gap <= lin_cutoff) break;
+    }
+    lin_sort(arr, tot, sz, cmp, context, swp, gap);
+}
+
+static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t lin_cutoff, lin_sort_callback lin_sort, size_t log_cutoff, sort_callback log_sort)
+{
+    struct frm { size_t a, b; } *stk = Alloca(log_cutoff * sizeof(*stk));
+    size_t frm = 0, a = 0, b = tot - sz;
     for (;;)
     {
         size_t left = a, right = b, pvt = a + ((b - a) / sz >> 1) * sz;
@@ -259,32 +286,40 @@ static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callb
             left += sz;
             right -= sz;
         } while (left <= right);
-        if (right - a < cutoff)
+        if (right - a < lin_cutoff)
         {
-            if (b - left < cutoff)
+            size_t tmp = right - a + sz;
+            lin_sort((char *) arr + a, tmp, sz, cmp, context, swp, tmp);
+            if (b - left < lin_cutoff)
             {
+                tmp = b - left + sz;
+                lin_sort((char *) arr + left, tmp, sz, cmp, context, swp, tmp);
                 if (!frm--) break;
                 a = stk[frm].a;
                 b = stk[frm].b;
             }
             else a = left;
         }
-        else if (b - left < cutoff) b = right;
+        else if (b - left < lin_cutoff)
+        {
+            size_t tmp = b - left + sz;
+            lin_sort((char *) arr + left, tmp, sz, cmp, context, swp, tmp);
+            b = right;
+        }
         else
         {
             if (right - a > b - left)
             {
-                stk[frm].a = a;
-                stk[frm].b = right;
+                if (frm < log_cutoff) stk[frm++] = (struct frm) { .a = a, .b = right };
+                else log_sort((char *) arr + a, right - a + sz, sz, cmp, context, swp, lin_cutoff, lin_sort);
                 a = left;
             }
             else
             {
-                stk[frm].a = left;
-                stk[frm].b = b;
+                if (frm < log_cutoff) stk[frm++] = (struct frm) { .a = left, .b = b };
+                else log_sort((char *) arr + left, b - left + sz, sz, cmp, context, swp, lin_cutoff, lin_sort);
                 b = right;
             }
-            frm++;
         }
     }
 }
@@ -293,24 +328,51 @@ void quick_sort(void *restrict arr, size_t cnt, size_t sz, cmp_callback cmp, voi
 {
     if (cnt < 2) return;
     void *restrict swp = Alloca(sz);
-    const size_t cutoff = QUICK_SORT_CUTOFF * sz, tot = cnt * sz;
-    if (tot > cutoff)
+    if (cnt > 2)
     {
-        quick_sort_impl(arr, tot, sz, cmp, context, swp, cutoff);
-        insertion_sort_impl(arr, tot, sz, cmp, context, swp, cutoff);
+        const size_t lin_cutoff = QUICK_SORT_CUTOFF * sz, tot = cnt * sz;
+        if (tot > lin_cutoff)
+        {
+            size_t log_cutoff = size_sub_sat(size_log2_ceiling(cnt), size_bit_scan_reverse(QUICK_SORT_CUTOFF) << 1);
+#       ifdef QUICK_SORT_CACHED
+            quick_sort_impl(arr, tot, sz, cmp, context, swp, lin_cutoff, insertion_sort_impl, log_cutoff, comb_sort_impl);
+#       else
+            quick_sort_impl(arr, tot, sz, cmp, context, swp, lin_cutoff, lin_sort_stub, log_cutoff, comb_sort_impl);
+            insertion_sort_impl(arr, tot, sz, cmp, context, swp, lin_cutoff);
+#       endif 
+        }
+        else insertion_sort_impl(arr, tot, sz, cmp, context, swp, tot);
     }
-    else insertion_sort_impl(arr, tot, sz, cmp, context, swp, tot);
+    else if (cmp(arr, (char *) arr + sz, context)) swap(arr, (char *) arr + sz, swp, sz);
 }
 
-size_t binary_search(const void *restrict key, const void *restrict list, size_t sz, size_t cnt, stable_cmp_callback cmp, void *context)
+bool binary_search(size_t *p_ind, const void *key, const void *arr, size_t cnt, size_t sz, stable_cmp_callback cmp, void *context, enum binary_search_flags flags)
 {
-    size_t left = 0;
-    while (left + 1 < cnt)
+    if (!cnt) return 0;
+    bool critical = !!(flags & BINARY_SEARCH_CRITICAL), rightmost = !!(flags & BINARY_SEARCH_RIGHTMOST);
+    size_t left = 0, right = cnt - 1;
+    int res = 0;
+    while (left < right) for (;;)
     {
-        size_t mid = left + ((cnt - left) >> 1);
-        if (cmp(key, (char *) list + sz * mid, context) >= 0) left = mid;
-        else cnt = mid;
+        size_t mid = left + ((right - left + rightmost) >> 1);
+        res = cmp(key, (char *) arr + sz * mid, context);
+        if (res > 0) left = mid + 1;
+        else if (res < 0) right = mid - 1;
+        else
+        {
+            if (critical)
+            {
+                if (rightmost) left = mid;
+                else right = mid;
+                if (left < right) continue;
+            }
+            *p_ind = mid;
+            return 1;
+        }
+        break;
     }
-    if (left + 1 == cnt && !cmp(key, (char *) list + sz * left, context)) return left;
-    return SIZE_MAX;
+    size_t ind = rightmost ? left : right;
+    if ((flags & BINARY_SEARCH_APPROX) || cmp(key, (char *) arr + sz * ind, context)) return 0;
+    *p_ind = ind;
+    return 1;
 }

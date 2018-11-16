@@ -1,26 +1,26 @@
 CC = gcc
-CC_INC_Release = /usr/include
-CC_INC_Debug = $(CC_INC_Release)
+CC_INC_Release = ../gsl-Release
+CC_INC_Debug = ../gsl-Debug
 CC_OPT_Release = -std=c11 -mavx -flto -O3 -Wall
-CC_OPT_Debug = -D_DEBUG -mavx -std=c11 -O0 -ggdb -Wall
+CC_OPT_Debug = -D_DEBUG -mavx -flto -std=c11 -O0 -ggdb -Wall
 
 CXX = g++
 CXX_INC_Release = 
 CXX_INC_Debug = $(CXX_INC_Release)
 CXX_OPT_Release = -std=c++0x -mavx -flto -O3 -Wall
-CXX_OPT_Debug = -D_DEBUG -mavx -std=c++0x -O0 -ggdb -Wall
+CXX_OPT_Debug = -D_DEBUG -mavx -flto -std=c++0x -O0 -ggdb -Wall
 
 ASM = yasm
 ASM_OPT_Release =
 ASM_OPT_Debug = -D_DEBUG
 
 LD = $(CC)
-LD_INC_Release = /usr/lib
-LD_INC_Debug = $(LD_INC_Release)
+LD_INC_Release = ../gsl-Release
+LD_INC_Debug = ../gsl-Debug
 LD_LIB_Release = m pthread gsl gslcblas
 LD_LIB_Debug = $(LD_LIB_Release)
 LD_OPT_Release = -flto
-LD_OPT_Debug =
+LD_OPT_Debug = -flto
 
 OS = $(shell uname)
 
@@ -38,8 +38,8 @@ endif
 TARGET_Release = RegionsMT-Release
 TARGET_Debug = RegionsMT-Debug
 
-OBJ_DIR_Release = ./obj-release
-OBJ_DIR_Debug = ./obj-debug
+OBJ_DIR_Release = ./obj-Release
+OBJ_DIR_Debug = ./obj-Debug
 SRC_DIR = ./src
 
 CONFIG = Release Debug
@@ -54,19 +54,27 @@ release: Release;
 debug: Debug;
 
 .PHONY: clean
-clean:; $(foreach cfg, $(CONFIG), $(shell rm -rf $($(addprefix OBJ_DIR_,$(cfg)))) $(shell rm -f $($(addprefix TARGET_,$(cfg)))))
+clean: clean-Release clean-Debug;
 
 define build =
 .PHONY: $1
 $1: | $(call struct,$1) $($(addprefix TARGET_,$1));
-$(call struct,$1):; $$(shell mkdir -p $$@)
+$(call struct,$1):; mkdir -p $$@
 $($(addprefix TARGET_,$1)): $(call obj,$1,.c) $(call obj,$1,.cpp) $(call obj,$1,.asm); $(LD) $($(addprefix LD_OPT_, $1)) -o $$@ $$^ $(addprefix -L,$($(addprefix LD_INC_,$1))) $(addprefix -l,$($(addprefix LD_LIB_,$1)))
 $(call obj,$1,.c): $($(addprefix OBJ_DIR_,$1))/%.o: $(SRC_DIR)/%.c; $(CC) $($(addprefix CC_OPT_,$1)) $(addprefix -I,$($(addprefix CC_INC_,$1))) -o $$@ -c $$^
 $(call obj,$1,.cpp): $($(addprefix OBJ_DIR_,$1))/%.o: $(SRC_DIR)/%.cpp; $(CXX) $($(addprefix CXX_OPT_,$1)) $(addprefix -I,$($(addprefix CXX_INC,$1))) -o $$@ -c $$^
 $(call obj,$1,.asm): $($(addprefix OBJ_DIR_,$1))/%.o: $(SRC_DIR)/%.asm; $(ASM) $($(addprefix ASM_OPT_,$1)) -o $$@ $$^
 endef
 
+define clean =
+.PHONY: $(addprefix clean-,$1) $(addprefix clean-obj-,$1) $(addprefix clean-target-,$1)
+$(addprefix clean-,$1): $(addprefix clean-obj-,$1) $(addprefix clean-target-,$1);
+$(addprefix clean-obj-,$1):; rm -rf $($(addprefix OBJ_DIR_,$1))
+$(addprefix clean-target-,$1):; rm -f $($(addprefix TARGET_,$1))
+endef
+
 $(foreach cfg, $(CONFIG), $(eval $(call build, $(cfg))))
+$(foreach cfg, $(CONFIG), $(eval $(call clean, $(cfg))))
 
 .PHONY: print-%
 print-% :; @echo $* = $($*)

@@ -7,6 +7,7 @@
 #include <immintrin.h>
 
 #if defined __GNUC__ || defined __clang__
+
 #   define DECLARE_LOAD_ACQUIRE(TYPE, PREFIX) \
         TYPE PREFIX ## _load_acquire(volatile TYPE *src) \
         { \
@@ -107,6 +108,7 @@ size_t size_pop_cnt(size_t x)
 #   endif 
 #elif defined _MSC_BUILD
 #   include <intrin.h>
+
 #   define DECLARE_LOAD_ACQUIRE(TYPE, PREFIX) \
         TYPE PREFIX ## _load_acquire(volatile TYPE *src) \
         { \
@@ -114,6 +116,7 @@ size_t size_pop_cnt(size_t x)
             _ReadBarrier(); \
             return res; \
         }
+
 #   define DECLARE_STORE_RELEASE(TYPE, PREFIX) \
         void PREFIX ## _store_release(volatile TYPE *dst, TYPE val) \
         { \
@@ -219,20 +222,25 @@ size_t size_add(size_t *p_car, size_t x, size_t y)
 {
     unsigned __int64 res;
     *p_car = _addcarry_u64(0, x, y, &res);
-    return res;
+    return (size_t) res;
 }
 
 size_t size_sub(size_t *p_bor, size_t x, size_t y)
 {
     unsigned __int64 res;
     *p_bor = _subborrow_u64(0, x, y, &res);
-    return res;
+    return (size_t) res;
 }
 
 size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
 {
-    unsigned __int64 lo = 0, hi = 0;
-    for (size_t i = 0; i < args_cnt; _addcarry_u64(_addcarry_u64(0, lo, args[i++], &lo), hi, 0, &hi));
+    if (!args_cnt)
+    {
+        *p_hi = 0;
+        return 0;
+    }
+    unsigned __int64 lo = args[0], hi = 0;
+    for (size_t i = 1; i < args_cnt; _addcarry_u64(_addcarry_u64(0, lo, args[i++], &lo), hi, 0, &hi));
     *p_hi = (size_t) hi;
     return (size_t) lo;
 }
@@ -271,38 +279,43 @@ void size_dec_interlocked(volatile size_t *mem)
 
 #if defined __GNUC__ || defined __clang__ || defined _M_IX86 || defined __i386__
 #   if defined _M_X64 || defined __x86_64__
-typedef unsigned __int128 dsize_t;
+typedef unsigned __int128 double_size_t;
 #   elif defined _M_IX86 || defined __i386__
-typedef unsigned long long dsize_t;
+typedef unsigned long long double_size_t;
 #   endif
 
 size_t size_mul(size_t *p_hi, size_t x, size_t y)
 {
-    union { dsize_t val; struct { size_t lo, hi; }; } res = { .val = (dsize_t) x * (dsize_t) y };
-    *p_hi = res.hi;
-    return res.lo;
+    double_size_t val = (double_size_t) x * (double_size_t) y;
+    *p_hi = (size_t) (val >> SIZE_BIT);
+    return (size_t) val;
 }
 
 size_t size_add(size_t *p_car, size_t x, size_t y)
 {
-    union { dsize_t val; struct { size_t lo, hi; }; } res = { .val = (dsize_t) x + (dsize_t) y } ;
-    *p_car = res.hi;
-    return res.lo;
+    double_size_t val = (double_size_t) x + (double_size_t) y;
+    *p_car = (size_t) (val >> SIZE_BIT);
+    return (size_t) val;
 }
 
 size_t size_sub(size_t *p_bor, size_t x, size_t y)
 {
-    union { dsize_t val; struct { size_t lo, hi; }; } res = { .val = (dsize_t) x - (dsize_t) y };
-    *p_bor = 0 - res.hi;
-    return res.lo;
+    double_size_t val = (double_size_t) x - (double_size_t) y;
+    *p_bor = 0 - (size_t) (val >> SIZE_BIT);
+    return (size_t) val;
 }
 
 size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
 {
-    union { dsize_t val; struct { size_t lo, hi; }; } res = { .val = 0 };
-    for (size_t i = 0; i < args_cnt; res.val += args[i++]);
-    *p_hi = res.hi;
-    return res.lo;
+    if (!args_cnt)
+    {
+        *p_hi = 0;
+        return 0;
+    }
+    double_size_t val = args[0];
+    for (size_t i = 1; i < args_cnt; val += args[i++]);
+    *p_hi = (size_t) (val >> SIZE_BIT);
+    return (size_t) val;
 }
 
 #endif
@@ -433,6 +446,11 @@ uint8_t uint8_bit_scan_forward(uint8_t x)
     return (uint8_t) uint32_bit_scan_forward((uint8_t) x);
 }
 
+size_t size_log2_ceiling(size_t x)
+{
+    return size_bit_scan_reverse(x) + !!(x && (x & (x - 1)));
+}
+
 size_t size_add_sat(size_t a, size_t b)
 {
     size_t car, res = size_add(&car, a, b);
@@ -445,18 +463,26 @@ size_t size_sub_sat(size_t a, size_t b)
     return bor ? 0 : res;
 }
 
-int size_cmp_stable_dsc(const void *A, const void *B, void *thunk)
+#define DECLARE_STABLE_CMP_ASC(PREFIX, SUFFIX) \
+    int PREFIX ## _stable_cmp_asc ## SUFFIX (const void *A, const void *B, void *thunk) \
+    { \
+        return PREFIX ## _stable_cmp_dsc ## SUFFIX (B, A, thunk);\
+    }
+
+#define DECLARE_CMP_ASC(PREFIX, SUFFIX) \
+    bool PREFIX ## _cmp_asc ## SUFFIX (const void *A, const void *B, void *thunk) \
+    { \
+        return PREFIX ## _cmp_dsc ## SUFFIX (B, A, thunk);\
+    }
+
+int size_stable_cmp_dsc(const void *A, const void *B, void *thunk)
 {
     (void) thunk;
     size_t bor, diff = size_sub(&bor, *(size_t *) B, *(size_t *) A);
     return diff ? 1 - (int) (bor << 1) : 0;
 }
 
-int size_cmp_stable_asc(const void *A, const void *B, void *thunk)
-{
-    (void) thunk;
-    return -size_cmp_stable_dsc(A, B, thunk);
-}
+DECLARE_STABLE_CMP_ASC(size, )
 
 bool size_cmp_dsc(const void *A, const void *B, void *thunk)
 {
@@ -464,11 +490,7 @@ bool size_cmp_dsc(const void *A, const void *B, void *thunk)
     return *(size_t *) B > *(size_t *) A;
 }
 
-bool size_cmp_asc(const void *A, const void *B, void *thunk)
-{
-    (void) thunk;
-    return *(size_t *) A > *(size_t *) B;
-}
+DECLARE_CMP_ASC(size, )
 
 int flt64_stable_cmp_dsc(const void *a, const void *b, void *thunk)
 {
@@ -478,6 +500,8 @@ int flt64_stable_cmp_dsc(const void *a, const void *b, void *thunk)
     return _mm_extract_epi32(res, 2) - _mm_cvtsi128_si32(res);
 }
 
+DECLARE_STABLE_CMP_ASC(flt64, )
+
 int flt64_stable_cmp_dsc_abs(const void *a, const void *b, void *thunk)
 {
     (void) thunk;
@@ -486,19 +510,32 @@ int flt64_stable_cmp_dsc_abs(const void *a, const void *b, void *thunk)
     return _mm_extract_epi32(res, 2) - _mm_cvtsi128_si32(res);
 }
 
-int flt64_stable_cmp_dsc_nan(const void *a, const void *b, void *thunk)
+DECLARE_STABLE_CMP_ASC(flt64, _abs)
+
+// Warning! The approach from above doesn't work there
+#define DECLARE_FLT64_STABLE_CMP_NAN(INFIX, DIR) \
+    int flt64_stable_cmp ## INFIX ## _nan(const void *a, const void *b, void *thunk) \
+    { \
+        (void) thunk; \
+        __m128d ab = _mm_loadh_pd(_mm_load_sd(a), b); \
+        __m128i res = _mm_sub_epi32(_mm_castpd_si128(_mm_cmpunord_pd(ab, ab)), _mm_castpd_si128(_mm_cmp_pd(ab, _mm_permute_pd(ab, 1), (DIR)))); \
+        return _mm_extract_epi32(res, 2) - _mm_cvtsi128_si32(res); \
+    }
+
+DECLARE_FLT64_STABLE_CMP_NAN(_dsc, _CMP_NLE_UQ)
+DECLARE_FLT64_STABLE_CMP_NAN(_asc, _CMP_NGE_UQ)
+
+int flt64_sign(double x)
 {
-    (void) thunk;
-    __m128d ab = _mm_loadh_pd(_mm_load_sd(a), b);
-    __m128i res = _mm_sub_epi32(_mm_castpd_si128(_mm_cmpunord_pd(ab, ab)), _mm_castpd_si128(_mm_cmp_pd(ab, _mm_permute_pd(ab, 1), _CMP_NLE_UQ)));
+    __m128i res = _mm_castpd_si128(_mm_cmpgt_pd(_mm_set_sd(x), _mm_set_pd(x, 0)));
     return _mm_extract_epi32(res, 2) - _mm_cvtsi128_si32(res);
 }
 
 uint32_t uint32_fused_mul_add(uint32_t *p_res, uint32_t m, uint32_t a)
 {
-    union { uint64_t val; struct { uint32_t lo, hi; }; } res = { .val = (uint64_t) *p_res * (uint64_t) m + (uint64_t) a };
-    *p_res = res.lo;
-    return res.hi;
+    uint64_t val = (uint64_t) *p_res * (uint64_t) m + (uint64_t) a;
+    *p_res = (uint32_t) val;
+    return (uint32_t) (val >> UINT32_BIT);
 }
 
 #define DECLARE_BIT_TEST(TYPE, PREFIX) \

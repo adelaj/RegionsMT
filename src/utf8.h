@@ -4,21 +4,29 @@
 
 #define UTF8_COUNT 6
 #define UTF8_BOUND 0x110000
+#define UTF8_BOM "\xef\xbb\xbf"
+
+#define UTF8_LDQUO "\xe2\x80\x9c"
+#define UTF8_RDQUO "\xe2\x80\x9d"
+#define UTF8_LSQUO "\xe2\x80\x98"
+#define UTF8_RSQUO "\xe2\x80\x99"
 
 uint8_t utf8_len(uint32_t);
 
 bool utf8_is_overlong(uint32_t, uint8_t);
-bool utf8_is_invalid(uint32_t, uint8_t);
+bool utf8_is_valid(uint32_t, uint8_t);
 
-// Before proceeding with these functions, 'utf8_is_invalid' should be ensured to return 'false'.
-// In all cases length is known explicitly, so we provide a possibility to pass it directly.
-bool utf8_is_whitespace(uint32_t, uint8_t);
-bool utf8_is_xml_name_start_char(uint32_t, uint8_t);
-bool utf8_is_xml_name_char(uint32_t, uint8_t);
+// Before proceeding with these functions, 'utf8_is_valid' should be ensured to return 'true'.
+// In many cases length is known explicitly, so it is provided a possibility to pass it directly.
+bool utf8_is_whitespace(uint32_t);
+bool utf8_is_whitespace_len(uint32_t, uint8_t);
+bool utf8_is_xml_char(uint32_t);
+bool utf8_is_xml_char_len(uint32_t, uint8_t);
+bool utf8_is_xml_name_start_char_len(uint32_t, uint8_t);
+bool utf8_is_xml_name_char_len(uint32_t, uint8_t);
 
 void utf8_encode(uint32_t, uint8_t *restrict, uint8_t *restrict);
 bool utf8_decode(uint8_t, uint32_t *restrict, uint8_t *restrict, uint8_t *restrict, uint8_t *restrict);
-bool utf8_decode_once(uint8_t *restrict, size_t, uint32_t *restrict, uint8_t *restrict);
 
 #define UTF16_COUNT 2
 
