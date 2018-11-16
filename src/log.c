@@ -43,39 +43,63 @@ enum fmt_flags {
 };
 
 enum fmt_type {
-    FMT_INT8 = 0, // 'bi'
-    FMT_INT16, // 'wi'
-    FMT_INT32, // 'di'
-    FMT_INT64, // 'qi'
-    FMT_PTR_DIFF, // 'zi'
-    FMT_INTPTR, // 'pi'
-    FMT_INT, // 'i'
-    FMT_LONG, // 'li'
-    FMT_LONGLONG, // 'lli'
-    FMT_UINT8, // 'bu'
-    FMT_UINT16, // 'wu'
-    FMT_UINT32, // 'du'
-    FMT_UINT64, // 'qu'
-    FMT_SIZE, // 'zu'
-    FMT_UINTPTR, // 'pu'
-    FMT_CHAR, // 'c'
-    FMT_STR, // 's'
-    FMT_TIME_DIFF, // 'T'
-    FMT_TIME_STAMP, // 'U'
+    FMT_INT, // 'i' (int)
+    FMT_INT8, // 'i8' (int8_t)
+    FMT_INT16, // 'i16' (int16_t)
+    FMT_INT32, // 'i32' (int32_t)
+    FMT_INT64, // 'i64' (int64_t)
+    FMT_PTR_DIFF, // 'iz' (ptrdiff_t)
+    FMT_LONG, // 'il' (long)
+    FMT_LONGLONG, // 'ill' (long long)
+    FMT_UINT, // 'u' (unsigned)
+    FMT_UINT8, // 'u8' (uint8_t)
+    FMT_UINT16, // 'u16' (uint16_t)
+    FMT_UINT32, // 'u32' (uint32_t)
+    FMT_UINT64, // 'u64' (uint64_t)
+    FMT_SIZE, // 'uz' (size_t)
+    FMT_ULONG, // 'ul' (unsigned long)
+    FMT_ULONGLONG, // 'ull' (unsigned long long)
+    FMT_CHAR, // 'c' (int)
+    FMT_STR, // 's' (char *, size_t)
+    FMT_FLT64, // 'f' (double)
+    FMT_TIME_DIFF, // 'T' (char *, size_t, uint64_t, uint64_t, char *, size_t) 
+    FMT_TIME_STAMP, // 'D'
 };
 
-struct fmt_context {
-    size_t width, precision;
-    enum fmt_flags flags;
+struct fmt_res {
+    size_t arg;
     enum fmt_type type;
 };
 
 bool decode_fmt(struct fmt_context *context, char *fmt, size_t *p_pos)
 {
+    enum fmt_status res = 0;
     size_t pos = *p_pos;
-    for (;;)
+    for (size_t i = 0, j = 1; i < j; i++) switch (i)
     {
+    case 1:
+        switch (fmt[pos++])
+        {
+        case 'i':
+            res = FMT_INT;
+            j++;
+            break;
+        case 'u':
+            res = FMT_UINT;
+            j++;
+            break;
+            continue;
+        case 'c':
+            res = FMT_CHAR;
+            break;
+        case 's':
 
+        case 'f':
+        case 'T':
+        case 'D':
+        default:
+
+        }
     }
     *p_pos = pos;
     return 1;
@@ -197,9 +221,6 @@ bool message_var(char *buff, size_t *p_cnt, void *context, struct style style, v
     return print_fmt_var(buff, p_cnt, arg);
 }
 
-#define STAGED_LOOP(I, LIM_I, LEN, INI_LEN, TMP, CNT) \
-    for (size_t (I) = 0, (LEN) = (INI_LEN), (TMP) = (LEN); (I) < (LIM_I) && ((TMP) = (LEN) = size_sub_sat((TMP), (LEN))); (CNT) = size_add_sat((CNT), (LEN)), (I)++) switch (I)
-
 bool message_var_two_stage(char *buff, size_t *p_cnt, void *Thunk, struct style style, va_list arg)
 {
     size_t cnt = 0;
@@ -283,17 +304,7 @@ static bool log_prefix(char *buff, size_t *p_cnt, struct code_metric code_metric
 {
     const char *ttl[] = { "MESSAGE", "ERROR", "WARNING", "NOTE", "INFO", "DAMNATION" };
     size_t cnt = 0;
-    for (size_t i = 0, len = 0, tmp = *p_cnt; i < 3 && (tmp = len = size_sub_sat(tmp, len)); cnt = size_add_sat(cnt, len), i++) switch (i)
-    {
-    case 0:
-        if (!print_fmt(buff + cnt, &len, "%s[", ENV_BEGIN(style.ts))) return 0;
-        break;
-    case 1:
-        print_time_stamp(buff + cnt, &len);
-        break;
-    case 2:
-        if (!print_fmt(buff + cnt, &len, "]%s %s%s%s %s(%s%s%s @ %s%s%s:%zu):%s ", ENV_END(style.ts), ENV(style.ttl[type], ttl[type]), ENV(style.src, DQUO(style.dquo, code_metric.func), DQUO(style.dquo, code_metric.path), code_metric.line))) return 0;
-    }
+    if (!print_fmt2(buff + cnt, p_cnt, "%s[%D]%s %s%s%s %s(%s%s%s @ %s%s%s:%zu):%s ", ENV_EMPTY(style.ts), ENV(style.ttl[type], ttl[type]), ENV(style.src, ENV(style.dquo, code_metric.func), ENV(style.dquo, code_metric.path), code_metric.line))) return 0;
     *p_cnt = cnt;
     return 1;
 }
