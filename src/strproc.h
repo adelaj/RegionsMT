@@ -32,12 +32,18 @@ struct handler_context {
     size_t bit_pos;
 };
 
-bool str_to_uint64(const char *, char **, uint64_t *);
-bool str_to_uint32(const char *, char **, uint32_t *);
-bool str_to_uint16(const char *, char **, uint16_t *);
-bool str_to_uint8(const char *, char **, uint8_t *);
-bool str_to_size(const char *, char **, size_t *);
-bool str_to_flt64(const char *, char **, double *);
+enum {
+    CVT_ERROR = 0,
+    CVT_SUCCESS,
+    CVT_OUT_OF_RANGE
+};
+
+unsigned str_to_uint64(const char *, char **, uint64_t *);
+unsigned str_to_uint32(const char *, char **, uint32_t *);
+unsigned str_to_uint16(const char *, char **, uint16_t *);
+unsigned str_to_uint8(const char *, char **, uint8_t *);
+unsigned str_to_size(const char *, char **, size_t *);
+unsigned str_to_flt64(const char *, char **, double *);
 
 // Functions to be used as 'read_callback'
 // If the second argument is 'SIZE_MAX', it is considered undefined

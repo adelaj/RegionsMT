@@ -32,48 +32,52 @@ bool print_fmt_var(char *buff, size_t *p_cnt, va_list arg)
     return 1;
 }
 
-enum fmt_flags {
-    FMT_FLUSH_LEFT = 1,
-    FMT_SIGN_PLACEHOLDER = 2,
-    FMT_SIGN_POSITIVE = FMT_SIGN_PLACEHOLDER | 4,
-    FMT_FANCY_NUMBERS = 8,
-    FMT_ZERO_PADDING = 16,
-    FMT_ARG_WIDTH = 32,
-    FMT_ARG_PRECISION = 64
-};
-
 enum fmt_type {
     FMT_INT, // 'i' (int)
-    FMT_INT8, // 'i8' (int8_t)
-    FMT_INT16, // 'i16' (int16_t)
-    FMT_INT32, // 'i32' (int32_t)
-    FMT_INT64, // 'i64' (int64_t)
+    FMT_INT8, // 'ib' (int8_t)
+    FMT_INT16, // 'iw' (int16_t)
+    FMT_INT32, // 'id' (int32_t)
+    FMT_INT64, // 'iq' (int64_t)
     FMT_PTR_DIFF, // 'iz' (ptrdiff_t)
     FMT_LONG, // 'il' (long)
     FMT_LONGLONG, // 'ill' (long long)
     FMT_UINT, // 'u' (unsigned)
-    FMT_UINT8, // 'u8' (uint8_t)
-    FMT_UINT16, // 'u16' (uint16_t)
-    FMT_UINT32, // 'u32' (uint32_t)
-    FMT_UINT64, // 'u64' (uint64_t)
+    FMT_UINT8, // 'ub' (uint8_t)
+    FMT_UINT16, // 'uw' (uint16_t)
+    FMT_UINT32, // 'ud' (uint32_t)
+    FMT_UINT64, // 'uq' (uint64_t)
     FMT_SIZE, // 'uz' (size_t)
     FMT_ULONG, // 'ul' (unsigned long)
     FMT_ULONGLONG, // 'ull' (unsigned long long)
-    FMT_CHAR, // 'c' (int)
-    FMT_STR, // 's' (char *, size_t)
-    FMT_FLT64, // 'f' (double)
-    FMT_TIME_DIFF, // 'T' (char *, size_t, uint64_t, uint64_t, char *, size_t) 
-    FMT_TIME_STAMP, // 'D'
+    FMT_STR, // 's' (char *), 's*' (char *, size_t)
+    FMT_FLT64, // 'f' (double), 'f*' (double, size_t)
+    FMT_TIME_DIFF, // 'T' (struct env, uint64_t, uint64_t) 
+    FMT_TIME_STAMP, // 'D' (struct env)
+    FMT_FMT, // 'F' 
+    FMT_PERC, // '%'
+    FMT_UTF, // '#', 
+    FMT_UTF_HEX, // '#x', '#X'
+    FMT_EMPTY // ' '
+};
+
+enum frm_res_flags {
+    FMT_PHANTOM = 1,
+    FNT_ENV_BEGIN = 2,
+    FNT_ENV_END = 4
 };
 
 struct fmt_res {
-    size_t arg;
+    enum frm_res_flags flags;
     enum fmt_type type;
+    union {
+
+    };
 };
 
 bool decode_fmt(struct fmt_context *context, char *fmt, size_t *p_pos)
 {
-    enum fmt_status res = 0;
+    struct fmt_res res;
+    char *tmp;
     size_t pos = *p_pos;
     for (size_t i = 0, j = 1; i < j; i++) switch (i)
     {
@@ -81,25 +85,41 @@ bool decode_fmt(struct fmt_context *context, char *fmt, size_t *p_pos)
         switch (fmt[pos++])
         {
         case 'i':
-            res = FMT_INT;
+            res.type = FMT_INT;
             j++;
             break;
         case 'u':
-            res = FMT_UINT;
+            res.type = FMT_UINT;
             j++;
             break;
-            continue;
         case 'c':
-            res = FMT_CHAR;
+            res.type = FMT_CHAR;
             break;
         case 's':
-
+            res.type = FMT_STR;
+            j++;
+            break;
         case 'f':
+            res.type = FMT_FLT64;
+            j++;
+            break;
         case 'T':
+            res.type = FMT_TIME_DIFF;
+            break;
         case 'D':
+            res.type = FMT_TIME_STAMP;
+            break;
+        case 'F':
+            res.type = FMT_FMT;
+            break;
+        case '%':
+            res.type = FMT_PERC;
+            break;
         default:
-
+            return 0;
         }
+    case 2:
+        str_to_size(fmt + pos, &tmp, res.arg);
     }
     *p_pos = pos;
     return 1;

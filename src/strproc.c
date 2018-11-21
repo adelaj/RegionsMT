@@ -60,12 +60,18 @@ bool str_handler(const char *str, size_t len, void *Ptr, void *context)
 }
 
 #define DECLARE_STR_TO_UINT(TYPE, SUFFIX, LIMIT, BACKEND_RETURN, BACKEND) \
-    bool str_to_ ## SUFFIX(const char *str, char **ptr, TYPE *p_res) \
+    unsigned str_to_ ## SUFFIX(const char *str, char **ptr, TYPE *p_res) \
     { \
         errno = 0; \
         BACKEND_RETURN res = BACKEND(str, ptr, 10); \
-        *p_res = (TYPE) MIN(res, (LIMIT)); \
-        return !!errno; \
+        Errno_t err = errno; \
+        if (res > (LIMIT)) \
+        { \
+            *p_res = (LIMIT); \
+            return err && err != ERANGE ? 0 : CVT_OUT_OF_RANGE; \
+        } \
+        *p_res = (TYPE) res; \
+        return err ? err == ERANGE ? CVT_OUT_OF_RANGE : 0 : 1; \
     }
 
 DECLARE_STR_TO_UINT(uint64_t, uint64, UINT64_MAX, unsigned long long, strtoull)
@@ -79,11 +85,12 @@ DECLARE_STR_TO_UINT(size_t, size, SIZE_MAX, unsigned long long, strtoull)
 DECLARE_STR_TO_UINT(size_t, size, SIZE_MAX, unsigned long, strtoul)
 #endif
 
-bool str_to_flt64(const char *str, char **ptr, double *p_res)
+unsigned str_to_flt64(const char *str, char **ptr, double *p_res)
 {
     errno = 0;
     *p_res = strtod(str, ptr);
-    return !!errno;
+    Errno_t err = errno;
+    return err ? err == ERANGE ? CVT_OUT_OF_RANGE : 0 : 1;
 }
 
 struct bool_handler_context {
