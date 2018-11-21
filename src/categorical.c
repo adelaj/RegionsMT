@@ -265,11 +265,11 @@ static bool outer_prod_combined_impl(size_t *outer, size_t *gen_mar, size_t *phe
 
 double stat_exact(size_t *table, size_t *gen_mar, size_t *phen_mar)
 {
-    size_t lo = size_sub_sat(gen_mar[0], phen_mar[1]), hi = MIN(gen_mar[0], phen_mar[0]);
-    double hyp_comp = pdf_hypergeom(table[0], phen_mar[0], phen_mar[1], gen_mar[0]), a = 0., b = 0.;
+    size_t g0 = gen_mar[0], p0 = phen_mar[0], p1 = phen_mar[1], lo = size_sub_sat(g0, p1), hi = MIN(g0, p0);
+    double hyp_comp = pdf_hypergeom(table[0], p0, p1, g0), a = 0., b = 0.;
     for (size_t i = lo; i <= hi; i++)
     {
-        double hyp = pdf_hypergeom(i, phen_mar[0], phen_mar[1], gen_mar[0]);
+        double hyp = pdf_hypergeom(i, p0, p1, g0);
         a += hyp;
         if (hyp <= hyp_comp) b += hyp;
     }

@@ -34,7 +34,7 @@ struct maver_adj_res {
 };
 
 double stat_exact(size_t *, size_t *, size_t *);
-double qas_exact(size_t *t);
+double qas_exact(size_t *);
 
 bool categorical_init(struct categorical_supp *, size_t, size_t);
 struct categorical_res categorical_impl(struct categorical_supp *, uint8_t *, size_t *, size_t, size_t, enum categorical_flags);

@@ -203,7 +203,7 @@ size_t Strnlen(const char *str, size_t len)
 
 size_t Strchrnul(const char *str, int ch)
 {
-    return strcspn(str, (const char []) { (char) ch, '\0' });
+    return strcspn(str, (const char [2]) { (char) ch });
 }
 
 void *Memrchr(void const *Str, int ch, size_t cnt)

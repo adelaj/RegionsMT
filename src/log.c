@@ -49,6 +49,7 @@ enum fmt_type {
     FMT_SIZE, // 'uz' (size_t)
     FMT_ULONG, // 'ul' (unsigned long)
     FMT_ULONGLONG, // 'ull' (unsigned long long)
+    FMT_CHAR, // 'c'
     FMT_STR, // 's' (char *), 's*' (char *, size_t)
     FMT_FLT64, // 'f' (double), 'f*' (double, size_t)
     FMT_TIME_DIFF, // 'T' (struct env, uint64_t, uint64_t) 
@@ -70,8 +71,10 @@ struct fmt_res {
     enum frm_res_flags flags;
     enum fmt_type type;
     union {
-
-    };
+        size_t length;
+        size_t precision;
+        uint32_t utf8_val;
+    } arg;
 };
 
 bool decode_fmt(struct fmt_context *context, char *fmt, size_t *p_pos)
@@ -81,6 +84,9 @@ bool decode_fmt(struct fmt_context *context, char *fmt, size_t *p_pos)
     size_t pos = *p_pos;
     for (size_t i = 0, j = 1; i < j; i++) switch (i)
     {
+    case 0:
+
+
     case 1:
         switch (fmt[pos++])
         {
