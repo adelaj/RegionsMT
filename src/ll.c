@@ -184,13 +184,13 @@ void bit_set2_interlocked(volatile uint8_t *arr, size_t bit)
 uint32_t uint32_bit_scan_reverse(uint32_t x)
 {
     unsigned long res;
-    return _BitScanReverse(&res, (unsigned long) x) ? res : UINT32_MAX;
+    return _BitScanReverse(&res, (unsigned long) x) ? (uint32_t) res : UINT32_MAX;
 }
 
 uint32_t uint32_bit_scan_forward(uint32_t x)
 {
     unsigned long res;
-    return _BitScanForward(&res, (unsigned long) x) ? res : UINT32_MAX;
+    return _BitScanForward(&res, (unsigned long) x) ? (uint32_t) res : UINT32_MAX;
 }
 
 uint32_t uint32_pop_cnt(uint32_t x)
@@ -392,8 +392,7 @@ bool bit_test2_acquire_p(volatile void *arr, const void *p_bit)
 bool bit_test_range_acquire(volatile uint8_t *arr, size_t cnt)
 {
     size_t div = cnt / CHAR_BIT, rem = cnt % CHAR_BIT;
-    for (size_t i = 0; i < div; i++) 
-        if (uint8_load_acquire(arr + i) != UINT8_MAX) return 0;
+    for (size_t i = 0; i < div; i++) if (uint8_load_acquire(arr + i) != UINT8_MAX) return 0;
     if (rem)
     {
         uint8_t msk = (1u << rem) - 1;
@@ -410,8 +409,7 @@ bool bit_test_range_acquire_p(volatile void *arr, const void *p_cnt)
 bool bit_test2_range_acquire(volatile uint8_t *arr, size_t cnt)
 {
     size_t div = cnt / CHAR_BIT, rem = cnt % CHAR_BIT;
-    for (size_t i = 0; i < div; i++) 
-        if ((uint8_load_acquire(arr + i) & BIT_TEST2_MASK) != BIT_TEST2_MASK) return 0;
+    for (size_t i = 0; i < div; i++) if ((uint8_load_acquire(arr + i) & BIT_TEST2_MASK) != BIT_TEST2_MASK) return 0;
     if (rem)
     {
         uint8_t msk = ((1u << rem) - 1) & BIT_TEST2_MASK;

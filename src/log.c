@@ -62,7 +62,7 @@ enum fmt_type {
 };
 
 enum frm_res_flags {
-    FMT_PHANTOM = 1,
+    FMT_PHONY = 1,
     FNT_ENV_BEGIN = 2,
     FNT_ENV_END = 4
 };
@@ -79,14 +79,20 @@ struct fmt_res {
 
 bool decode_fmt(struct fmt_context *context, char *fmt, size_t *p_pos)
 {
-    struct fmt_res res;
+    struct fmt_res res = { 0 };
     char *tmp;
     size_t pos = *p_pos;
     for (size_t i = 0, j = 1; i < j; i++) switch (i)
     {
     case 0:
-
-
+        switch (fmt[pos++])
+        {
+        case '?':
+            res.flags |= FMT_PHONY;
+        default:
+            j++;
+        }
+        break;
     case 1:
         switch (fmt[pos++])
         {
@@ -124,8 +130,9 @@ bool decode_fmt(struct fmt_context *context, char *fmt, size_t *p_pos)
         default:
             return 0;
         }
+        break;
     case 2:
-        str_to_size(fmt + pos, &tmp, res.arg);
+        
     }
     *p_pos = pos;
     return 1;
