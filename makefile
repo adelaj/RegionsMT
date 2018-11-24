@@ -1,12 +1,12 @@
 CC = gcc
-CC_OPT = -std=c11 -mavx -flto -Wall
+CC_OPT = -std=c11 -mavx -flto -fuse-linker-plugin -Wall
 
 LD = $(CC)
-LD_OPT = -flto
+LD_OPT = -flto -fuse-linker-plugin
 LD_LIB = m pthread gsl gslcblas
 
 ifeq ($(ARCH),i386)
-    CC_OPT += m32
+    CC_OPT += -m32
 else ifneq ($(ARCH),x86_64)
     ARCH = x86_64
 endif
@@ -16,12 +16,12 @@ GSL_DIR_Release = $(GSL_DIR)-$(ARCH)-Release
 GSL_DIR_Debug = $(GSL_DIR)-$(ARCH)-Debug
 
 CC_OPT_Release = $(CC_OPT) -O3
-CC_OPT_Debug = $(CC_OPT) -D_DEBUG -mavx -O0 -ggdb
+CC_OPT_Debug = $(CC_OPT) -D_DEBUG -mavx -Og -ggdb
 CC_INC_Release = $(GSL_DIR_Release)
 CC_INC_Debug = $(GSL_DIR_Debug)
 
-LD_OPT_Release = $(LD_OPT)
-LD_OPT_Debug = $(LD_OPT)
+LD_OPT_Release = $(LD_OPT) -O3
+LD_OPT_Debug = $(LD_OPT) -Og
 LD_INC_Release = $(GSL_DIR_Release)
 LD_INC_Debug = $(GSL_DIR_Debug)
 LD_LIB_Release = $(LD_LIB)
