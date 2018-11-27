@@ -40,7 +40,7 @@
 #define CLAMP(x, a, b) \
     ((x) >= (a) ? (x) <= (b) ? (x) : (b) : (a))
 #define SIGN(x, y) \
-    ((x) > (y) ? 1 : (x) == (y) ? 0 : -1)
+    ((x) > (y) ? 1 : (x) < (y) ? -1 : 0)
 
 // Number of elements of array
 #define countof(ARR) \

@@ -30,17 +30,9 @@
 #define FG_BR_CYAN 96
 #define FG_BR_WHITE 97
 
-#define INIT_ENV_COL(COL) \
-    { .begin = STRI(ANSI CSI SGR(TOSTRING(COL))), .end = STRI(ANSI CSI SGR(TOSTRING(FG_RESET))) }
-#define INIT_ENV_SQUO \
-    { .begin = STRI(UTF8_LSQUO), .end = STRI(UTF8_RSQUO) }
-#define INIT_ENV_DQUO \
-    { .begin = STRI(UTF8_LDQUO), .end = STRI(UTF8_RDQUO) }
-
-#define ENV_GUARD(S) (S).str, (S).len
-#define ENV(E, ...) ENV_GUARD((E).begin), __VA_ARGS__, ENV_GUARD((E).end)
-#define ENV_MUX_GUARD(S, T, SW) (S ? (E).str : (F).str), (S ? (E).len : (F).len)
-#define ENV_MUX(E, F, SW, ...) ENV_MUX_GUARD((E).begin, (F).begin, SW), __VA_ARGS__, ENV_MUX_GUARD((E).end, (F).end, SW)
+#define INIT_ENV(BEGIN, END) { .begin = STRI(BEGIN), .end = STRI(END) }
+#define INIT_ENV_COL_EXT(BEGIN, COL, END) INIT_ENV(ANSI CSI SGR(TOSTRING(COL) BEGIN), END ANSI CSI SGR(TOSTRING(FG_RESET)))
+#define INIT_ENV_COL(COL) INIT_ENV_COL_EXT("", COL, "")
 
 struct env {
     struct strl begin, end;
@@ -63,7 +55,7 @@ enum message_type {
 };
 
 struct style {
-    struct env ts, ttl[MESSAGE_CNT], src, dquo, squo, num, path, str, time;
+    struct env ttl[MESSAGE_CNT], ts, td, src, num, path, str, chr;
 };
 
 struct log {

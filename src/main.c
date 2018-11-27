@@ -368,13 +368,13 @@ static int Main(int argc, char **argv)
     
     struct style style = {
         .ttl = { INIT_ENV_COL(FG_GREEN), INIT_ENV_COL(FG_RED), INIT_ENV_COL(FG_YELLOW), INIT_ENV_COL(FG_MAGENTA), INIT_ENV_COL(FG_CYAN) },
-        .ts = INIT_ENV_COL(FG_BR_BLACK),
-        .src = INIT_ENV_COL(FG_BR_BLACK),
-        .str = INIT_ENV_COL(FG_BR_MAGENTA),
+        .src = INIT_ENV_COL_EXT("(" , FG_BR_BLACK, "):"),
+        .ts = INIT_ENV_COL_EXT("[" , FG_BR_BLACK, "]"),
+        .td = INIT_ENV_COL(FG_BR_YELLOW),
+        .str = INIT_ENV_COL_EXT(UTF8_LDQUO, FG_BR_MAGENTA, UTF8_RDQUO,),
+        .chr = INIT_ENV_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO,),
         .num = INIT_ENV_COL(FG_BR_CYAN),
-        .time = INIT_ENV_COL(FG_BR_YELLOW),
-        .squo = INIT_ENV_SQUO,
-        .dquo = INIT_ENV_DQUO
+        
     };
 
     struct log log;

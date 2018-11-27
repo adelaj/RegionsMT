@@ -206,6 +206,13 @@ size_t Strchrnul(const char *str, int ch)
     return strcspn(str, (const char [2]) { (char) ch });
 }
 
+size_t Strlncpy(char *dst, char *src, size_t cnt)
+{
+    size_t len = Strnlen(src, cnt);
+    memcpy(dst, src, len + (len < cnt));
+    return len;
+}
+
 void *Memrchr(void const *Str, int ch, size_t cnt)
 {
     const __m128i test[] = {

@@ -60,6 +60,7 @@ int Stricmp(const char *, const char *);
 int Strnicmp(const char *, const char *, size_t);
 size_t Strnlen(const char *, size_t);
 size_t Strchrnul(const char *, int);
+size_t Strlncpy(char *, char *, size_t);
 void *Memrchr(void const *, int, size_t);
 
 bool file_is_tty(FILE *);

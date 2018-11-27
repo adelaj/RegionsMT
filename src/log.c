@@ -33,144 +33,282 @@ bool print_fmt_var(char *buff, size_t *p_cnt, va_list arg)
 }
 
 enum fmt_type {
-    FMT_INT, // 'i' (int)
-    FMT_INT8, // 'ib' (int8_t)
-    FMT_INT16, // 'iw' (int16_t)
-    FMT_INT32, // 'id' (int32_t)
-    FMT_INT64, // 'iq' (int64_t)
-    FMT_PTR_DIFF, // 'iz' (ptrdiff_t)
-    FMT_LONG, // 'il' (long)
-    FMT_LONGLONG, // 'ill' (long long)
-    FMT_UINT, // 'u' (unsigned)
-    FMT_UINT8, // 'ub' (uint8_t)
-    FMT_UINT16, // 'uw' (uint16_t)
-    FMT_UINT32, // 'ud' (uint32_t)
-    FMT_UINT64, // 'uq' (uint64_t)
-    FMT_SIZE, // 'uz' (size_t)
-    FMT_ULONG, // 'ul' (unsigned long)
-    FMT_ULONGLONG, // 'ull' (unsigned long long)
-    FMT_CHAR, // 'c'
-    FMT_STR, // 's' (char *), 's*' (char *, size_t)
-    FMT_FLT64, // 'f' (double), 'f*' (double, size_t)
-    FMT_TIME_DIFF, // 'T' (struct env, uint64_t, uint64_t) 
-    FMT_TIME_STAMP, // 'D' (struct env)
-    FMT_FMT, // 'F' 
-    FMT_PERC, // '%'
-    FMT_UTF, // '#', 
-    FMT_UTF_HEX, // '#x', '#X'
-    FMT_EMPTY // ' '
+    TYPE_INT = 0,
+    TYPE_CHAR,
+    TYPE_STR,
+    TYPE_FLT,
+    TYPE_TIME_DIFF,
+    TYPE_TIME_STAMP,
+    TYPE_FMT,
+    TYPE_PERC,
+    TYPE_UTF,
+    TYPE_EMPTY
+};
+
+enum fmt_int_spec {
+    INT_SPEC_DEFAULT = 0,
+    INT_SPEC_BYTE,
+    INT_SPEC_WORD,
+    INT_SPEC_DWORD,
+    INT_SPEC_QWORD,
+    INT_SPEC_SIZE,
+    INT_SPEC_SHRTSHRT, // 'signed char' or 'unsigned char'
+    INT_SPEC_SHRT,
+    INT_SPEC_LONG,
+    INT_SPEC_LONGLONG,
+};
+
+enum fmt_int_flags {
+    INT_FLAG_UNSIGNED = 1,
+    INT_FLAG_HEX = 2,
+    INT_FLAG_UPPERCASE = 4
+};
+
+enum fmt_flt_spec {
+    FLT_SPEC_DEFAULT = 0,
+    FLT_SPEC_EXP = 1
+};
+
+enum fmt_flt_flags {
+    FLT_FLAG_PAYLOAD = 1,
+    FLT_FLAG_HEX = 2,
+    FLT_FLAG_UPPERCASE = 4
 };
 
 enum frm_res_flags {
-    FMT_PHONY = 1,
-    FNT_ENV_BEGIN = 2,
-    FNT_ENV_END = 4
+    FMT_CONDITIONAL = 1,
+    FMT_ENV_BEGIN = 2,
+    FMT_ENV_END = 4,
+};
+
+enum frm_arg_mode {
+    ARG_DEFAULT = 0,
+    ARG_SET,
+    ARG_FETCH,
 };
 
 struct fmt_res {
     enum frm_res_flags flags;
     enum fmt_type type;
     union {
-        size_t length;
-        size_t precision;
-        uint32_t utf8_val;
-    } arg;
+        struct {
+            enum fmt_int_spec spec;
+            enum fmt_int_flags flags;
+        } int_arg;
+        struct {
+            enum frm_arg_mode mode;
+            enum fmt_flt_spec spec;
+            enum fmt_flt_flags flags;
+            size_t prec;
+        } flt_arg;
+        struct {
+            enum frm_arg_mode mode;
+            size_t len;
+        } str_arg;
+        struct {
+            enum frm_arg_mode mode;
+            uint32_t val;
+        } utf_arg;        
+    };
 };
 
-bool decode_fmt(struct fmt_context *context, char *fmt, size_t *p_pos)
+static bool decode_fmt_int(enum fmt_int_spec *p_spec, enum fmt_int_flags *p_flags, const char *fmt, size_t *p_pos)
 {
-    struct fmt_res res = { 0 };
-    char *tmp;
     size_t pos = *p_pos;
-    for (size_t i = 0, j = 1; i < j; i++) switch (i)
+    for (size_t i = 0; i < 2; i++) switch (i)
     {
     case 0:
-        switch (fmt[pos++])
+        switch (fmt[pos])
         {
-        case '?':
-            res.flags |= FMT_PHONY;
+        case 'b':
+            *p_spec = INT_SPEC_BYTE;
+            break;
+        case 'w':
+            *p_spec = INT_SPEC_WORD;
+            break;
+        case 'd':
+            *p_spec = INT_SPEC_DWORD;
+            break;
+        case 'q':
+            *p_spec = INT_SPEC_QWORD;
+            break;
+        case 'z':
+            *p_spec = INT_SPEC_SIZE;
+            break;
+        case 'h':
+            if (fmt[pos + 1] == 'h')
+            {
+                *p_spec = INT_SPEC_SHRTSHRT;
+                pos++;
+            }
+            else *p_spec = INT_SPEC_SHRT;
+            break;
+        case 'l':
+            if (fmt[pos + 1] == 'l')
+            {
+                *p_spec = INT_SPEC_LONGLONG;
+                pos++;
+            }
+            else *p_spec = INT_SPEC_LONG;
+            break;
         default:
-            j++;
+            return 1;
         }
+        pos++;
         break;
     case 1:
-        switch (fmt[pos++])
-        {
-        case 'i':
-            res.type = FMT_INT;
-            j++;
-            break;
-        case 'u':
-            res.type = FMT_UINT;
-            j++;
-            break;
-        case 'c':
-            res.type = FMT_CHAR;
-            break;
-        case 's':
-            res.type = FMT_STR;
-            j++;
-            break;
-        case 'f':
-            res.type = FMT_FLT64;
-            j++;
-            break;
-        case 'T':
-            res.type = FMT_TIME_DIFF;
-            break;
-        case 'D':
-            res.type = FMT_TIME_STAMP;
-            break;
-        case 'F':
-            res.type = FMT_FMT;
-            break;
-        case '%':
-            res.type = FMT_PERC;
-            break;
-        default:
-            return 0;
-        }
+        if (fmt[pos] != 'x' && fmt[pos] != 'X') break;
+        *p_flags |= INT_FLAG_HEX;
+        pos++;
         break;
-    case 2:
-        
     }
     *p_pos = pos;
     return 1;
 }
 
+static bool decode_fmt_size(size_t *p_val, enum frm_arg_mode *p_mode, const char *fmt, size_t *p_pos)
+{
+    size_t pos = *p_pos;
+    if (fmt[pos] == '*')
+    {
+        *p_mode |= ARG_FETCH;
+        *p_pos = pos + 1;
+        return 1;
+    }
+    const char *tmp;
+    unsigned cvt = str_to_size(fmt + pos, &tmp, p_val);
+    if (!cvt || tmp == fmt + pos) return 0;
+    pos = tmp - fmt;    
+    *p_mode = ARG_SET;
+    return 1;
+}
+
+static bool decode_fmt_utf(uint32_t *p_val, enum frm_arg_mode *p_mode, const char *fmt, size_t *p_pos)
+{
+    bool hex = 0;
+    size_t pos = *p_pos;
+    if (fmt[pos] == 'x' || fmt[pos] == 'X')
+    {
+        pos++;
+        hex = 1;
+    }
+    if (fmt[pos] == '*')
+    {
+        *p_mode |= ARG_FETCH;
+        *p_pos = pos + 1;
+        return 1;
+    }
+    const char *tmp;
+    unsigned cvt = (hex ? str_to_uint32_hex : str_to_uint32)(fmt + pos, &tmp, p_val);
+    if (!cvt || tmp == fmt + pos || *p_val >= UTF8_BOUND) return 0;
+    pos = tmp - fmt;
+    *p_mode = ARG_SET;
+    return 1;
+}
+
+static bool decode_fmt(struct fmt_res *res, const char *fmt, size_t *p_pos)
+{
+    const char flags[] = { '?', '<', '>' };
+    size_t pos = *p_pos;
+    *res = (struct fmt_res) { 0 };
+    for (size_t i = 0; i < 4; i++) switch (i)
+    {
+    case 0:
+    case 1:
+    case 2:
+        if (fmt[pos] != flags[i]) break;
+        res->flags |= 1 << i;
+        pos++;
+        break;
+    case 3:
+        switch (fmt[pos])
+        {
+        case 'u':
+            res->int_arg.flags |= INT_FLAG_UNSIGNED;
+        case 'i':
+            res->type = TYPE_INT;
+            *p_pos = pos;
+            return decode_fmt_int(&res->int_arg.flags, &res->int_arg.spec, fmt, p_pos);
+        case 'c':
+            res->type = TYPE_CHAR;
+            break;
+        case 's':
+            res->type = TYPE_STR;
+            *p_pos = pos;
+            return decode_fmt_size(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
+        case 'A':
+            res->flt_arg.flags |= FLT_FLAG_UPPERCASE;
+        case 'a':
+            res->flt_arg.flags |= FLT_FLAG_HEX;
+            res->flt_arg.spec = FLT_SPEC_EXP;
+        case 'f':
+            res->type = TYPE_FLT;
+            *p_pos = pos;
+            return decode_fmt_flt(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
+        case 'E':
+            res->flt_arg.flags |= FLT_FLAG_UPPERCASE;
+        case 'e':
+            res->flt_arg.spec = FLT_SPEC_EXP;
+            res->type = TYPE_FLT;
+            *p_pos = pos;
+            return decode_fmt_flt(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
+        case 'T':
+            res->type = TYPE_TIME_DIFF;
+            break;
+        case 'D':
+            res->type = TYPE_TIME_STAMP;
+            break;
+        case '$':
+            res->type = TYPE_FMT;
+            break;
+        case '%':
+            res->type = TYPE_PERC;
+            break;
+        case '#':
+            res->type = TYPE_UTF;
+            *p_pos = pos;
+            return decode_fmt_utf(&res->utf_arg.val, &res->utf_arg.mode, fmt, p_pos);
+        case ' ':
+            res->type = TYPE_EMPTY;
+            continue;
+        default:
+            *p_pos = pos;
+            return 0;
+        }
+    }
+    *p_pos = pos;
+    return 1;
+}
+
+bool execute_fmt(const char *fmt, char *buff, size_t *p_cnt, va_list arg, bool phony)
+{
+    size_t cnt = *p_cnt;
+    for (size_t i = 0, len = 0, tmp = *p_cnt, pos = 0; (tmp = len = size_sub_sat(tmp, len)); cnt = size_add_sat(cnt, len), i = (i + 1) & 1)
+    {
+        if (!i)
+        {
+            size_t ctr = Strchrnul(fmt + pos, '%');
+            print(buff + cnt, &len, fmt + pos, ctr);
+            if (!fmt[pos += ctr]) break;
+        }
+        else
+        {
+            size_t off;
+            struct fmt_res res;
+            if (!decode_fmt(&res, fmt + pos, &off)) return 0;
+            pos += off;
+            bool no_print = phony;
+            //if (res.flags & FMT_CONDITIONAL) phony &= va_arg(arg, bool);
+            //if (res.flags & (FMT_ENV_BEGIN | FMT_ENV_END)) 
+        }
+    }
+    *p_cnt = cnt;
+}
+
 bool print_fmt2_var(char *buff, size_t *p_cnt, va_list arg)
 {
     const char *fmt = va_arg(arg, const char *);
-    if (fmt)
-    {
-        bool halt = 0;
-        size_t cnt = *p_cnt;
-        for (size_t i = 0, len = 0, tmp = *p_cnt, pos = 0, ctr; !halt && (tmp = len = size_sub_sat(tmp, len)); cnt = size_add_sat(cnt, len), i++) switch (i)
-        {
-        case 0:
-            ctr = Strchrnul(fmt + pos, '%');
-            print(buff + cnt, &len, fmt + pos, ctr);
-            if (!fmt[pos += ctr]) halt = 1;
-            break;
-        case 1:
-            for (pos++;; pos++)
-            {
-                switch (fmt[pos])
-                {
-                case '-':
-                case '+':
-                case ' ':
-
-                    return 0; // Wrong format string
-                }
-            }
-        default:
-            i = 0;
-        }
-        *p_cnt = cnt;
-    }
-    else *p_cnt = 0;
-    return 1;
+    return !fmt || execute_fmt(fmt, buff, p_cnt, arg, 0);
 }
 
 bool print_fmt(char *buff, size_t *p_cnt, ...)
@@ -283,7 +421,7 @@ bool log_init(struct log *restrict log, char *restrict path, size_t lim, enum lo
         if (!array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)) log_message_crt(log_error, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
-            if (bom) strncpy(log->buff, UTF8_BOM, log->cnt = lengthof(UTF8_BOM));
+            if (bom) memcpy(log->buff, UTF8_BOM, log->cnt = lengthof(UTF8_BOM));
             else log->cnt = 0;
             log->style = tty ? style : (struct style) { 0 };
             log->lim = lim;
@@ -335,9 +473,9 @@ void log_multiple_close(struct log *restrict arr, size_t cnt)
 
 static bool log_prefix(char *buff, size_t *p_cnt, struct code_metric code_metric, enum message_type type, struct style style)
 {
-    const char *ttl[] = { "MESSAGE", "ERROR", "WARNING", "NOTE", "INFO", "DAMNATION" };
+    const struct strl ttl[] = { STRI("MESSAGE"), STRI("ERROR"), STRI("WARNING"), STRI("NOTE"), STRI("INFO"), STRI("DAMNATION") };
     size_t cnt = 0;
-    if (!print_fmt2(buff + cnt, p_cnt, "%s[%D]%s %s%s%s %s(%s%s%s @ %s%s%s:%zu):%s ", ENV_EMPTY(style.ts), ENV(style.ttl[type], ttl[type]), ENV(style.src, ENV(style.dquo, code_metric.func), ENV(style.dquo, code_metric.path), code_metric.line))) return 0;
+    if (!print_fmt2(buff + cnt, p_cnt, "%<>D %<>s* %< %<>s @ %<>s:%uz%>  ", style.ts, style.ttl[type], ttl[type].str, ttl[type].len, ENV(style.src, ENV(style.dquo, code_metric.func), ENV(style.dquo, code_metric.path), code_metric.line))) return 0;
     *p_cnt = cnt;
     return 1;
 }

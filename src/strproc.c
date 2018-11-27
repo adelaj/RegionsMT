@@ -59,11 +59,11 @@ bool str_handler(const char *str, size_t len, void *Ptr, void *context)
     return 1;
 }
 
-#define DECLARE_STR_TO_UINT(TYPE, SUFFIX, LIMIT, BACKEND_RETURN, BACKEND) \
-    unsigned str_to_ ## SUFFIX(const char *str, char **ptr, TYPE *p_res) \
+#define DECLARE_STR_TO_UINT(TYPE, SUFFIX, LIMIT, BACKEND_RETURN, BACKEND, RADIX) \
+    unsigned str_to_ ## SUFFIX(const char *str, const char **ptr, TYPE *p_res) \
     { \
         errno = 0; \
-        BACKEND_RETURN res = BACKEND(str, ptr, 10); \
+        BACKEND_RETURN res = BACKEND(str, (char **) ptr, (RADIX)); \
         Errno_t err = errno; \
         if (res > (LIMIT)) \
         { \
@@ -74,21 +74,27 @@ bool str_handler(const char *str, size_t len, void *Ptr, void *context)
         return err ? err == ERANGE ? CVT_OUT_OF_RANGE : 0 : 1; \
     }
 
-DECLARE_STR_TO_UINT(uint64_t, uint64, UINT64_MAX, unsigned long long, strtoull)
-DECLARE_STR_TO_UINT(uint32_t, uint32, UINT32_MAX, unsigned long, strtoul)
-DECLARE_STR_TO_UINT(uint16_t, uint16, UINT16_MAX, unsigned long, strtoul)
-DECLARE_STR_TO_UINT(uint8_t, uint8, UINT8_MAX, unsigned long, strtoul)
+DECLARE_STR_TO_UINT(uint64_t, uint64, UINT64_MAX, unsigned long long, strtoull, 10)
+DECLARE_STR_TO_UINT(uint32_t, uint32, UINT32_MAX, unsigned long, strtoul, 10)
+DECLARE_STR_TO_UINT(uint16_t, uint16, UINT16_MAX, unsigned long, strtoul, 10)
+DECLARE_STR_TO_UINT(uint8_t, uint8, UINT8_MAX, unsigned long, strtoul, 10)
+DECLARE_STR_TO_UINT(uint64_t, uint64_hex, UINT64_MAX, unsigned long long, strtoull, 16)
+DECLARE_STR_TO_UINT(uint32_t, uint32_hex, UINT32_MAX, unsigned long, strtoul, 16)
+DECLARE_STR_TO_UINT(uint16_t, uint16_hex, UINT16_MAX, unsigned long, strtoul, 16)
+DECLARE_STR_TO_UINT(uint8_t, uint8_hex, UINT8_MAX, unsigned long, strtoul, 16)
 
 #if defined _M_X64 || defined __x86_64__
-DECLARE_STR_TO_UINT(size_t, size, SIZE_MAX, unsigned long long, strtoull)
+DECLARE_STR_TO_UINT(size_t, size, SIZE_MAX, unsigned long long, strtoull, 10)
+DECLARE_STR_TO_UINT(size_t, size_hex, SIZE_MAX, unsigned long long, strtoull, 16)
 #elif defined _M_IX86 || defined __i386__
-DECLARE_STR_TO_UINT(size_t, size, SIZE_MAX, unsigned long, strtoul)
+DECLARE_STR_TO_UINT(size_t, size, SIZE_MAX, unsigned long, strtoul, 10)
+DECLARE_STR_TO_UINT(size_t, size_hex, SIZE_MAX, unsigned long, strtoul, 16)
 #endif
 
-unsigned str_to_flt64(const char *str, char **ptr, double *p_res)
+unsigned str_to_flt64(const char *str, const char **ptr, double *p_res)
 {
     errno = 0;
-    *p_res = strtod(str, ptr);
+    *p_res = strtod(str, (char **) ptr);
     Errno_t err = errno;
     return err ? err == ERANGE ? CVT_OUT_OF_RANGE : 0 : 1;
 }
