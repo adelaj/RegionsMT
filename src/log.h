@@ -70,12 +70,12 @@ typedef bool (*message_callback)(char *, size_t *, void *, struct style);
 typedef bool (*message_callback_var)(char *, size_t *, void *, struct style, va_list);
 
 struct code_metric {
-    const char *path, *func;
+    const struct strl path, func;
     size_t line;
 };
 
 #define CODE_METRIC \
-    (struct code_metric) { .path = (__FILE__), .func = (__func__), .line = (__LINE__) }
+    (struct code_metric) { .path = STRI(__FILE__), .func = STRI(__func__), .line = (__LINE__) }
 
 struct time_diff {
     uint64_t start, stop;

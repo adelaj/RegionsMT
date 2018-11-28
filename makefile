@@ -1,70 +1,74 @@
-CC = gcc
-CC_OPT = -std=c11 -mavx -flto -fuse-linker-plugin -Wall
-
-LD = $(CC)
-LD_OPT = -flto -fuse-linker-plugin
-LD_LIB = m pthread gsl gslcblas
-
-ifeq ($(ARCH),i386)
-    CC_OPT += -m32
-else ifneq ($(ARCH),x86_64)
-    ARCH = x86_64
+ifeq ($(ARCH),)
+ARCH = x86_64
 endif
 
-GSL_DIR = ../gsl
-GSL_DIR_Release = $(GSL_DIR)-$(ARCH)-Release
-GSL_DIR_Debug = $(GSL_DIR)-$(ARCH)-Debug
+ifeq ($(CFG),)
+CFG = Release
+endif
 
-CC_OPT_Release = $(CC_OPT) -O3
-CC_OPT_Debug = $(CC_OPT) -D_DEBUG -mavx -Og -ggdb
-CC_INC_Release = $(GSL_DIR_Release)
-CC_INC_Debug = $(GSL_DIR_Debug)
+CC = gcc
+CC_OPT = -std=c11 -mavx -flto -fuse-linker-plugin -Wall
+CC_OPT-i386 = -m32
+CC_OPT-Release = -O3
+CC_OPT-Debug = -D_DEBUG -Og -ggdb
+CC_INC = ../gsl
 
-LD_OPT_Release = $(LD_OPT) -O3
-LD_OPT_Debug = $(LD_OPT) -Og
-LD_INC_Release = $(GSL_DIR_Release)
-LD_INC_Debug = $(GSL_DIR_Debug)
-LD_LIB_Release = $(LD_LIB)
-LD_LIB_Debug = $(LD_LIB)
+LD = $(CC)
+LD_OPT = -mavx -flto -fuse-linker-plugin
+LD_OPT-i386 = -m32
+LD_OPT-Release = -O3
+LD_OPT-Debug = -Og
+LD_LIB = m pthread gsl gslcblas
+LD_INC = ../gsl
 
-TARGET_Release = RegionsMT-$(ARCH)-Release
-TARGET_Debug = RegionsMT-$(ARCH)-Debug
-
-OBJ_DIR_Release = ./obj-$(ARCH)-Release
-OBJ_DIR_Debug = ./obj-$(ARCH)-Debug
+TARGET = RegionsMT
+OBJ_DIR = ./obj
 SRC_DIR = ./src
 
-CONFIG = Release Debug
+target = $(foreach cfg,$(CFG),$(addsuffix -$(cfg),$(addprefix $1-,$(ARCH))))
 
-rwildcard = $(wildcard $(addsuffix $2,$1)) $(foreach d,$(wildcard $(addsuffix *,$1)),$(call rwildcard,$d/,$2))
-struct = $(sort $(patsubst $(SRC_DIR)/%,$($(addprefix OBJ_DIR_,$1))/%,$(dir $(call rwildcard,$(SRC_DIR)/,))))
-obj = $(sort $(patsubst $(addprefix $(SRC_DIR)/%,$2),$(addprefix $($(addprefix OBJ_DIR_,$1))/%,$(addsuffix .o,$2)),$(call rwildcard,$(SRC_DIR)/,$(addprefix *,$2))))
-
-.PHONY: all release debug
-all: release debug;
-release: Release;
-debug: Debug;
+.PHONY: all
+all: $(call target,$(TARGET));
 
 .PHONY: clean
-clean: clean-Release clean-Debug;
+clean: $(call target,clean);
+
+rwildcard = $(wildcard $1$2) $(foreach d,$(wildcard $1*),$(call rwildcard,$d/,$2))
+struct = $(sort $(patsubst $(SRC_DIR)/%,$(OBJ_DIR)-$1/%,$(dir $(call rwildcard,$(SRC_DIR)/,))))
+obj = $(sort $(patsubst $(SRC_DIR)/%$2,$(OBJ_DIR)-$1/%$2.o,$(call rwildcard,$(SRC_DIR)/,*$2)))
+
+define build_var =
+BUILD_$1-$2-$3 = $(addsuffix $4,$($1))
+ifneq ($($1-$2),)
+BUILD_$1-$2-$3 += $(addsuffix $4,$($1-$2))
+endif
+ifneq ($($1-$3),)
+BUILD_$1-$2-$3 += $(addsuffix $4,$($1-$3))
+endif
+ifneq ($($1-$2-$3),)
+BUILD_$1-$2-$3 += $(addsuffix $4,$($1-$2-$3))
+endif
+endef
 
 define build =
-.PHONY: $1
-$1: | $(call struct,$1) $($(addprefix TARGET_,$1));
-$(call struct,$1):; mkdir -p $$@
-$($(addprefix TARGET_,$1)): $(call obj,$1,.c); $(LD) $($(addprefix LD_OPT_, $1)) -o $$@ $$^ $(addprefix -L,$($(addprefix LD_INC_,$1))) $(addprefix -l,$($(addprefix LD_LIB_,$1)))
-$(call obj,$1,.c): $($(addprefix OBJ_DIR_,$1))/%.c.o: $(SRC_DIR)/%.c; $(CC) $($(addprefix CC_OPT_,$1)) $(addprefix -I,$($(addprefix CC_INC_,$1))) -o $$@ -c $$^
+.PHONY: $1-$2
+$1-$2: | $(call struct,$1-$2) $(TARGET)-$1-$2;
+$(call struct,$1-$2):; mkdir -p $$@
+$(foreach var,CC_OPT LD_OPT LD_LIB,$(eval $(call build_var,$(var),$1,$2,)))
+$(foreach var,CC_INC LD_INC,$(eval $(call build_var,$(var),$1,$2,-$1-$2)))
+$(TARGET)-$1-$2: $(call obj,$1-$2,.c); $(LD) $(BUILD_LD_OPT-$1-$2) -o $$@ $$^ $(addprefix -L,$(BUILD_LD_INC-$1-$2)) $(addprefix -l,$(BUILD_LD_LIB-$1-$2))
+$(call obj,$1-$2,.c): $(OBJ_DIR)-$1-$2/%.c.o: $(SRC_DIR)/%.c; $(CC) $(BUILD_CC_OPT-$1-$2) $(addprefix -I,$(BUILD_CC_INC-$1-$2)) -o $$@ -c $$^
 endef
 
 define clean =
-.PHONY: $(addprefix clean-,$1) $(addprefix clean-obj-,$1) $(addprefix clean-target-,$1)
-$(addprefix clean-,$1): $(addprefix clean-obj-,$1) $(addprefix clean-target-,$1);
-$(addprefix clean-obj-,$1):; rm -rf $($(addprefix OBJ_DIR_,$1))
-$(addprefix clean-target-,$1):; rm -f $($(addprefix TARGET_,$1))
+.PHONY: clean-$1-$2 clean-obj-$1-$2 clean-target-$1-$2
+clean-$1-$2: clean-obj-$1-$2 clean-target-$1-$2;
+clean-obj-$1-$2:; rm -rf $(OBJ_DIR)-$1-$2
+clean-target-$1-$2:; rm -f $(TARGET)-$1-$2
 endef
 
-$(foreach cfg, $(CONFIG), $(eval $(call build, $(cfg))))
-$(foreach cfg, $(CONFIG), $(eval $(call clean, $(cfg))))
+$(foreach arch,$(ARCH),$(foreach cfg,$(CFG),$(eval $(call build,$(arch),$(cfg)))))
+$(foreach arch,$(ARCH),$(foreach cfg,$(CFG),$(eval $(call clean,$(arch),$(cfg)))))
 
 .PHONY: print-%
 print-% :; @echo $* = $($*)

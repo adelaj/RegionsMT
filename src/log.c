@@ -171,19 +171,20 @@ static bool decode_fmt_size(size_t *p_val, enum frm_arg_mode *p_mode, const char
     size_t pos = *p_pos;
     if (fmt[pos] == '*')
     {
-        *p_mode |= ARG_FETCH;
+        *p_mode = ARG_FETCH;
         *p_pos = pos + 1;
         return 1;
     }
     const char *tmp;
     unsigned cvt = str_to_size(fmt + pos, &tmp, p_val);
-    if (!cvt || tmp == fmt + pos) return 0;
-    pos = tmp - fmt;    
+    if (tmp == fmt + pos) return 1;
+    if (!cvt) return 0;
+    *p_pos = tmp - fmt;    
     *p_mode = ARG_SET;
     return 1;
 }
 
-static bool decode_fmt_utf(uint32_t *p_val, enum frm_arg_mode *p_mode, const char *fmt, size_t *p_pos)
+static bool decode_fmt_str(uint32_t *p_val, enum frm_arg_mode *p_mode, const char *fmt, size_t *p_pos)
 {
     bool hex = 0;
     size_t pos = *p_pos;
@@ -194,14 +195,15 @@ static bool decode_fmt_utf(uint32_t *p_val, enum frm_arg_mode *p_mode, const cha
     }
     if (fmt[pos] == '*')
     {
-        *p_mode |= ARG_FETCH;
+        *p_mode = ARG_FETCH;
         *p_pos = pos + 1;
         return 1;
     }
     const char *tmp;
     unsigned cvt = (hex ? str_to_uint32_hex : str_to_uint32)(fmt + pos, &tmp, p_val);
-    if (!cvt || tmp == fmt + pos || *p_val >= UTF8_BOUND) return 0;
-    pos = tmp - fmt;
+    *p_pos = tmp - fmt;
+    if (tmp == fmt + pos) return 1;
+    if (!cvt || *p_val >= UTF8_BOUND) return 0;
     *p_mode = ARG_SET;
     return 1;
 }
@@ -235,7 +237,7 @@ static bool decode_fmt(struct fmt_res *res, const char *fmt, size_t *p_pos)
         case 's':
             res->type = TYPE_STR;
             *p_pos = pos;
-            return decode_fmt_size(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
+            return decode_fmt_str(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
         case 'A':
             res->flt_arg.flags |= FLT_FLAG_UPPERCASE;
         case 'a':
@@ -244,14 +246,14 @@ static bool decode_fmt(struct fmt_res *res, const char *fmt, size_t *p_pos)
         case 'f':
             res->type = TYPE_FLT;
             *p_pos = pos;
-            return decode_fmt_flt(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
+            return decode_fmt_str(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
         case 'E':
             res->flt_arg.flags |= FLT_FLAG_UPPERCASE;
         case 'e':
             res->flt_arg.spec = FLT_SPEC_EXP;
             res->type = TYPE_FLT;
             *p_pos = pos;
-            return decode_fmt_flt(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
+            return decode_fmt_str(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
         case 'T':
             res->type = TYPE_TIME_DIFF;
             break;
@@ -475,7 +477,7 @@ static bool log_prefix(char *buff, size_t *p_cnt, struct code_metric code_metric
 {
     const struct strl ttl[] = { STRI("MESSAGE"), STRI("ERROR"), STRI("WARNING"), STRI("NOTE"), STRI("INFO"), STRI("DAMNATION") };
     size_t cnt = 0;
-    if (!print_fmt2(buff + cnt, p_cnt, "%<>D %<>s* %< %<>s @ %<>s:%uz%>  ", style.ts, style.ttl[type], ttl[type].str, ttl[type].len, ENV(style.src, ENV(style.dquo, code_metric.func), ENV(style.dquo, code_metric.path), code_metric.line))) return 0;
+    if (!print_fmt2(buff + cnt, p_cnt, "%<>D %<>s* %< %<>s* @ %<>s*:%uz%>  ", style.ts, style.ttl[type], ttl[type].str, ttl[type].len, ENV(style.src, ENV(style.dquo, code_metric.func), ENV(style.dquo, code_metric.path), code_metric.line))) return 0;
     *p_cnt = cnt;
     return 1;
 }

@@ -32,7 +32,7 @@ static bool message_argv(char *buff, size_t *p_cnt, void *Context, struct style 
 {
     const char *fmt[] = {
         "Expected a value for",
-        "Unable to handle the value %< %<>s*%> of",
+        "Unable to handle the value %<>s*%> of",
         "Unable to handle",
         "Unused value of",
         "Invalid %s*",
@@ -40,7 +40,7 @@ static bool message_argv(char *buff, size_t *p_cnt, void *Context, struct style 
     };
     struct argv_context *context = Context;
     size_t cnt = 0, len = *p_cnt;
-    bool squo = context->status & 1;
+    bool shrt = context->status & 1;
     for (unsigned i = 0;; i++)
     {
         size_t tmp = len;
@@ -51,7 +51,7 @@ static bool message_argv(char *buff, size_t *p_cnt, void *Context, struct style 
             {
             case ARGV_WARNING_UNHANDLED_PAR_LONG:
             case ARGV_WARNING_UNHANDLED_PAR_SHRT:
-                if (!print_fmt(buff + cnt, &tmp, fmt[context->status / 2], style.str, style.dquo, context->val_str, context->val_len, style.str)) return 0;
+                if (!print_fmt(buff + cnt, &tmp, fmt[context->status / 2], style.str, context->val_str, context->val_len)) return 0;
                 break;
             case ARGV_WARNING_INVALID_PAR_LONG:
                 if (!print_fmt(buff + cnt, &tmp, fmt[context->status / 2], STRC("name"))) return 0;
@@ -71,7 +71,7 @@ static bool message_argv(char *buff, size_t *p_cnt, void *Context, struct style 
             {
             case ARGV_WARNING_INVALID_PAR_LONG:
             case ARGV_WARNING_INVALID_PAR_SHRT:
-                if (!print_fmt(buff + cnt, &tmp, " %< %<>s*%>  in", style.str, squo ? style.squo : style.dquo, context->name_str, context->name_len, style.str)) return 0;
+                if (!print_fmt(buff + cnt, &tmp, " %<>s* in", shrt ? style.chr : style.str, context->name_str, context->name_len)) return 0;
                 break;
             default:
                 tmp = 0;
@@ -84,7 +84,7 @@ static bool message_argv(char *buff, size_t *p_cnt, void *Context, struct style 
             switch (context->status)
             {
             default:
-                if (!print_fmt(buff + cnt, &tmp, " %< %<>s*%> ", style.str, squo ? style.squo : style.dquo, context->name_str, context->name_len, style.str)) return 0;
+                if (!print_fmt(buff + cnt, &tmp, " %<>s*", shrt ? style.chr : style.str, context->name_str, context->name_len)) return 0;
                 break;
             case ARGV_WARNING_INVALID_PAR_LONG:
             case ARGV_WARNING_INVALID_PAR_SHRT:
