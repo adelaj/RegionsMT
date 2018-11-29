@@ -1,14 +1,15 @@
-ifeq ($(ARCH),)
-ARCH = x86_64
+ifeq ($(strip $(ARCH)),)
+ARCH = $(shell arch)
 endif
 
-ifeq ($(CFG),)
+ifeq ($(strip $(CFG)),)
 CFG = Release
 endif
 
 CC = gcc
 CC_OPT = -std=c11 -flto -fuse-linker-plugin -Wall -mavx
 CC_OPT-i386 = -m32
+CC_OPT-x86_64 = -m64
 CC_OPT-Release = -O3
 CC_OPT-Debug = -D_DEBUG -Og -ggdb
 CC_INC = ../gsl
@@ -16,6 +17,7 @@ CC_INC = ../gsl
 LD = $(CC)
 LD_OPT = -flto -fuse-linker-plugin -mavx
 LD_OPT-i386 = -m32
+LD_OPT-x86_64 = -m64
 LD_OPT-Release = -O3
 LD_OPT-Debug = -Og
 LD_LIB = m pthread gsl gslcblas
@@ -33,24 +35,15 @@ all: $(call target,build);
 .PHONY: clean
 clean: $(call target,clean);
 
-rwildcard = $(sort $(wildcard $1$2)) $(foreach d,$(sort $(wildcard $1*)),$(call rwildcard,$d/,$2))
+rwildcard = $(sort $(wildcard $(addprefix $1,$2))) $(foreach d,$(sort $(wildcard $1*)),$(call rwildcard,$d/,$2))
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 
 define build_var =
-BUILD_$1-$2-$3 = $(addsuffix $4,$($1))
-ifneq ($($1-$2),)
-BUILD_$1-$2-$3 += $(addsuffix $4,$($1-$2))
-endif
-ifneq ($($1-$3),)
-BUILD_$1-$2-$3 += $(addsuffix $4,$($1-$3))
-endif
-ifneq ($($1-$2-$3),)
-BUILD_$1-$2-$3 += $(addsuffix $4,$($1-$2-$3))
-endif
+BUILD_$1-$2-$3 = $(strip $(addsuffix $4,$($1)) $(addsuffix $4,$($1-$2)) $(addsuffix $4,$($1-$3)) $(addsuffix $4,$($1-$2-$3)))
 endef
 
 define build_obj =
-OBJ$1 = $(patsubst $(SRC_DIR)/%.c,$(OBJ_DIR)$1/%.c.o,$(call rwildcard,$(SRC_DIR)/,*.c))
+OBJ$1 = $(patsubst $(SRC_DIR)/%,$(OBJ_DIR)$1/%.o,$(call rwildcard,$(SRC_DIR)/,*.c))
 endef
 
 define build_struct =
@@ -62,7 +55,7 @@ define build =
 build$1: | $(STRUCT$1) $(TARGET)$1;
 $(STRUCT$1):; mkdir $$@
 $(TARGET)$1: $(OBJ$1); $(LD) $(BUILD_LD_OPT$1) -o $$@ $$^ $(addprefix -L,$(BUILD_LD_INC$1)) $(addprefix -l,$(BUILD_LD_LIB$1))
-$(OBJ$1): $(OBJ_DIR)$1/%.c.o: $(SRC_DIR)/%.c; $(CC) $(BUILD_CC_OPT$1) $(addprefix -I,$(BUILD_CC_INC$1)) -o $$@ -c $$^
+$(OBJ_DIR)$1/%.c.o: $(SRC_DIR)/%.c; $(CC) $(BUILD_CC_OPT$1) $(addprefix -I,$(BUILD_CC_INC$1)) -o $$@ -c $$^
 endef
 
 define clean =
