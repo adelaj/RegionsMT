@@ -7,6 +7,11 @@
 
 #include <stdarg.h>
 
+void print(char *, size_t *, const char *, size_t);
+bool print_fmt(char *, size_t *, ...);
+bool print_time_diff(char *, size_t *, uint64_t, uint64_t);
+void print_time_stamp(char *, size_t *);
+
 #define ANSI "\x1b"
 #define CSI "["
 #define SGR(C) C "m"
@@ -37,11 +42,6 @@
 struct env {
     struct strl begin, end;
 };
-
-void print(char *, size_t *, const char *, size_t);
-bool print_fmt(char *, size_t *, ...);
-bool print_time_diff(char *, size_t *, uint64_t, uint64_t, struct env);
-void print_time_stamp(char *, size_t *);
 
 enum message_type {
     MESSAGE_DEFAULT = 0,

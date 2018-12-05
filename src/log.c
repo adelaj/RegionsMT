@@ -35,10 +35,18 @@ void print_time_stamp(char *buff, size_t *p_cnt)
     else *p_cnt = 1;
 }
 
-bool print_time_diff(char *buff, size_t *p_cnt, uint64_t start, uint64_t stop, struct env env)
+static uint64_t uint64_dec_ctz(uint64_t x)
 {
-    uint64_t diff = DIST(stop, start), hdq = diff / 3600000000, hdr = diff % 3600000000, mdq = hdr / 60000000, mdr = hdr % 60000000, sdq = mdr / 1000000, sdr = mdr % 1000000;
-    return print_fmt(buff, p_cnt, "%?$%?$%< %uq.000000%-uq%>  sec", !!hdq, "%<>uq hr ", env, hdq, !!mdq, "%<>uq min", env, mdq, env, sdq, sdr, env);
+    if (!x) return UINT64_MAX;
+    uint64_t res = 0;
+    for (; !(x % 10); res++, x /= 10);
+    return res;
+}
+
+bool print_time_diff(char *buff, size_t *p_cnt, uint64_t start, uint64_t stop)
+{
+    uint64_t diff = DIST(stop, start), hdq = diff / 3600000000, hdr = diff % 3600000000, mdq = hdr / 60000000, mdr = hdr % 60000000, sdq = mdr / 1000000, sdr = mdr % 1000000, ctz = uint64_dec_ctz(sdr);
+    return print_fmt(buff, p_cnt, "%?$%?$%uq.000000%-uq%-^* sec", !!hdq, "%uq hr ", hdq, !!mdq, "%uq min ", mdq, sdq, sdr, (size_t) MIN(ctz, 6));
 }
 
 void print_crt(char *buff, size_t *p_cnt, Errno_t err)
@@ -59,6 +67,7 @@ enum fmt_type {
     TYPE_PERC,
     TYPE_UTF,
     TYPE_EMPTY,
+    TYPE_SKIP,
 };
 
 enum fmt_int_spec {
@@ -77,7 +86,7 @@ enum fmt_int_spec {
 enum fmt_int_flags {
     INT_FLAG_UNSIGNED = 1,
     INT_FLAG_HEX = 2,
-    INT_FLAG_UPPERCASE = 4
+    INT_FLAG_UPPERCASE = 4,
 };
 
 enum fmt_flt_spec {
@@ -92,9 +101,9 @@ enum fmt_flt_flags {
 
 enum fmt_flags {
     FMT_CONDITIONAL = 1,
-    FMT_ENV_BEGIN = 2,
-    FMT_ENV_END = 4,
-    FMT_LEFT_JUSTIFY = 8
+    FMT_LEFT_JUSTIFY = 2,
+    FMT_ENV_BEGIN = 4,
+    FMT_ENV_END = 8,
 };
 
 enum fmt_arg_mode {
@@ -125,7 +134,7 @@ struct fmt_res {
         struct {
             enum fmt_arg_mode mode;
             uint32_t val;
-        } utf_arg;        
+        } utf_arg;
     };
 };
 
@@ -226,7 +235,7 @@ static bool fmt_decode_utf(uint32_t *p_val, enum fmt_arg_mode *p_mode, const cha
 
 static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
 {
-    const char flags[] = { '?', '<', '>', '-' };
+    const char flags[] = { '?', '-', '<', '>' };
     size_t pos = *p_pos;
     *res = (struct fmt_res) { 0 };
     for (size_t i = 0; i < countof(flags) + 1; i++) switch (i)
@@ -293,6 +302,10 @@ static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
         case ' ':
             res->type = TYPE_EMPTY;
             break;
+        case '^':
+            res->type = TYPE_SKIP;
+            *p_pos = pos + 1;
+            return fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
         default:
             *p_pos = pos;
             return 0;
@@ -366,9 +379,8 @@ static void fmt_execute_str(size_t len, enum fmt_arg_mode mode, char *buff, size
 
 static bool fmt_execute_time_diff(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
 {
-    struct env env = va_arg(*p_arg, struct env);
     uint64_t start = va_arg(*p_arg, Uint64_dom_t), stop = va_arg(*p_arg, Uint64_dom_t);
-    if (!phony) return print_time_diff(buff, p_cnt, start, stop, env);
+    if (!phony) return print_time_diff(buff, p_cnt, start, stop);
     return 1;
 }
 
@@ -376,6 +388,12 @@ static void fmt_execute_crt(char *buff, size_t *p_cnt, va_list *p_arg, bool phon
 {
     Errno_t err = va_arg(*p_arg, Errno_t);
     if (!phony) print_crt(buff, p_cnt, err);
+}
+
+static void fmt_execute_skip(size_t len, enum fmt_arg_mode mode, size_t *p_cnt, va_list *p_arg, bool phony)
+{
+    if (mode == ARG_FETCH) len = va_arg(*p_arg, Size_dom_t);
+    if (!phony) *p_cnt = len;
 }
 
 static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
@@ -398,20 +416,21 @@ static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
         cnt = size_add_sat(cnt, len);
     case 2:
         tmp = len = size_sub_sat(tmp, len);
+        if (!tmp) i = SIZE_MAX; // Exit loop if there is no more space
         break;
     case 9:
-        if ((res.flags & FMT_LEFT_JUSTIFY)) // (!) control numeric overflow
+        if (res.flags & FMT_LEFT_JUSTIFY)
         {
             size_t diff = cnt - off, disp = size_sub_sat(off, diff);
-            array_shift_left(buff + disp, diff, 1, off);
+            array_shift_left(buff + disp, diff, 1, off - disp);
             cnt = disp + diff;
         }
         i = 1;
-    case 1: 
+    case 1:
         off = Strchrnul(fmt + pos, '%'); 
         print(buff + cnt, &len, fmt + pos, off);
         if (fmt[pos += off]) pos++;
-        else i = SIZE_MAX;
+        else i = SIZE_MAX; // Exit loop if there no more arguments
         off = cnt = size_add_sat(cnt, len);
         break;
     case 3:
@@ -446,6 +465,9 @@ static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
             break;
         case TYPE_FMT:
             if (!fmt_execute(buff + cnt, &len, p_arg, !cond)) return 0;
+            break;
+        case TYPE_SKIP:
+            fmt_execute_skip(res.str_arg.len, res.str_arg.mode, &len, p_arg, !cond);
             break;
         case TYPE_FLT:
         case TYPE_CHAR:

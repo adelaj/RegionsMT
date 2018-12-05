@@ -30,8 +30,8 @@ double lde_impl(uint8_t *gen_pos, uint8_t *gen_neg, size_t phen_cnt)
     size_t bor, cov = size_sub(&bor, 4 * fr[0] * ts, mar_pos[0] * mar_neg[0]); // Actual covariance = 'cov / (16 * ts * ts)'
     if (!cov) return 0.;
     size_t pr0, pr1;
-    if (!bor) pr0 = mar_pos[0] * mar_pos[1], pr1 = mar_neg[0] * mar_neg[1];
-    else pr0 = mar_pos[0] * mar_neg[1], pr1 = mar_neg[0] * mar_pos[1];
+    if (bor) pr0 = mar_pos[0] * mar_neg[1], pr1 = mar_neg[0] * mar_pos[1], cov = 0 - cov;
+    else pr0 = mar_pos[0] * mar_pos[1], pr1 = mar_neg[0] * mar_neg[1];
     return (double) cov / (double) MIN(pr0, pr1);
 }
 

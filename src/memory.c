@@ -14,12 +14,13 @@ void array_broadcast(void *arr, size_t cnt, size_t sz, void *val)
     for (size_t i = 0; i < tot; i += sz) memcpy((char *) arr + i, val, sz);
 }
 
+// Equivalent to 'memmove(arr, (char *) arr + off * sz, cnt * sz)'
 void array_shift_left(void *arr, size_t cnt, size_t sz, size_t off)
 {
     if (!off || !cnt) return;
     size_t div = cnt / off, rem = (cnt % off) * sz, tot = off * sz, left = 0;
     for (size_t i = 0; i < div; i++, left += tot) memcpy((char *) arr + left, (char *) arr + left + tot, tot);
-    memcpy((char *) arr + left, (char *) arr + left + rem, rem);
+    memcpy((char *) arr + left, (char *) arr + left + tot, rem);
 }
 
 // 'p_cap' -- pointer to initial capacity
@@ -116,24 +117,16 @@ unsigned queue_test(struct queue *queue, size_t diff, size_t sz)
     unsigned res = array_test(&queue->arr, &cap, sz, 0, 0, queue->cnt, diff);
     if (!res || (res & ARRAY_UNTOUCHED)) return res;
 
-    size_t bor, left = size_sub(&bor, queue->begin, queue->cap - queue->cnt);
-    if (!bor && left) // queue->begin > queue->cap - queue->cnt
+    size_t bor, rem = size_sub(&bor, queue->begin, queue->cap - queue->cnt);
+    if (!bor && rem) // queue->begin > queue->cap - queue->cnt
     {
-        /*size_t left2 = size_sub(&bor, queue->begin, cap - queue->cnt);
-        if (!bor && left2) // queue->begin > cap - queue->cnt
+        size_t off = size_sub(&bor, rem, cap - queue->cap);
+        if (!bor && off) // queue->begin > cap - queue->cnt
         {
-            size_t capp_diff = cap - queue->cap, capp_diff_pr = capp_diff * sz;
-            memcpy((char *) queue->arr + queue->cap * sz, queue->arr, capp_diff_pr);
-
-            size_t left3 = size_sub(&bor, left2, capp_diff);
-            if (!bor && left3) // queue->begin - cap + queue->cnt > cap - queue->cap
-            {
-                memcpy(queue->arr, (char *) queue->arr + capp_diff_pr, capp_diff_pr);
-                memcpy((char *) queue->arr + capp_diff_pr, (char *) queue->arr + (capp_diff_pr << 1), left3 * sz);
-            }
-            else memcpy(queue->arr, (char *) queue->arr + capp_diff_pr, left2 * sz);
+            memcpy((char *) queue->arr + queue->cap * sz, queue->arr, off * sz);
+            array_shift_left(queue->arr, rem - off, sz, off);
         }
-        else memcpy((char *) queue->arr + queue->cap * sz, queue->arr, left * sz);*/
+        else memcpy((char *) queue->arr + queue->cap * sz, queue->arr, rem * sz);
     }
     queue->cap = cap;
     return ARRAY_SUCCESS;
@@ -152,12 +145,12 @@ static void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, s
     size_t bor, left = size_sub(&bor, queue->begin, queue->cap - queue->cnt);
     if (bor) left += queue->cap;
     size_t diff = queue->cap - left; // Never overflows
-    size_t bor2, left2 = size_sub(&bor2, cnt, diff);
-    if (!bor2 && left2) // cnt > queue->cap - left
+    size_t bor2, diff2 = size_sub(&bor2, cnt, diff);
+    if (!bor2 && diff2) // cnt > queue->cap - left
     {
-        size_t diff_pr = diff * sz;
-        memcpy((char *) queue->arr + left * sz, arr, diff_pr);
-        memcpy(queue->arr, (char *) queue->arr + diff_pr, left2 * sz);
+        size_t tot = diff * sz;
+        memcpy((char *) queue->arr + left * sz, arr, tot);
+        memcpy(queue->arr, (char *) arr + tot, diff2 * sz);
     }
     else memcpy((char *) queue->arr + left * sz, arr, cnt * sz);    
     queue->cnt += cnt;
@@ -169,9 +162,9 @@ static void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, s
     size_t bor, diff = size_sub(&bor, cnt, queue->begin);
     if (!bor && diff) // cnt > queue->begin
     {
-        size_t diff_pr = diff * sz, left = queue->cap - diff;
-        memcpy((char *) queue->arr + left * sz, arr, diff_pr);
-        memcpy(queue->arr, (char *) queue->arr + diff_pr, queue->begin * sz);
+        size_t tot = diff * sz, left = queue->cap - diff;
+        memcpy((char *) queue->arr + left * sz, arr, tot);
+        memcpy(queue->arr, (char *) arr + tot, queue->begin * sz);
         queue->begin = left;
     }
     else
