@@ -183,7 +183,7 @@ static bool message_xml(char *buff, size_t *p_buff_cnt, void *Context)
             case XML_ERROR_STR_ENDING:
             case XML_ERROR_STR_UNHANDLED_VALUE:
             case XML_ERROR_STR_CONTROL:
-                if (!print_fmt(buff + cnt, &tmp, "%s \"%.*s\"", str[context->status], INTP(context->len), context->str)) return 0;
+                if (!print_fmt(buff + cnt, &tmp, "%s \"%.*s\"", str[context->status], (context->len), context->str)) return 0;
                 break;
             case XML_ERROR_VAL_RANGE:
             case XML_ERROR_VAL_REFERENCE:

@@ -30,16 +30,15 @@
 #define FG_BR_CYAN 96
 #define FG_BR_WHITE 97
 
-#define INIT_ENV(BEGIN, END) { .begin = STRI(BEGIN), .end = STRI(END) }
-#define INIT_ENV_COL_EXT(BEGIN, COL, END) INIT_ENV(ANSI CSI SGR(TOSTRING(COL) BEGIN), END ANSI CSI SGR(TOSTRING(FG_RESET)))
-#define INIT_ENV_COL(COL) INIT_ENV_COL_EXT("", COL, "")
+#define ENV_INIT(BEGIN, END) { .begin = STRI(BEGIN), .end = STRI(END) }
+#define ENV_INIT_COL_EXT(BEGIN, COL, END) ENV_INIT(ANSI CSI SGR(TOSTRING(COL)) BEGIN, END ANSI CSI SGR(TOSTRING(FG_RESET)))
+#define ENV_INIT_COL(COL) ENV_INIT_COL_EXT("", COL, "")
 
 struct env {
     struct strl begin, end;
 };
 
 void print(char *, size_t *, const char *, size_t);
-bool print_fmt_var(char *, size_t *, va_list);
 bool print_fmt(char *, size_t *, ...);
 bool print_time_diff(char *, size_t *, uint64_t, uint64_t, struct env);
 void print_time_stamp(char *, size_t *);
@@ -55,7 +54,7 @@ enum message_type {
 };
 
 struct style {
-    struct env ttl[MESSAGE_CNT], ts, td, src, num, path, str, chr;
+    struct env ttl[MESSAGE_CNT], inf, tmd, num, pth, str, chr;
 };
 
 struct log {
@@ -70,29 +69,12 @@ typedef bool (*message_callback)(char *, size_t *, void *, struct style);
 typedef bool (*message_callback_var)(char *, size_t *, void *, struct style, va_list);
 
 struct code_metric {
-    const struct strl path, func;
+    struct strl path, func;
     size_t line;
 };
 
 #define CODE_METRIC \
     (struct code_metric) { .path = STRI(__FILE__), .func = STRI(__func__), .line = (__LINE__) }
-
-struct time_diff {
-    uint64_t start, stop;
-};
-
-bool message_time_diff(char *, size_t *, void *, struct style);
-bool message_crt(char *, size_t *, void *, struct style);
-bool message_var(char *, size_t *, void *, struct style, va_list);
-
-struct message_thunk {
-    message_callback handler;
-    void *context;
-};
-
-bool message_var_two_stage(char *, size_t *, void *Thunk, struct style, va_list);
-
-#define INTP(X) ((int) MIN((X), INT_MAX)) // Useful for the printf-like functions
 
 enum log_flags {
     LOG_APPEND = 1,
@@ -109,7 +91,6 @@ bool log_message_var(struct log *restrict, struct code_metric, enum message_type
 
 // Some specialized messages
 bool log_message_fmt(struct log *restrict, struct code_metric, enum message_type, ...);
-bool log_message_time_diff(struct log *restrict, struct code_metric, enum message_type, uint64_t, uint64_t, ...);
 bool log_message_crt(struct log *restrict, struct code_metric, enum message_type, Errno_t);
 bool log_message_fopen(struct log *restrict, struct code_metric, enum message_type, const char *restrict, Errno_t);
 bool log_message_fseek(struct log *restrict, struct code_metric, enum message_type, int64_t, const char *restrict);

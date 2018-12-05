@@ -279,28 +279,28 @@ void size_dec_interlocked(volatile size_t *mem)
 
 #if defined __GNUC__ || defined __clang__ || defined _M_IX86 || defined __i386__
 #   if defined _M_X64 || defined __x86_64__
-typedef unsigned __int128 double_size_t;
+typedef unsigned __int128 Size_dbl_t;
 #   elif defined _M_IX86 || defined __i386__
-typedef unsigned long long double_size_t;
+typedef unsigned long long Size_dbl_t;
 #   endif
 
 size_t size_mul(size_t *p_hi, size_t x, size_t y)
 {
-    double_size_t val = (double_size_t) x * (double_size_t) y;
+    Size_dbl_t val = (Size_dbl_t) x * (Size_dbl_t) y;
     *p_hi = (size_t) (val >> SIZE_BIT);
     return (size_t) val;
 }
 
 size_t size_add(size_t *p_car, size_t x, size_t y)
 {
-    double_size_t val = (double_size_t) x + (double_size_t) y;
+    Size_dbl_t val = (Size_dbl_t) x + (Size_dbl_t) y;
     *p_car = (size_t) (val >> SIZE_BIT);
     return (size_t) val;
 }
 
 size_t size_sub(size_t *p_bor, size_t x, size_t y)
 {
-    double_size_t val = (double_size_t) x - (double_size_t) y;
+    Size_dbl_t val = (Size_dbl_t) x - (Size_dbl_t) y;
     *p_bor = 0 - (size_t) (val >> SIZE_BIT);
     return (size_t) val;
 }
@@ -312,7 +312,7 @@ size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
         *p_hi = 0;
         return 0;
     }
-    double_size_t val = args[0];
+    Size_dbl_t val = args[0];
     for (size_t i = 1; i < args_cnt; val += args[i++]);
     *p_hi = (size_t) (val >> SIZE_BIT);
     return (size_t) val;

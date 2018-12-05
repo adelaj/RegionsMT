@@ -20,17 +20,17 @@ enum utf8_test_obituary {
 
 static bool log_message_error_utf8_test(struct log *restrict log, struct code_metric code_metric, enum utf8_test_obituary obituary)
 {
-    static const char *str[] = {
-        "Incorrect length of the UTF-8 byte sequence",
-        "Incorrect UTF-8 byte sequence",
-        "Incorrect Unicode value of the UTF-8 byte sequence",
-        "Internal error",
-        "Incorrect length of the UTF-16 word sequence",
-        "Incorrect UTF-16 word sequence",
-        "Incorrect Unicode value of the UTF-16 word sequence",
-        "Internal error"
+    const struct strl str[] = { 
+        STRI("Incorrect length of the UTF-8 byte sequence"),
+        STRI("Incorrect UTF-8 byte sequence"),
+        STRI("Incorrect Unicode value of the UTF-8 byte sequence"),
+        STRI("Internal error"),
+        STRI("Incorrect length of the UTF-16 word sequence"),
+        STRI("Incorrect UTF-16 word sequence"),
+        STRI("Incorrect Unicode value of the UTF-16 word sequence"),
+        STRI("Internal error")
     };
-    return log_message_fmt(log, code_metric, MESSAGE_ERROR, "%s!\n", str[obituary]);
+    return log_message_fmt(log, code_metric, MESSAGE_ERROR, "%s*!\n", STRL(str[obituary]));
 }
 
 bool test_utf8_generator(void *dst, size_t *p_context, struct log *log)

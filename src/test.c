@@ -32,7 +32,7 @@ bool test(const struct test_group *group_arr, size_t cnt, struct log *log)
                         for (size_t k = 0; k < group->test_cnt; k++)
                         {
                             bool res = group->test[k](test_data, log);
-                            if (!res) log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Test no. %s%zu%s of the group no. %s%zu%s failed under the input data instance no. %s%zu%s of the generator no. %s%zu%s!\n", ENV(log->style.num, k + 1), ENV(log->style.num, i + 1), ENV(log->style.num, ind + 1), ENV(log->style.num, j + 1));
+                            if (!res) log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Test no. %<>uz of the group no. %<>uz failed under the input data instance no. %<>uz of the generator no. %<>uz!\n", log->style.num, k + 1, log->style.num, i + 1, log->style.num, ind + 1, log->style.num, j + 1);
                             succ &= res;
                         }
                         if (group->test_dispose) group->test_dispose(test_data);
@@ -41,9 +41,9 @@ bool test(const struct test_group *group_arr, size_t cnt, struct log *log)
                     succ = 0;
                 } while (context);
             }
-            log_message_time_diff(log, CODE_METRIC, MESSAGE_INFO, group_start, get_time(), "Tests execution of the group no. %s%zu%s took ", ENV(log->style.num, i + 1));
+            log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution of the group no. %<>uz took %T.\n", log->style.num, i + 1, log->style.tmd, group_start, get_time());
         }
-        log_message_time_diff(log, CODE_METRIC, MESSAGE_INFO, start, get_time(), "Tests execution took ");
+        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution took %T.\n", log->style.tmd, start, get_time());
         free(test_data);
     }
     return succ;
@@ -55,6 +55,6 @@ bool perf(struct log *log)
 
     // Performance tests here
 
-    log_message_time_diff(log, CODE_METRIC, MESSAGE_INFO, start, get_time(), "Performance tests execution took ");
+    log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Performance tests execution took %D.\n", log->style.tmd, start, get_time());
     return 1;
 }

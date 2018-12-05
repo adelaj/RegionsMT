@@ -12,6 +12,8 @@ struct strl {
     size_t len;
 };
 
+#define STRL(STRL) (STRL).str, (STRL).len
+
 struct text_metric {
     uint64_t byte;
     size_t col, row;

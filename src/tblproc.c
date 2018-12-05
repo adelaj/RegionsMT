@@ -29,7 +29,7 @@ struct row_read_context {
     enum row_read_status status;
 };
 
-static bool message_error_tbl_read(char *buff, size_t *p_buff_cnt, void *Context)
+static bool message_error_tbl_read(char *buff, size_t *p_buff_cnt, void *Context, struct style style)
 {
     struct row_read_context *restrict context = Context;
     const char *fmt[] = {
@@ -52,7 +52,7 @@ static bool message_error_tbl_read(char *buff, size_t *p_buff_cnt, void *Context
             switch (context->status)
             {
             case TBL_STATUS_UNHANDLED_VALUE:
-                tmp = snprintf(buff + cnt, len, fmt[context->status], INTP(context->len), context->str);
+                tmp = snprintf(buff + cnt, len, fmt[context->status], context->str, context->len);
                 break;
             default:
                 tmp = snprintf(buff + cnt, len, "%s", fmt[context->status]);

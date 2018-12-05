@@ -364,17 +364,14 @@ static int Main(int argc, char **argv)
     //for (size_t i = 0; i < (size_t) argc; i++) fprintf(stderr, "%s\n", argv[i]);
     //fclose(f);
 
-    printf("%0#.*s", 5, "abcdef");
-    
     struct style style = {
-        .ttl = { INIT_ENV_COL(FG_GREEN), INIT_ENV_COL(FG_RED), INIT_ENV_COL(FG_YELLOW), INIT_ENV_COL(FG_MAGENTA), INIT_ENV_COL(FG_CYAN) },
-        .src = INIT_ENV_COL_EXT("(" , FG_BR_BLACK, "):"),
-        .ts = INIT_ENV_COL_EXT("[" , FG_BR_BLACK, "]"),
-        .td = INIT_ENV_COL(FG_BR_YELLOW),
-        .str = INIT_ENV_COL_EXT(UTF8_LDQUO, FG_BR_MAGENTA, UTF8_RDQUO,),
-        .chr = INIT_ENV_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO,),
-        .num = INIT_ENV_COL(FG_BR_CYAN),
-        
+        .ttl = { ENV_INIT_COL(FG_GREEN), ENV_INIT_COL(FG_RED), ENV_INIT_COL(FG_YELLOW), ENV_INIT_COL(FG_MAGENTA), ENV_INIT_COL(FG_CYAN) },
+        .inf = ENV_INIT_COL(FG_BR_BLACK),
+        .tmd = ENV_INIT_COL(FG_BR_YELLOW),
+        .pth = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_YELLOW, UTF8_RDQUO),
+        .str = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_MAGENTA, UTF8_RDQUO),
+        .chr = ENV_INIT_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO),
+        .num = ENV_INIT_COL(FG_BR_CYAN),        
     };
 
     struct log log;
