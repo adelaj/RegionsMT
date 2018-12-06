@@ -115,8 +115,52 @@ bool append_out(const char *path_out, struct maver_adj_res res, struct log *log)
     return succ;
 }
 
-bool categorical_run(const char *path_phen, const char *path_gen, const char *path_top_hit, const char *path_out, size_t rpl, uint64_t seed, struct log *log)
+bool categorical_run_chisq(const char *path_phen, const char *path_gen, const char *path_out, size_t rpl, uint64_t seed, struct log *log)
 {
+    struct categorical_supp supp = { 0 };
+    uint8_t *gen = NULL;
+    size_t *phen = NULL;
+    FILE *f = NULL;
+    struct phen_context phen_context = { 0 };
+    size_t phen_skip = 0, phen_cnt = 0, phen_length = 0;
+    if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
+
+    uintptr_t *phen_ptr = pointers_stable(phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str);
+    if (!phen_ptr) goto error;
+    size_t phen_ucnt = phen_cnt;
+    ranks_unique_from_pointers_impl(phen, phen_ptr, (uintptr_t) phen, &phen_ucnt, sizeof(*phen), str_off_cmp, phen_context.handler_context.str);
+    free(phen_ptr);
+
+    struct gen_context gen_context = { .phen_cnt = phen_cnt };
+    size_t gen_skip = 0, snp_cnt = 0, gen_length = 0;
+    if (!tbl_read(path_gen, 0, tbl_gen_selector2, NULL, &gen_context, &gen, &gen_skip, &snp_cnt, &gen_length, ',', log)) goto error;
+
+    f = fopen(path_out, "w");
+    for (;;)
+    {
+        if (!f) log_message_fopen(log, CODE_METRIC, MESSAGE_ERROR, path_out, errno);
+        else break;
+        goto error;
+    }
+
+    if (!categorical_init(&supp, phen_cnt, phen_ucnt)) goto error;
+
+    for (size_t i = 0; i < snp_cnt; i++)
+    {
+        struct categorical_res res = categorical_impl(&supp, gen, phen,)
+    }
+
+error:
+    Fclose(f);
+    free(phen_context.handler_context.str);
+    free(phen);
+    free(gen);
+    return 1;
+}
+
+bool categorical_run_adj(const char *path_phen, const char *path_gen, const char *path_top_hit, const char *path_out, size_t rpl, uint64_t seed, struct log *log)
+{
+    struct maver_adj_supp supp = { 0 };
     uint8_t *gen = NULL;
     gsl_rng *rng = NULL;    
     size_t *phen = NULL;
@@ -144,8 +188,6 @@ bool categorical_run(const char *path_phen, const char *path_gen, const char *pa
     rng = gsl_rng_alloc(gsl_rng_taus);
     if (!rng) goto error;
     gsl_rng_set(rng, (unsigned long) seed);
-
-    struct maver_adj_supp supp;
 
     size_t wnd = 0;
     for (size_t i = 0; i < top_hit_cnt; i++)

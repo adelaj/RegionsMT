@@ -237,13 +237,13 @@ static bool fmt_decode_utf(uint32_t *p_val, enum fmt_arg_mode *p_mode, const cha
 
 static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
 {
-    const char flags[] = { '?', '!', '-', '<', '>' };
+    const char flags[] = { ['?'] = 1, ['!'] = 2, ['-'] = 3, ['<'] = 4, ['>'] = 5 };
     size_t pos = *p_pos;
     *res = (struct fmt_res) { 0 };
     for (size_t i = 0; i < countof(flags) + 1; i++) switch (i)
     {
     default:
-        if (fmt[pos] != flags[i]) break;
+        if ((size_t) fmt[pos] < countof(flags) && flags[] ) break;
         res->flags |= 1 << i;
         pos++;
         break;   
