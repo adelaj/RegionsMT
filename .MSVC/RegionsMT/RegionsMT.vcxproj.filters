@@ -117,6 +117,9 @@
     <ClInclude Include="src\test\utf8.h">
       <Filter>Header Files\test</Filter>
     </ClInclude>
+    <ClInclude Include="src\intdom.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\argv.c">

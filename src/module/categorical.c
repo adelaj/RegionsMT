@@ -177,12 +177,12 @@ bool categorical_run(const char *path_phen, const char *path_gen, const char *pa
 
         uint64_t t0 = get_time();
         struct maver_adj_res x = maver_adj_impl(&supp, gen + left * phen_cnt, phen, right - left + 1, phen_cnt, phen_ucnt, rpl, 10, rng, 15);
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value for window %uz:%uz no. %uz: "
-            "[%s] %f, %uz; [%s] %f, %uz; [%s] %f, %uz; [%s] %f, %uz.\n",
-            left + 1, right + 1, i + 1,
-            "CD", x.nlpv[0], x.rpl[0], "R", x.nlpv[1], x.rpl[1], "D", x.nlpv[2], x.rpl[2], "A", x.nlpv[3], x.rpl[3]);
+        //log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value for window %uz:%uz no. %uz: "
+        //    "[%s] %f, %uz; [%s] %f, %uz; [%s] %f, %uz; [%s] %f, %uz.\n",
+        //    left + 1, right + 1, i + 1,
+        //    "CD", x.nlpv[0], x.rpl[0], "R", x.nlpv[1], x.rpl[1], "D", x.nlpv[2], x.rpl[2], "A", x.nlpv[3], x.rpl[3]);
         uint64_t t1 = get_time();
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation took %D.\n", log->style.tmd, t0, t1);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation took %<>T.\n", log->style.tmd, t0, t1);
 
         int64_t diff = t1 - t0, mdq = diff / 60000000, mdr = diff % 60000000;
         double sec = 1.e-6 * (double) mdr;

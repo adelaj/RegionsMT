@@ -35,18 +35,19 @@ void print_time_stamp(char *buff, size_t *p_cnt)
     else *p_cnt = 1;
 }
 
-static uint64_t uint64_dec_ctz(uint64_t x)
+static uint32_t uint32_dec_ctz(uint32_t x)
 {
-    if (!x) return UINT64_MAX;
-    uint64_t res = 0;
+    if (!x) return UINT32_MAX;
+    uint32_t res = 0;
     for (; !(x % 10); res++, x /= 10);
     return res;
 }
 
 bool print_time_diff(char *buff, size_t *p_cnt, uint64_t start, uint64_t stop)
 {
-    uint64_t diff = DIST(stop, start), hdq = diff / 3600000000, hdr = diff % 3600000000, mdq = hdr / 60000000, mdr = hdr % 60000000, sdq = mdr / 1000000, sdr = mdr % 1000000, ctz = uint64_dec_ctz(sdr);
-    return print_fmt(buff, p_cnt, "%?$%?$%uq.000000%-uq%-^* sec", !!hdq, "%uq hr ", hdq, !!mdq, "%uq min ", mdq, sdq, sdr, (size_t) MIN(ctz, 6));
+    uint64_t diff = DIST(stop, start), hdq = diff / 3600000000;
+    uint32_t hdr = (uint32_t) (diff % 3600000000), mdq = hdr / 60000000, mdr = hdr % 60000000, sdq = mdr / 1000000, sdr = mdr % 1000000, ctz = uint32_dec_ctz(sdr);
+    return print_fmt(buff, p_cnt, "%?$%?$%ud.000000%-ud%!-^* sec", !!hdq, "%uq hr ", hdq, !!mdq, "%ud min ", mdq, sdq, sdr, (size_t) MIN(ctz, 7));
 }
 
 void print_crt(char *buff, size_t *p_cnt, Errno_t err)
@@ -101,9 +102,10 @@ enum fmt_flt_flags {
 
 enum fmt_flags {
     FMT_CONDITIONAL = 1,
-    FMT_LEFT_JUSTIFY = 2,
-    FMT_ENV_BEGIN = 4,
-    FMT_ENV_END = 8,
+    FMT_OVERPRINT =  2,
+    FMT_LEFT_JUSTIFY = 4,
+    FMT_ENV_BEGIN = 8,
+    FMT_ENV_END = 16,
 };
 
 enum fmt_arg_mode {
@@ -235,20 +237,17 @@ static bool fmt_decode_utf(uint32_t *p_val, enum fmt_arg_mode *p_mode, const cha
 
 static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
 {
-    const char flags[] = { '?', '-', '<', '>' };
+    const char flags[] = { '?', '!', '-', '<', '>' };
     size_t pos = *p_pos;
     *res = (struct fmt_res) { 0 };
     for (size_t i = 0; i < countof(flags) + 1; i++) switch (i)
     {
-    case 0:
-    case 1:
-    case 2:
-    case 3:
+    default:
         if (fmt[pos] != flags[i]) break;
         res->flags |= 1 << i;
         pos++;
         break;   
-    case 4:
+    case countof(flags):
         switch (fmt[pos])
         {
         case 'u':
@@ -408,7 +407,7 @@ static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
     size_t cnt = 0;
     struct env env = { 0 };
     struct fmt_res res = { 0 };
-    for (size_t i = 0, len = *p_cnt, tmp = len, pos = 0, off; ++i;) switch (i)
+    for (size_t i = 0, len = *p_cnt, tmp = len, pos = 0, off = 0; ++i;) switch (i)
     {
     case 4:
     case 6:
@@ -422,15 +421,17 @@ static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
         if (res.flags & FMT_LEFT_JUSTIFY)
         {
             size_t diff = cnt - off, disp = size_sub_sat(off, diff);
-            array_shift_left(buff + disp, diff, 1, off - disp);
-            cnt = disp + diff;
+            memmove(buff + disp, buff + off, diff);
+            cnt = res.flags & FMT_OVERPRINT ? disp : disp + diff;
+            tmp = len = *p_cnt - cnt;
         }
+        else if (res.flags & FMT_OVERPRINT) tmp = len = *p_cnt - (cnt = off);
         i = 1;
     case 1:
         off = Strchrnul(fmt + pos, '%'); 
         print(buff + cnt, &len, fmt + pos, off);
         if (fmt[pos += off]) pos++;
-        else i = SIZE_MAX; // Exit loop if there no more arguments
+        else i = SIZE_MAX; // Exit loop if there are no more arguments
         off = cnt = size_add_sat(cnt, len);
         break;
     case 3:

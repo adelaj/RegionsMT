@@ -21,7 +21,6 @@ enum {
 };
 
 void array_broadcast(void *, size_t, size_t, void *);
-void array_shift_left(void *, size_t, size_t, size_t);
 
 unsigned array_init(void *, size_t *restrict, size_t, size_t, size_t, enum array_flags);
 unsigned array_test_impl(void *, size_t *restrict, size_t, size_t, enum array_flags, size_t *restrict, size_t);

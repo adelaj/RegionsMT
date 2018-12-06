@@ -41,9 +41,9 @@ bool test(const struct test_group *group_arr, size_t cnt, struct log *log)
                     succ = 0;
                 } while (context);
             }
-            log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution of the group no. %<>uz took %T.\n", log->style.num, i + 1, log->style.tmd, group_start, get_time());
+            log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution of the group no. %<>uz took %<>T.\n", log->style.num, i + 1, log->style.tmd, group_start, get_time());
         }
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution took %T.\n", log->style.tmd, start, get_time());
+        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution took %<>T.\n", log->style.tmd, start, get_time());
         free(test_data);
     }
     return succ;

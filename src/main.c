@@ -377,8 +377,6 @@ static int Main(int argc, char **argv)
     struct log log;
     if (log_init(&log, NULL, 1, 0, style, NULL))
     {
-        log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "TTT%-i %<>T 1234.\n", 1234567, log.style.tmd, UINT64_C(0), 12300ull);
-        
         size_t pos_cnt;
         char **pos_arr;
         struct main_args main_args = { 0 };

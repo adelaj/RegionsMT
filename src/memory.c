@@ -14,15 +14,6 @@ void array_broadcast(void *arr, size_t cnt, size_t sz, void *val)
     for (size_t i = 0; i < tot; i += sz) memcpy((char *) arr + i, val, sz);
 }
 
-// Equivalent to 'memmove(arr, (char *) arr + off * sz, cnt * sz)'
-void array_shift_left(void *arr, size_t cnt, size_t sz, size_t off)
-{
-    if (!off || !cnt) return;
-    size_t div = cnt / off, rem = (cnt % off) * sz, tot = off * sz, left = 0;
-    for (size_t i = 0; i < div; i++, left += tot) memcpy((char *) arr + left, (char *) arr + left + tot, tot);
-    memcpy((char *) arr + left, (char *) arr + left + tot, rem);
-}
-
 // 'p_cap' -- pointer to initial capacity
 // 'cnt' -- desired capacity
 unsigned array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, size_t diff, enum array_flags flags)
@@ -123,8 +114,9 @@ unsigned queue_test(struct queue *queue, size_t diff, size_t sz)
         size_t off = size_sub(&bor, rem, cap - queue->cap);
         if (!bor && off) // queue->begin > cap - queue->cnt
         {
-            memcpy((char *) queue->arr + queue->cap * sz, queue->arr, off * sz);
-            array_shift_left(queue->arr, rem - off, sz, off);
+            size_t tot = off * sz;
+            memcpy((char *) queue->arr + queue->cap * sz, queue->arr, tot);
+            memmove(queue->arr, (char *) queue->arr + tot, (rem - off) * sz);
         }
         else memcpy((char *) queue->arr + queue->cap * sz, queue->arr, rem * sz);
     }
