@@ -27,10 +27,6 @@ static bool tbl_phen_selector(struct tbl_col *cl, size_t row, size_t col, void *
     return 1;
 }
 
-struct gen_context {
-    size_t gen_cap, gen_cnt, phen_cnt;
-};
-
 static bool tbl_gen_selector(struct tbl_col *cl, size_t row, size_t col, void *tbl, void *Context)
 {
     (void) row;
@@ -48,12 +44,15 @@ static bool tbl_gen_selector(struct tbl_col *cl, size_t row, size_t col, void *t
 static bool gen_handler(const char *str, size_t len, void *res, void *Context)
 {
     struct gen_context *context = Context;
-    if (len != context->phen_cnt) return 0;
-    for (size_t i = 0; i < len; i++) ((uint8_t *) res)[i]  = (uint8_t) str[i] - '0';
+    if (!context->phen_cnt) context->phen_cnt = len;
+    else if (len != context->phen_cnt) return 0;
+    if (!array_test(res, &context->gen_cap, sizeof(uint8_t), 0, 0, context->gen_cnt, len)) return 0;
+    for (size_t i = 0; i < len; i++) (*(uint8_t **) res)[context->gen_cnt + i]  = (uint8_t) str[i] - '0';
+    context->gen_cnt += len;
     return 1;
 }
 
-static bool tbl_gen_selector2(struct tbl_col *cl, size_t row, size_t col, void *tbl, void *Context)
+bool tbl_gen_selector2(struct tbl_col *cl, size_t row, size_t col, void *tbl, void *Context)
 {
     (void) row;
     struct gen_context *context = Context;
@@ -62,9 +61,7 @@ static bool tbl_gen_selector2(struct tbl_col *cl, size_t row, size_t col, void *
         cl->handler.read = NULL;
         return 1;
     }
-    if (!array_test(tbl, &context->gen_cap, 1, 0, 0, context->gen_cnt, context->phen_cnt)) return 0;
-    *cl = (struct tbl_col) { .handler = { .read = gen_handler }, .ptr = *(uint8_t **) tbl + context->gen_cnt, .context = context };
-    context->gen_cnt += context->phen_cnt;
+    *cl = (struct tbl_col) { .handler = { .read = gen_handler }, .ptr = tbl, .context = context };
     return 1;
 }
 
@@ -115,7 +112,7 @@ bool append_out(const char *path_out, struct maver_adj_res res, struct log *log)
     return succ;
 }
 
-bool categorical_run_chisq(const char *path_phen, const char *path_gen, const char *path_out, size_t rpl, uint64_t seed, struct log *log)
+bool categorical_run_chisq(const char *path_phen, const char *path_gen, const char *path_out, struct log *log)
 {
     struct categorical_supp supp = { 0 };
     uint8_t *gen = NULL;
@@ -147,7 +144,10 @@ bool categorical_run_chisq(const char *path_phen, const char *path_gen, const ch
 
     for (size_t i = 0; i < snp_cnt; i++)
     {
-        struct categorical_res res = categorical_impl(&supp, gen, phen,)
+        struct categorical_res x = categorical_impl(&supp, gen, phen, phen_cnt, phen_ucnt, 15);
+        fprintf(f, "%zu,%.15e,%.15e,%.15e,%.15e,%.15e,%.15e,%.15e,%.15e\n",
+            i + 1, x.nlpv[0], x.qas[0], x.nlpv[1], x.qas[1], x.nlpv[2], x.qas[2], x.nlpv[3], x.qas[3]);
+        fflush(f);
     }
 
 error:

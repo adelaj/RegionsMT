@@ -2,5 +2,12 @@
 
 #include "../common.h"
 #include "../log.h"
+#include "../tblproc.h"
 
-bool categorical_run(const char *, const char *, const char *, const char *, size_t, uint64_t, struct log *);
+struct gen_context {
+    size_t gen_cap, gen_cnt, phen_cnt;
+};
+
+bool tbl_gen_selector2(struct tbl_col *, size_t, size_t, void *tbl, void *);
+bool categorical_run_chisq(const char *, const char *, const char *, struct log *log);
+bool categorical_run_adj(const char *, const char *, const char *, const char *, size_t, uint64_t, struct log *);

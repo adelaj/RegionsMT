@@ -173,7 +173,7 @@ static int Main(int argc, char **argv)
     struct argv_par_sch argv_par_sch =
     {
         CLII((struct tag[]) { { STRI("help"), 0 }, { STRI("log"), 1 }, { STRI("test"), 2 }, { STRI("threads"), 3 }}),
-        CLII((struct tag[]) { { STRI("C"), 4 }, { STRI("L"), 5 }, { STRI("T"), 2 }, { STRI("h"), 0 }, { STRI("l"), 1 }, { STRI("t"), 3 } }),
+        CLII((struct tag[]) { { STRI("C"), 4 }, { STRI("F"), 6 }, { STRI("L"), 5 }, { STRI("T"), 2 }, { STRI("h"), 0 }, { STRI("l"), 1 }, { STRI("t"), 3 } }),
         CLII((struct par_sch[])
         {
             { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_HELP }, empty_handler, 1 },
@@ -182,6 +182,7 @@ static int Main(int argc, char **argv)
             { offsetof(struct main_args, thread_cnt), &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_THREAD_CNT }, size_handler, 0 },
             { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CAT }, empty_handler, 1 },
             { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_LDE }, empty_handler, 1 },
+            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CHISQ }, empty_handler, 1 },
         })
     };
 
@@ -398,12 +399,19 @@ static int Main(int argc, char **argv)
                 {
                     size_t rpl = (size_t) strtoull(pos_arr[4], NULL, 10);
                     uint64_t seed = (uint64_t) strtoull(pos_arr[5], NULL, 10);
-                    categorical_run(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], rpl, seed, &log);
+                    categorical_run_adj(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], rpl, seed, &log);
                 }
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LDE))
             {
                 if (pos_cnt >= 2) lde_run(pos_arr[0], pos_arr[1], &log);
+            }
+            else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CHISQ))
+            {
+                if (pos_cnt >= 3)
+                {
+                    categorical_run_chisq(pos_arr[0], pos_arr[1], pos_arr[2], &log);
+                }
             }
             else
             {

@@ -237,78 +237,93 @@ static bool fmt_decode_utf(uint32_t *p_val, enum fmt_arg_mode *p_mode, const cha
 
 static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
 {
-    const char flags[] = { ['?'] = 1, ['!'] = 2, ['-'] = 3, ['<'] = 4, ['>'] = 5 };
     size_t pos = *p_pos;
     *res = (struct fmt_res) { 0 };
-    for (size_t i = 0; i < countof(flags) + 1; i++) switch (i)
+    for (;; pos++)
     {
-    default:
-        if ((size_t) fmt[pos] < countof(flags) && flags[] ) break;
-        res->flags |= 1 << i;
-        pos++;
-        break;   
-    case countof(flags):
+        enum fmt_flags tmp = 0;
         switch (fmt[pos])
         {
-        case 'u':
-            res->int_arg.flags |= INT_FLAG_UNSIGNED;
-        case 'i':
-            res->type = TYPE_INT;
-            *p_pos = pos + 1;
-            return fmt_decode_int(&res->int_arg.spec, &res->int_arg.flags, fmt, p_pos);
-        case 'c':
-            res->type = TYPE_CHAR;
+        case '?':
+            tmp = FMT_CONDITIONAL;
             break;
-        case 's':
-            res->type = TYPE_STR;
-            *p_pos = pos + 1;
-            return fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
-        case 'A':
-            res->flt_arg.flags |= FLT_FLAG_UPPERCASE;
-        case 'a':
-            res->flt_arg.flags |= FLT_FLAG_HEX;
-            res->flt_arg.spec = FLT_SPEC_EXP;
-        case 'f':
-            res->type = TYPE_FLT;
-            *p_pos = pos + 1;
-            return fmt_decode_str(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
-        case 'E':
-            res->flt_arg.flags |= FLT_FLAG_UPPERCASE;
-        case 'e':
-            res->flt_arg.spec = FLT_SPEC_EXP;
-            res->type = TYPE_FLT;
-            *p_pos = pos + 1;
-            return fmt_decode_str(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
-        case 'T':
-            res->type = TYPE_TIME_DIFF;
+        case '!':
+            tmp = FMT_OVERPRINT;
             break;
-        case 'D':
-            res->type = TYPE_TIME_STAMP;
+        case '-':
+            tmp = FMT_LEFT_JUSTIFY;
             break;
-        case 'C':
-            res->type = TYPE_CRT;
+        case '<':
+            tmp = FMT_ENV_BEGIN;
             break;
-        case '$':
-            res->type = TYPE_FMT;
+        case '>':
+            tmp = FMT_ENV_END;
             break;
-        case '%':
-            res->type = TYPE_PERC;
-            break;
-        case '#':
-            res->type = TYPE_UTF;
-            *p_pos = pos + 1;
-            return fmt_decode_utf(&res->utf_arg.val, &res->utf_arg.mode, fmt, p_pos);
-        case ' ':
-            res->type = TYPE_EMPTY;
-            break;
-        case '^':
-            res->type = TYPE_SKIP;
-            *p_pos = pos + 1;
-            return fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
-        default:
-            *p_pos = pos;
-            return 0;
         }
+        if (!tmp) break;
+        if (res->flags >= tmp) return 0;
+        res->flags |= tmp;
+    }
+    switch (fmt[pos])
+    {
+    case 'u':
+        res->int_arg.flags |= INT_FLAG_UNSIGNED;
+    case 'i':
+        res->type = TYPE_INT;
+        *p_pos = pos + 1;
+        return fmt_decode_int(&res->int_arg.spec, &res->int_arg.flags, fmt, p_pos);
+    case 'c':
+        res->type = TYPE_CHAR;
+        break;
+    case 's':
+        res->type = TYPE_STR;
+        *p_pos = pos + 1;
+        return fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
+    case 'A':
+        res->flt_arg.flags |= FLT_FLAG_UPPERCASE;
+    case 'a':
+        res->flt_arg.flags |= FLT_FLAG_HEX;
+        res->flt_arg.spec = FLT_SPEC_EXP;
+    case 'f':
+        res->type = TYPE_FLT;
+        *p_pos = pos + 1;
+        return fmt_decode_str(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
+    case 'E':
+        res->flt_arg.flags |= FLT_FLAG_UPPERCASE;
+    case 'e':
+        res->flt_arg.spec = FLT_SPEC_EXP;
+        res->type = TYPE_FLT;
+        *p_pos = pos + 1;
+        return fmt_decode_str(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
+    case 'T':
+        res->type = TYPE_TIME_DIFF;
+        break;
+    case 'D':
+        res->type = TYPE_TIME_STAMP;
+        break;
+    case 'C':
+        res->type = TYPE_CRT;
+        break;
+    case '$':
+        res->type = TYPE_FMT;
+        break;
+    case '%':
+        res->type = TYPE_PERC;
+        break;
+    case '#':
+        res->type = TYPE_UTF;
+        *p_pos = pos + 1;
+        return fmt_decode_utf(&res->utf_arg.val, &res->utf_arg.mode, fmt, p_pos);
+    case ' ':
+        res->type = TYPE_EMPTY;
+        break;
+    case '^':
+        res->type = TYPE_SKIP;
+        *p_pos = pos + 1;
+        return fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
+    default:
+        *p_pos = pos;
+        return 0;
     }
     *p_pos = pos + 1;
     return 1;
