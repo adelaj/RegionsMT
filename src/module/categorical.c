@@ -95,6 +95,7 @@ static void gsl_error_a(const char *reason, const char *file, int line, int gsl_
     return;
 }
 
+/*
 bool append_out(const char *path_out, struct maver_adj_res res, struct log *log)
 {
     bool succ = 1;
@@ -111,6 +112,7 @@ bool append_out(const char *path_out, struct maver_adj_res res, struct log *log)
     Fclose(f);
     return succ;
 }
+*/
 
 bool categorical_run_chisq(const char *path_phen, const char *path_gen, const char *path_out, struct log *log)
 {
@@ -145,8 +147,15 @@ bool categorical_run_chisq(const char *path_phen, const char *path_gen, const ch
     for (size_t i = 0; i < snp_cnt; i++)
     {
         struct categorical_res x = categorical_impl(&supp, gen, phen, phen_cnt, phen_ucnt, 15);
-        fprintf(f, "%zu,%.15e,%.15e,%.15e,%.15e,%.15e,%.15e,%.15e,%.15e\n",
-            i + 1, x.nlpv[0], x.qas[0], x.nlpv[1], x.qas[1], x.nlpv[2], x.qas[2], x.nlpv[3], x.qas[3]);
+        fprintf(f, 
+            "%zu,%.15e,%.15e\n"
+            "%zu,%.15e,%.15e\n"
+            "%zu,%.15e,%.15e\n"
+            "%zu,%.15e,%.15e\n",
+            4 * i + 1, x.nlpv[0], x.qas[0], 
+            4 * i + 2, x.nlpv[1], x.qas[1], 
+            4 * i + 3, x.nlpv[2], x.qas[2], 
+            4 * i + 4, x.nlpv[3], x.qas[3]);
         fflush(f);
     }
 

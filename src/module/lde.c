@@ -35,10 +35,13 @@ bool lde_run(const char *path_gen, const char *path_out, struct log *log)
         {
             double lde = lde_impl(gen + gen_context.phen_cnt * i, gen + gen_context.phen_cnt * j, gen_context.phen_cnt);
             //unsigned res = -lde > .9;
-            fprintf(f ,"%zu,%zu,%.15f\n%zu,%zu,%.15f\n", j + 1, i + 1, lde, i + 1, j + 1, lde);
+            fprintf(f ,
+                "%zu,%zu,%.15e\n"
+                "%zu,%zu,%.15e\n", 
+                j + 1, i + 1, lde, 
+                i + 1, j + 1, lde);
         }
     }
-
     Fclose(f);
 
 error:
