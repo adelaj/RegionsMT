@@ -47,7 +47,7 @@ bool print_time_diff(char *buff, size_t *p_cnt, uint64_t start, uint64_t stop)
 {
     uint64_t diff = DIST(stop, start), hdq = diff / 3600000000;
     uint32_t hdr = (uint32_t) (diff % 3600000000), mdq = hdr / 60000000, mdr = hdr % 60000000, sdq = mdr / 1000000, sdr = mdr % 1000000, ctz = uint32_dec_ctz(sdr);
-    return print_fmt(buff, p_cnt, "%?$%?$%ud.000000%-ud%!-^* sec", !!hdq, "%uq hr ", hdq, !!mdq, "%ud min ", mdq, sdq, sdr, (size_t) MIN(ctz, 7));
+    return print_fmt(buff, p_cnt, "%?$%?$%ud.000000%-ud%!-* sec", !!hdq, "%uq hr ", hdq, !!mdq, "%ud min ", mdq, sdq, sdr, (size_t) MIN(ctz, 7));
 }
 
 void print_crt(char *buff, size_t *p_cnt, Errno_t err)
@@ -57,7 +57,8 @@ void print_crt(char *buff, size_t *p_cnt, Errno_t err)
 }
 
 enum fmt_type {
-    TYPE_INT = 0,
+    TYPE_DEFAULT = 0,
+    TYPE_INT,
     TYPE_CHAR,
     TYPE_STR,
     TYPE_FLT,
@@ -67,8 +68,7 @@ enum fmt_type {
     TYPE_FMT,
     TYPE_PERC,
     TYPE_UTF,
-    TYPE_EMPTY,
-    TYPE_SKIP,
+    TYPE_CALLBACK
 };
 
 enum fmt_int_spec {
@@ -78,6 +78,7 @@ enum fmt_int_spec {
     INT_SPEC_DWORD,
     INT_SPEC_QWORD,
     INT_SPEC_SIZE,
+    INT_SPEC_MAX,
     INT_SPEC_SHRTSHRT, // 'signed char' or 'unsigned char'
     INT_SPEC_SHRT,
     INT_SPEC_LONG,
@@ -103,9 +104,9 @@ enum fmt_flt_flags {
 enum fmt_flags {
     FMT_CONDITIONAL = 1,
     FMT_OVERPRINT =  2,
-    FMT_LEFT_JUSTIFY = 4,
-    FMT_ENV_BEGIN = 8,
-    FMT_ENV_END = 16,
+    FMT_ENV_BEGIN = 4,
+    FMT_ENV_END = 8,
+    FMT_LEFT_JUSTIFY = 16
 };
 
 enum fmt_arg_mode {
@@ -163,6 +164,9 @@ static bool fmt_decode_int(enum fmt_int_spec *p_spec, enum fmt_int_flags *p_flag
         case 'z':
             *p_spec = INT_SPEC_SIZE;
             break;
+        case 'j':
+            *p_spec = INT_SPEC_MAX;
+            break;
         case 'h':
             if (fmt[pos + 1] == 'h')
             {
@@ -194,7 +198,7 @@ static bool fmt_decode_int(enum fmt_int_spec *p_spec, enum fmt_int_flags *p_flag
     return 1;
 }
 
-static bool fmt_decode_str(size_t *p_val, enum fmt_arg_mode *p_mode, const char *fmt, size_t *p_pos)
+static bool fmt_decode_str(size_t *p_cnt, enum fmt_arg_mode *p_mode, const char *fmt, size_t *p_pos)
 {
     size_t pos = *p_pos;
     if (fmt[pos] == '*')
@@ -204,7 +208,7 @@ static bool fmt_decode_str(size_t *p_val, enum fmt_arg_mode *p_mode, const char 
         return 1;
     }
     const char *tmp;
-    unsigned cvt = str_to_size(fmt + pos, &tmp, p_val);
+    unsigned cvt = str_to_size(fmt + pos, &tmp, p_cnt);
     if (tmp == fmt + pos) return 1;
     *p_pos = tmp - fmt;
     if (!cvt) return 0;
@@ -249,19 +253,19 @@ static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
             break;
         case '!':
             tmp = FMT_OVERPRINT;
-            break;
-        case '-':
-            tmp = FMT_LEFT_JUSTIFY;
-            break;
+            break;        
         case '<':
             tmp = FMT_ENV_BEGIN;
             break;
         case '>':
             tmp = FMT_ENV_END;
             break;
+        case '-':
+            tmp = FMT_LEFT_JUSTIFY;
+            break;
         }
         if (!tmp) break;
-        if (res->flags >= tmp) return 0;
+        if (res->flags >= tmp) return 1;
         res->flags |= tmp;
     }
     switch (fmt[pos])
@@ -314,108 +318,188 @@ static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
         res->type = TYPE_UTF;
         *p_pos = pos + 1;
         return fmt_decode_utf(&res->utf_arg.val, &res->utf_arg.mode, fmt, p_pos);
-    case ' ':
-        res->type = TYPE_EMPTY;
+    case '&':
+        res->type = TYPE_CALLBACK;
         break;
-    case '^':
-        res->type = TYPE_SKIP;
-        *p_pos = pos + 1;
-        return fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
     default:
         *p_pos = pos;
-        return 0;
+        return fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
     }
     *p_pos = pos + 1;
     return 1;
 }
 
-static bool fmt_execute_int(enum fmt_int_spec spec, enum fmt_int_flags flags, char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
+enum fmt_execute_flags {
+    FMT_EXE_FLAG_PHONY = 1,
+    FMT_EXE_FLAG_BLANK = 2
+};
+
+static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_flags, char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
 {
-    bool u = !!(flags & INT_FLAG_UNSIGNED);
+    bool u = !!(int_flags & INT_FLAG_UNSIGNED);
     union {
-        intmax_t s;
-        uintmax_t u;
+        int i;
+        int8_t ib;
+        int16_t iw;
+        int32_t id;
+        int64_t iq;
+        ptrdiff_t iz;
+        intmax_t ij;
+        signed char ihh;
+        short ih;
+        long il;
+        long long ill;        
+        unsigned u;
+        uint8_t ub;
+        uint16_t uw;
+        uint32_t ud;
+        uint64_t uq;
+        size_t uz;
+        uintmax_t uj;
+        unsigned char uhh;
+        unsigned short uh;
+        unsigned long ul;
+        unsigned long long ull;
     } val = { 0 };
-    switch (spec)
+    switch (int_spec)
     {
-    case INT_SPEC_SHRTSHRT:
-    case INT_SPEC_SHRT:
+    /*
     case INT_SPEC_DEFAULT:
         if (u) val.u = va_arg(*p_arg, unsigned);
-        else val.s = va_arg(*p_arg, int);
-        break;
-    case INT_SPEC_LONG:
-        if (u) val.u = va_arg(*p_arg, unsigned long);
-        else val.s = va_arg(*p_arg, long);
-        break;
-    case INT_SPEC_LONGLONG:
-        if (u) val.u = va_arg(*p_arg, unsigned long long);
-        else val.s = va_arg(*p_arg, long long);
+        else val.i = va_arg(*p_arg, int);
         break;
     case INT_SPEC_BYTE:
-        if (u) val.u = va_arg(*p_arg, Uint8_dom_t);
-        else val.s = va_arg(*p_arg, Int8_dom_t);
+        if (u) val.ub = (uint8_t) va_arg(*p_arg, Uint8_dom_t);
+        else val.ib = (int8_t) va_arg(*p_arg, Int8_dom_t);
         break;
     case INT_SPEC_WORD:
-        if (u) val.u = va_arg(*p_arg, Uint16_dom_t);
-        else val.s = va_arg(*p_arg, Int16_dom_t);
+        if (u) val.uw = (uint16_t) va_arg(*p_arg, Uint16_dom_t);
+        else val.iw = (int16_t) va_arg(*p_arg, Int16_dom_t);
         break;
     case INT_SPEC_DWORD:
-        if (u) val.u = va_arg(*p_arg, Uint32_dom_t);
-        else val.s = va_arg(*p_arg, Int32_dom_t);
+        if (u) val.ud = (uint32_t) va_arg(*p_arg, Uint32_dom_t);
+        else val.id = (int32_t) va_arg(*p_arg, Int32_dom_t);
         break;
     case INT_SPEC_QWORD:
-        if (u) val.u = va_arg(*p_arg, Uint64_dom_t);
-        else val.s = va_arg(*p_arg, Int64_dom_t);
+        if (u) val.uq = (uint64_t) va_arg(*p_arg, Uint64_dom_t);
+        else val.iq = (int64_t) va_arg(*p_arg, Int64_dom_t);
         break;
     case INT_SPEC_SIZE:
-        if (u) val.u = va_arg(*p_arg, Size_dom_t);
-        else val.s = va_arg(*p_arg, Ptrdiff_dom_t);
+        if (u) val.uz = (size_t) va_arg(*p_arg, Size_dom_t);
+        else val.iz = (ptrdiff_t) va_arg(*p_arg, Ptrdiff_dom_t);
+        break;
+    case INT_SPEC_MAX:
+        if (u) val.uj = (uintmax_t) va_arg(*p_arg, uintmax_t);
+        else val.ij = (intmax_t) va_arg(*p_arg, intmax_t);
+        break;
+    case INT_SPEC_SHRTSHRT:
+        if (u) val.uhh = va_arg(*p_arg, unsigned);
+        else val.ihh = va_arg(*p_arg, int);
+        break;
+    case INT_SPEC_SHRT:
+        if (u) val.uh = va_arg(*p_arg, unsigned);
+        else val.ih = va_arg(*p_arg, int);
+        break;
+    case INT_SPEC_LONG:
+        if (u) val.ul = va_arg(*p_arg, unsigned long);
+        else val.il = va_arg(*p_arg, long);
+        break;
+    case INT_SPEC_LONGLONG:
+        if (u) val.ull = va_arg(*p_arg, unsigned long long);
+        else val.ill = va_arg(*p_arg, long long);
+        */
+    case INT_SPEC_DEFAULT:
+        if (u) val.uj = va_arg(*p_arg, unsigned);
+        else val.ij = va_arg(*p_arg, int);
+        break;
+    case INT_SPEC_BYTE:
+        if (u) val.uj = va_arg(*p_arg, Uint8_dom_t);
+        else val.ij = va_arg(*p_arg, Int8_dom_t);
+        break;
+    case INT_SPEC_WORD:
+        if (u) val.uj = va_arg(*p_arg, Uint16_dom_t);
+        else val.ij = va_arg(*p_arg, Int16_dom_t);
+        break;
+    case INT_SPEC_DWORD:
+        if (u) val.uj = va_arg(*p_arg, Uint32_dom_t);
+        else val.ij = va_arg(*p_arg, Int32_dom_t);
+        break;
+    case INT_SPEC_QWORD:
+        if (u) val.uj = va_arg(*p_arg, Uint64_dom_t);
+        else val.ij = va_arg(*p_arg, Int64_dom_t);
+        break;
+    case INT_SPEC_SIZE:
+        if (u) val.uj = va_arg(*p_arg, Size_dom_t);
+        else val.ij = va_arg(*p_arg, Ptrdiff_dom_t);
+        break;
+    case INT_SPEC_MAX:
+        if (u) val.uj = va_arg(*p_arg, uintmax_t);
+        else val.ij = va_arg(*p_arg, intmax_t);
+        break;
+    case INT_SPEC_SHRTSHRT:
+        if (u) val.uj = va_arg(*p_arg, unsigned);
+        else val.ij = va_arg(*p_arg, int);
+        break;
+    case INT_SPEC_SHRT:
+        if (u) val.uj = va_arg(*p_arg, unsigned);
+        else val.ij = va_arg(*p_arg, int);
+        break;
+    case INT_SPEC_LONG:
+        if (u) val.uj = va_arg(*p_arg, unsigned long);
+        else val.ij = va_arg(*p_arg, long);
+        break;
+    case INT_SPEC_LONGLONG:
+        if (u) val.uj = va_arg(*p_arg, unsigned long long);
+        else val.ij = va_arg(*p_arg, long long);
     }
-    if (phony) *p_cnt = 0;
+    if (flags & FMT_EXE_FLAG_PHONY) *p_cnt = 0;
     else
     {
-        bool sgn = val.s >= 0;
-        if (!u) val.u = (uintmax_t) (sgn ? val.s : -val.s);
-        int tmp = snprintf(buff, *p_cnt, (flags & INT_FLAG_HEX ? flags & INT_FLAG_UPPERCASE ? "-%jX" : "-%jx" : "-%ju") + sgn, val.u);
+        bool sgn = 1;
+        if (!u)
+        {
+            sgn &= val.ij >= 0;
+            val.uj = (uintmax_t) (sgn ? val.ij : -val.ij);
+        }
+        int tmp = snprintf(buff, *p_cnt, (int_flags & INT_FLAG_HEX ? int_flags & INT_FLAG_UPPERCASE ? "-%jX" : "-%jx" : "-%ju") + sgn, val.uj);
         if (tmp < 0) return 0;
         *p_cnt = (size_t) tmp;
     }
     return 1;
 }
 
-static void fmt_execute_str(size_t len, enum fmt_arg_mode mode, char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
+static void fmt_execute_str(size_t len, enum fmt_arg_mode mode, char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
 {
     const char *str = va_arg(*p_arg, const char *);
     if (mode == ARG_FETCH) len = va_arg(*p_arg, Size_dom_t);
-    if (!phony) print(buff, p_cnt, str, mode == ARG_DEFAULT ? Strnlen(str, *p_cnt) : len);
+    if (!(flags & FMT_EXE_FLAG_PHONY)) print(buff, p_cnt, str, mode == ARG_DEFAULT ? Strnlen(str, *p_cnt) : len);
 }
 
-static bool fmt_execute_time_diff(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
+static bool fmt_execute_time_diff(char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
 {
     uint64_t start = va_arg(*p_arg, Uint64_dom_t), stop = va_arg(*p_arg, Uint64_dom_t);
-    if (!phony) return print_time_diff(buff, p_cnt, start, stop);
+    if (!(flags & FMT_EXE_FLAG_PHONY)) return print_time_diff(buff, p_cnt, start, stop);
     return 1;
 }
 
-static void fmt_execute_crt(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
+static void fmt_execute_crt(char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
 {
     Errno_t err = va_arg(*p_arg, Errno_t);
-    if (!phony) print_crt(buff, p_cnt, err);
+    if (!(flags & FMT_EXE_FLAG_PHONY)) print_crt(buff, p_cnt, err);
 }
 
-static void fmt_execute_skip(size_t len, enum fmt_arg_mode mode, size_t *p_cnt, va_list *p_arg, bool phony)
+static void fmt_execute_default(size_t len, enum fmt_arg_mode mode, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
 {
     if (mode == ARG_FETCH) len = va_arg(*p_arg, Size_dom_t);
-    if (!phony) *p_cnt = len;
+    if (!(flags & FMT_EXE_FLAG_PHONY)) *p_cnt = len;
 }
 
-static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
+static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
 {
     const char *fmt = va_arg(*p_arg, const char *);
     if (!fmt)
     {
-        if (!phony) *p_cnt = 0;
+        if (!(flags & FMT_EXE_FLAG_PHONY)) *p_cnt = 0;
         return 1;
     }
     bool cond = 1;
@@ -451,7 +535,7 @@ static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
         break;
     case 3:
         if (!fmt_decode(&res, fmt, &pos)) return 0;
-        cond = !phony;
+        cond = !(flags & FMT_EXE_FLAG_PHONY);
         if (res.flags & FMT_CONDITIONAL) cond &= va_arg(*p_arg, int);
         if (res.flags & (FMT_ENV_BEGIN | FMT_ENV_END))
         {
@@ -482,14 +566,14 @@ static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
         case TYPE_FMT:
             if (!fmt_execute(buff + cnt, &len, p_arg, !cond)) return 0;
             break;
-        case TYPE_SKIP:
-            fmt_execute_skip(res.str_arg.len, res.str_arg.mode, &len, p_arg, !cond);
+        case TYPE_DEFAULT:
+            fmt_execute_default(res.str_arg.len, res.str_arg.mode, &len, p_arg, !cond);
             break;
         case TYPE_FLT:
         case TYPE_CHAR:
         case TYPE_PERC:
         case TYPE_UTF:
-        case TYPE_EMPTY:
+        case TYPE_CALLBACK:
             if (cond) i++;
         }
         if (!cond) i++;
@@ -498,7 +582,7 @@ static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, bool phony)
         if (cond && (res.flags & FMT_ENV_END)) print(buff + cnt, &len, STRL(env.end));
         else i++;
     }
-    if (!phony) *p_cnt = cnt;
+    if (!(flags & FMT_EXE_FLAG_PHONY)) *p_cnt = cnt;
     return 1;
 }
 
@@ -576,7 +660,7 @@ void log_multiple_close(struct log *restrict arr, size_t cnt)
 static bool log_prefix(char *buff, size_t *p_cnt, struct code_metric metric, enum message_type type, struct style style)
 {
     const struct strl ttl[] = { STRI("MESSAGE"), STRI("ERROR"), STRI("WARNING"), STRI("NOTE"), STRI("INFO"), STRI("DAMNATION") };
-    return print_fmt(buff, p_cnt, "%< [%D]%>  %<>s* %< (" UTF8_LDQUO "%s*" UTF8_RDQUO " @ " UTF8_LDQUO "%s*" UTF8_RDQUO ":%uz):%>  ",
+    return print_fmt(buff, p_cnt, "%<[%D]%> %<>s* %<(" UTF8_LDQUO "%s*" UTF8_RDQUO " @ " UTF8_LDQUO "%s*" UTF8_RDQUO ":%uz):%> ",
         style.inf, style.inf, style.ttl[type], STRL(ttl[type]), style.inf, STRL(metric.func), STRL(metric.path), metric.line, style.inf);
 }
 

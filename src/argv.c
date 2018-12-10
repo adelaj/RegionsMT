@@ -16,96 +16,34 @@ enum argv_status {
     ARGV_WARNING_UNHANDLED_OPT_LONG,
     ARGV_WARNING_UNHANDLED_OPT_SHRT,
     ARGV_WARNING_UNEXPECTED_VALUE_LONG,
-    ARGV_WARNING_UNEXPECTED_VALUE_SHRT,
     ARGV_WARNING_INVALID_PAR_LONG,
     ARGV_WARNING_INVALID_PAR_SHRT,
     ARGV_WARNING_INVALID_UTF,
 };
 
-struct argv_context {
-    char *name_str, *val_str;
-    size_t name_len, val_len, ind;
-    enum argv_status status;
-};
-
-static bool message_argv(char *buff, size_t *p_cnt, void *Context, struct style style)
-{
-    const char *fmt[] = {
-        "Expected a value for",
-        "Unable to handle the value %<>s*%> of",
-        "Unable to handle",
-        "Unused value of",
-        "Invalid %s*",
-        "Invalid UTF-8 byte sequence at the byte %<>uz of",
-    };
-    struct argv_context *context = Context;
-    size_t cnt = 0, len = *p_cnt;
-    bool shrt = context->status & 1;
-    for (unsigned i = 0;; i++)
-    {
-        size_t tmp = len;
-        switch (i)
-        {
-        case 0:
-            switch (context->status)
-            {
-            case ARGV_WARNING_UNHANDLED_PAR_LONG:
-            case ARGV_WARNING_UNHANDLED_PAR_SHRT:
-                if (!print_fmt(buff + cnt, &tmp, fmt[context->status / 2], style.str, context->val_str, context->val_len)) return 0;
-                break;
-            case ARGV_WARNING_INVALID_PAR_LONG:
-                if (!print_fmt(buff + cnt, &tmp, fmt[context->status / 2], STRC("name"))) return 0;
-                break;
-            case ARGV_WARNING_INVALID_PAR_SHRT:
-                if (!print_fmt(buff + cnt, &tmp, fmt[context->status / 2], STRC("character"))) return 0;
-                break;
-            case ARGV_WARNING_INVALID_UTF:
-                if (!print_fmt(buff + cnt, &tmp, fmt[context->status / 2], context->name_len + 1)) return 0;
-                break;
-            default:
-                if (!print_fmt(buff + cnt, &tmp, "%s", fmt[context->status / 2])) return 0;
-            }
-            break;
-        case 1:
-            switch (context->status)
-            {
-            case ARGV_WARNING_INVALID_PAR_LONG:
-            case ARGV_WARNING_INVALID_PAR_SHRT:
-                if (!print_fmt(buff + cnt, &tmp, " %<>s* in", shrt ? style.chr : style.str, context->name_str, context->name_len)) return 0;
-                break;
-            default:
-                tmp = 0;
-            }
-            break;
-        case 2:
-            print(buff + cnt, &tmp, STRC(" the command-line parameter"));
-            break;
-        case 3:
-            switch (context->status)
-            {
-            default:
-                if (!print_fmt(buff + cnt, &tmp, " %<>s*", shrt ? style.chr : style.str, context->name_str, context->name_len)) return 0;
-                break;
-            case ARGV_WARNING_INVALID_PAR_LONG:
-            case ARGV_WARNING_INVALID_PAR_SHRT:
-            case ARGV_WARNING_INVALID_UTF:
-                tmp = 0;
-            }
-            break;
-        case 4:
-            if (!print_fmt(buff + cnt, &tmp, " no. %<>uz!\n", style.num, context->ind)) return 0;
-        }
-        cnt = size_add_sat(cnt, tmp);
-        if (i == 4) break;
-        len = size_sub_sat(len, tmp);
-    }
-    *p_cnt = cnt;
-    return 1;
-}
-
 static bool log_message_warning_argv(struct log *restrict log, struct code_metric code_metric, char *name_str, size_t name_len, char *val_str, size_t val_len, size_t ind, enum argv_status status)
 {
-    return log_message(log, code_metric, MESSAGE_WARNING, message_argv, &(struct argv_context) { .status = status, .name_str = name_str, .val_str = val_str, .name_len = name_len, .val_len = val_len, .ind = ind });
+    struct env style = status & 1 ? log->style.chr : log->style.str;
+    switch (status)
+    {
+    case ARGV_WARNING_MISSING_VALUE_LONG:
+    case ARGV_WARNING_MISSING_VALUE_SHRT:
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Expected a value for the parameter %<>s* within the command-line argument no. %<>uz!\n", style, name_str, name_len, log->style.num, ind);
+    case ARGV_WARNING_UNHANDLED_PAR_LONG:
+    case ARGV_WARNING_UNHANDLED_PAR_SHRT:
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unable to handle the value %<>s* of the parameter %<>s* near the command-line argument no. %<>uz!\n", log->style.str, val_str, val_len, style, name_str, name_len, log->style.num, ind);
+    case ARGV_WARNING_UNHANDLED_OPT_LONG:
+    case ARGV_WARNING_UNHANDLED_OPT_SHRT:
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unable to handle the option %<>s* within the command-line argument no. %<>uz!\n", style, name_str, name_len, log->style.num, ind);
+    case ARGV_WARNING_UNEXPECTED_VALUE_LONG:
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Redundant value %<>s* for the option %<>s* within the command-line argument no. %<>uz!\n", log->style.str, val_str, val_len, log->style.str, name_str, name_len, log->style.num, ind);
+    case ARGV_WARNING_INVALID_PAR_LONG:
+    case ARGV_WARNING_INVALID_PAR_SHRT:
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Invalid identifier %<>s* within the command-line argument no. %<>uz!\n", style, name_str, name_len, log->style.num, ind);
+    case ARGV_WARNING_INVALID_UTF:
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unexpected UTF-8 continuation byte at the position %<>uz within the command-line argument no. %<>uz!\n", log->style.num, name_len + 1, log->style.num, ind);
+    }
+    return 0;
 }
 
 static bool utf8_decode_len(char *str, size_t tot, size_t *p_len)
@@ -163,7 +101,7 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                         {
                             if (par.mode == PAR_OPTION)
                             {
-                                if (str[len]) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, ARGV_WARNING_UNEXPECTED_VALUE_LONG);
+                                if (str[len]) log_message_warning_argv(log, CODE_METRIC, str, len, str + len + 1, strlen(str + len + 1), i, ARGV_WARNING_UNEXPECTED_VALUE_LONG);
                                 if (par.handler && !par.handler(NULL, 0, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, ARGV_WARNING_UNHANDLED_OPT_LONG);
                             }
                             else if (!str[len]) capture = 1;

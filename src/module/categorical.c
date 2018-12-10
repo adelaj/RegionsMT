@@ -146,7 +146,7 @@ bool categorical_run_chisq(const char *path_phen, const char *path_gen, const ch
 
     for (size_t i = 0; i < snp_cnt; i++)
     {
-        struct categorical_res x = categorical_impl(&supp, gen, phen, phen_cnt, phen_ucnt, 15);
+        struct categorical_res x = categorical_impl(&supp, gen + i * phen_cnt, phen, phen_cnt, phen_ucnt, 15);
         fprintf(f, 
             "%zu,%.15e,%.15e\n"
             "%zu,%.15e,%.15e\n"
