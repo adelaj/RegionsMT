@@ -27,6 +27,7 @@ static bool tbl_phen_selector(struct tbl_col *cl, size_t row, size_t col, void *
     return 1;
 }
 
+/*
 static bool tbl_gen_selector(struct tbl_col *cl, size_t row, size_t col, void *tbl, void *Context)
 {
     (void) row;
@@ -40,6 +41,7 @@ static bool tbl_gen_selector(struct tbl_col *cl, size_t row, size_t col, void *t
     *cl = (struct tbl_col) { .handler = { .read = uint8_handler }, .ptr = *(uint8_t **) tbl + context->gen_cnt++ };
     return 1;
 }
+*/
 
 static bool gen_handler(const char *str, size_t len, void *res, void *Context)
 {

@@ -5,8 +5,6 @@
 #include "strproc.h"
 #include "utf8.h"
 
-#include <stdarg.h>
-
 void print(char *, size_t *, const char *, size_t);
 bool print_fmt(char *, size_t *, ...);
 bool print_time_diff(char *, size_t *, uint64_t, uint64_t);
@@ -66,7 +64,7 @@ struct log {
 };
 
 typedef bool (*message_callback)(char *, size_t *, void *, struct style);
-typedef bool (*message_callback_var)(char *, size_t *, void *, struct style, va_list);
+typedef bool (*message_callback_var)(char *, size_t *, void *, struct style, Va_list);
 
 struct code_metric {
     struct strl path, func;

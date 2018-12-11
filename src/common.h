@@ -60,7 +60,7 @@
 #define TOSTRING_EXPAND(Z) #Z
 #define TOSTRING(Z) TOSTRING_EXPAND(Z)
 
-#define STRC(STR) (STR), lengthof(STR)
+#define STRC(STR) ((char *) (STR)), lengthof(STR)
 #define STRI(STR) { STRC(STR) }
 #define ARRC(ARR) (ARR), countof(ARR)
 #define ARRI(ARR) { ARRC(ARR) }

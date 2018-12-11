@@ -36,8 +36,16 @@ typedef int Errno_t;
 
 #include "common.h"
 
+#include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
+
+// This can be safely passed by pointer
+typedef struct { va_list va_list; } Va_list;
+#define Va_arg(AP, T) va_arg((AP).va_list, T)
+#define Va_start(AP, P) va_start((AP).va_list, P)
+#define Va_end(AP) va_end((AP).va_list)
+#define Va_copy(DST, SRC) va_copy((DST).va_list, (SRC).va_list)
 
 bool aligned_alloca_chk(size_t, size_t, size_t);
 #define aligned_alloca(SZ, ALIGN) ((void *) ((((uintptr_t) Alloca((SZ) + (ALIGN) - 1) + (ALIGN) - 1) / (ALIGN)) * (ALIGN)))

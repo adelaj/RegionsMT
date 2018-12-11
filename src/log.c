@@ -347,7 +347,7 @@ enum fmt_execute_flags {
     FMT_EXE_FLAG_BLANK = 2
 };
 
-static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_flags, char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
+static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_flags, char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
     bool u = int_flags & INT_FLAG_UNSIGNED;
     union {
@@ -378,92 +378,92 @@ static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_f
     {
     /*
     case INT_SPEC_DEFAULT:
-        if (u) val.u = va_arg(*p_arg, unsigned);
-        else val.i = va_arg(*p_arg, int);
+        if (u) val.u = Va_arg(*p_arg, unsigned);
+        else val.i = Va_arg(*p_arg, int);
         break;
     case INT_SPEC_BYTE:
-        if (u) val.ub = (uint8_t) va_arg(*p_arg, Uint8_dom_t);
-        else val.ib = (int8_t) va_arg(*p_arg, Int8_dom_t);
+        if (u) val.ub = (uint8_t) Va_arg(*p_arg, Uint8_dom_t);
+        else val.ib = (int8_t) Va_arg(*p_arg, Int8_dom_t);
         break;
     case INT_SPEC_WORD:
-        if (u) val.uw = (uint16_t) va_arg(*p_arg, Uint16_dom_t);
-        else val.iw = (int16_t) va_arg(*p_arg, Int16_dom_t);
+        if (u) val.uw = (uint16_t) Va_arg(*p_arg, Uint16_dom_t);
+        else val.iw = (int16_t) Va_arg(*p_arg, Int16_dom_t);
         break;
     case INT_SPEC_DWORD:
-        if (u) val.ud = (uint32_t) va_arg(*p_arg, Uint32_dom_t);
-        else val.id = (int32_t) va_arg(*p_arg, Int32_dom_t);
+        if (u) val.ud = (uint32_t) Va_arg(*p_arg, Uint32_dom_t);
+        else val.id = (int32_t) Va_arg(*p_arg, Int32_dom_t);
         break;
     case INT_SPEC_QWORD:
-        if (u) val.uq = (uint64_t) va_arg(*p_arg, Uint64_dom_t);
-        else val.iq = (int64_t) va_arg(*p_arg, Int64_dom_t);
+        if (u) val.uq = (uint64_t) Va_arg(*p_arg, Uint64_dom_t);
+        else val.iq = (int64_t) Va_arg(*p_arg, Int64_dom_t);
         break;
     case INT_SPEC_SIZE:
-        if (u) val.uz = (size_t) va_arg(*p_arg, Size_dom_t);
-        else val.iz = (ptrdiff_t) va_arg(*p_arg, Ptrdiff_dom_t);
+        if (u) val.uz = (size_t) Va_arg(*p_arg, Size_dom_t);
+        else val.iz = (ptrdiff_t) Va_arg(*p_arg, Ptrdiff_dom_t);
         break;
     case INT_SPEC_MAX:
-        if (u) val.uj = (uintmax_t) va_arg(*p_arg, uintmax_t);
-        else val.ij = (intmax_t) va_arg(*p_arg, intmax_t);
+        if (u) val.uj = (uintmax_t) Va_arg(*p_arg, uintmax_t);
+        else val.ij = (intmax_t) Va_arg(*p_arg, intmax_t);
         break;
     case INT_SPEC_SHRTSHRT:
-        if (u) val.uhh = va_arg(*p_arg, unsigned);
-        else val.ihh = va_arg(*p_arg, int);
+        if (u) val.uhh = Va_arg(*p_arg, unsigned);
+        else val.ihh = Va_arg(*p_arg, int);
         break;
     case INT_SPEC_SHRT:
-        if (u) val.uh = va_arg(*p_arg, unsigned);
-        else val.ih = va_arg(*p_arg, int);
+        if (u) val.uh = Va_arg(*p_arg, unsigned);
+        else val.ih = Va_arg(*p_arg, int);
         break;
     case INT_SPEC_LONG:
-        if (u) val.ul = va_arg(*p_arg, unsigned long);
-        else val.il = va_arg(*p_arg, long);
+        if (u) val.ul = Va_arg(*p_arg, unsigned long);
+        else val.il = Va_arg(*p_arg, long);
         break;
     case INT_SPEC_LONGLONG:
-        if (u) val.ull = va_arg(*p_arg, unsigned long long);
-        else val.ill = va_arg(*p_arg, long long);
+        if (u) val.ull = Va_arg(*p_arg, unsigned long long);
+        else val.ill = Va_arg(*p_arg, long long);
         */
     case INT_SPEC_DEFAULT:
-        if (u) val.uj = va_arg(*p_arg, unsigned);
-        else val.ij = va_arg(*p_arg, int);
+        if (u) val.uj = Va_arg(*p_arg, unsigned);
+        else val.ij = Va_arg(*p_arg, int);
         break;
     case INT_SPEC_BYTE:
-        if (u) val.uj = va_arg(*p_arg, Uint8_dom_t);
-        else val.ij = va_arg(*p_arg, Int8_dom_t);
+        if (u) val.uj = Va_arg(*p_arg, Uint8_dom_t);
+        else val.ij = Va_arg(*p_arg, Int8_dom_t);
         break;
     case INT_SPEC_WORD:
-        if (u) val.uj = va_arg(*p_arg, Uint16_dom_t);
-        else val.ij = va_arg(*p_arg, Int16_dom_t);
+        if (u) val.uj = Va_arg(*p_arg, Uint16_dom_t);
+        else val.ij = Va_arg(*p_arg, Int16_dom_t);
         break;
     case INT_SPEC_DWORD:
-        if (u) val.uj = va_arg(*p_arg, Uint32_dom_t);
-        else val.ij = va_arg(*p_arg, Int32_dom_t);
+        if (u) val.uj = Va_arg(*p_arg, Uint32_dom_t);
+        else val.ij = Va_arg(*p_arg, Int32_dom_t);
         break;
     case INT_SPEC_QWORD:
-        if (u) val.uj = va_arg(*p_arg, Uint64_dom_t);
-        else val.ij = va_arg(*p_arg, Int64_dom_t);
+        if (u) val.uj = Va_arg(*p_arg, Uint64_dom_t);
+        else val.ij = Va_arg(*p_arg, Int64_dom_t);
         break;
     case INT_SPEC_SIZE:
-        if (u) val.uj = va_arg(*p_arg, Size_dom_t);
-        else val.ij = va_arg(*p_arg, Ptrdiff_dom_t);
+        if (u) val.uj = Va_arg(*p_arg, Size_dom_t);
+        else val.ij = Va_arg(*p_arg, Ptrdiff_dom_t);
         break;
     case INT_SPEC_MAX:
-        if (u) val.uj = va_arg(*p_arg, uintmax_t);
-        else val.ij = va_arg(*p_arg, intmax_t);
+        if (u) val.uj = Va_arg(*p_arg, uintmax_t);
+        else val.ij = Va_arg(*p_arg, intmax_t);
         break;
     case INT_SPEC_SHRTSHRT:
-        if (u) val.uj = va_arg(*p_arg, unsigned);
-        else val.ij = va_arg(*p_arg, int);
+        if (u) val.uj = Va_arg(*p_arg, unsigned);
+        else val.ij = Va_arg(*p_arg, int);
         break;
     case INT_SPEC_SHRT:
-        if (u) val.uj = va_arg(*p_arg, unsigned);
-        else val.ij = va_arg(*p_arg, int);
+        if (u) val.uj = Va_arg(*p_arg, unsigned);
+        else val.ij = Va_arg(*p_arg, int);
         break;
     case INT_SPEC_LONG:
-        if (u) val.uj = va_arg(*p_arg, unsigned long);
-        else val.ij = va_arg(*p_arg, long);
+        if (u) val.uj = Va_arg(*p_arg, unsigned long);
+        else val.ij = Va_arg(*p_arg, long);
         break;
     case INT_SPEC_LONGLONG:
-        if (u) val.uj = va_arg(*p_arg, unsigned long long);
-        else val.ij = va_arg(*p_arg, long long);
+        if (u) val.uj = Va_arg(*p_arg, unsigned long long);
+        else val.ij = Va_arg(*p_arg, long long);
     }
     if (flags & FMT_EXE_FLAG_PHONY) *p_cnt = 0;
     else
@@ -481,35 +481,35 @@ static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_f
     return 1;
 }
 
-static void fmt_execute_str(size_t len, enum fmt_arg_mode mode, char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
+static void fmt_execute_str(size_t len, enum fmt_arg_mode mode, char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    const char *str = va_arg(*p_arg, const char *);
-    if (mode == ARG_FETCH) len = va_arg(*p_arg, Size_dom_t);
+    const char *str = Va_arg(*p_arg, const char *);
+    if (mode == ARG_FETCH) len = Va_arg(*p_arg, Size_dom_t);
     if (!(flags & FMT_EXE_FLAG_PHONY)) print(buff, p_cnt, str, mode == ARG_DEFAULT ? Strnlen(str, *p_cnt) : len);
 }
 
-static bool fmt_execute_time_diff(char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
+static bool fmt_execute_time_diff(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    uint64_t start = va_arg(*p_arg, Uint64_dom_t), stop = va_arg(*p_arg, Uint64_dom_t);
+    uint64_t start = Va_arg(*p_arg, Uint64_dom_t), stop = Va_arg(*p_arg, Uint64_dom_t);
     if (!(flags & FMT_EXE_FLAG_PHONY)) return print_time_diff(buff, p_cnt, start, stop);
     return 1;
 }
 
-static void fmt_execute_crt(char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
+static void fmt_execute_crt(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    Errno_t err = va_arg(*p_arg, Errno_t);
+    Errno_t err = Va_arg(*p_arg, Errno_t);
     if (!(flags & FMT_EXE_FLAG_PHONY)) print_crt(buff, p_cnt, err);
 }
 
-static void fmt_execute_default(size_t len, enum fmt_arg_mode mode, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
+static void fmt_execute_default(size_t len, enum fmt_arg_mode mode, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    if (mode == ARG_FETCH) len = va_arg(*p_arg, Size_dom_t);
+    if (mode == ARG_FETCH) len = Va_arg(*p_arg, Size_dom_t);
     if (!(flags & FMT_EXE_FLAG_PHONY)) *p_cnt = len;
 }
 
-static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
+static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    const char *fmt = va_arg(*p_arg, const char *);
+    const char *fmt = Va_arg(*p_arg, const char *);
     if (!fmt)
     {
         if (!(flags & FMT_EXE_FLAG_PHONY)) *p_cnt = 0;
@@ -549,10 +549,10 @@ static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_exec
     case 3:
         if (!fmt_decode(&res, fmt, &pos)) return 0;
         cond = !(flags & FMT_EXE_FLAG_PHONY);
-        if (res.flags & FMT_CONDITIONAL) cond &= va_arg(*p_arg, int);
+        if (res.flags & FMT_CONDITIONAL) cond &= Va_arg(*p_arg, int);
         if (res.flags & (FMT_ENV_BEGIN | FMT_ENV_END))
         {
-            env = va_arg(*p_arg, struct env);
+            env = Va_arg(*p_arg, struct env);
             if (cond && (res.flags & FMT_ENV_BEGIN)) print(buff + cnt, &len, STRL(env.begin));
             else i++;
         }
@@ -601,10 +601,10 @@ static bool fmt_execute(char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_exec
 
 bool print_fmt(char *buff, size_t *p_cnt, ...)
 {
-    va_list arg;
-    va_start(arg, p_cnt);
+    Va_list arg;
+    Va_start(arg, p_cnt);
     bool res = fmt_execute(buff, p_cnt, &arg, 0);
-    va_end(arg);
+    Va_end(arg);
     return res;
 }
 
@@ -677,7 +677,7 @@ static bool log_prefix(char *buff, size_t *p_cnt, struct code_metric metric, enu
         style.inf, style.inf, style.ttl[type], STRL(ttl[type]), style.inf, STRL(metric.func), STRL(metric.path), metric.line, style.inf);
 }
 
-static bool log_message_impl(struct log *restrict log, struct code_metric metric, enum message_type type, message_callback handler, message_callback_var handler_var, void *context, va_list arg)
+static bool log_message_impl(struct log *restrict log, struct code_metric metric, enum message_type type, message_callback handler, message_callback_var handler_var, void *context, Va_list arg)
 {
     if (!log) return 1;
     size_t cnt = log->cnt;
@@ -692,10 +692,10 @@ static bool log_message_impl(struct log *restrict log, struct code_metric metric
         case 1:
             if (handler_var)
             {
-                va_list tmp;
-                va_copy(tmp, arg);
+                Va_list tmp;
+                Va_copy(tmp, arg);
                 bool res = handler_var(log->buff + cnt, &len, context, log->style, tmp);
-                va_end(tmp);
+                Va_end(tmp);
                 if (!res) return 0;
             }
             else if (handler && !handler(log->buff + cnt, &len, context, log->style)) return 0;
@@ -710,13 +710,13 @@ static bool log_message_impl(struct log *restrict log, struct code_metric metric
     return cnt >= log->lim ? log_flush(log) : 1;
 }
 
-// Emulation of passing '(va_list) 0'
+// Emulation of passing '(va_list_correct) 0'
 static bool log_message_supp(struct log *restrict log, struct code_metric code_metric, enum message_type type, message_callback handler, void *context, ...)
 {
-    va_list arg;
-    va_start(arg, context);
+    Va_list arg;
+    Va_start(arg, context);
     bool res = log_message_impl(log, code_metric, type, handler, NULL, context, arg);
-    va_end(arg);
+    Va_end(arg);
     return res;
 }
 
@@ -725,19 +725,18 @@ bool log_message(struct log *restrict log, struct code_metric code_metric, enum 
     return log_message_supp(log, code_metric, type, handler, context);
 }
 
-bool message_var(char *buff, size_t *p_cnt, void *context, struct style style, va_list arg)
+bool message_var(char *buff, size_t *p_cnt, void *context, struct style style, Va_list arg)
 {
-    (void) style;
-    (void) context;
+    (void) style, (void) context;
     return fmt_execute(buff, p_cnt, &arg, 0);
 }
 
 bool log_message_fmt(struct log *restrict log, struct code_metric code_metric, enum message_type type, ...)
 {
-    va_list arg;
-    va_start(arg, type);
+    Va_list arg;
+    Va_start(arg, type);
     bool res = log_message_impl(log, code_metric, type, NULL, message_var, NULL, arg);
-    va_end(arg);
+    Va_end(arg);
     return res;
 }
 
