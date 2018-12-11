@@ -17,6 +17,11 @@ struct test_sort_c {
     size_t cnt;
 };
 
+struct test_sort_d {
+    uint64_t *arr;
+    size_t cnt;
+};
+
 // Maximal array size is '1 << TEST_SORT_EXP'
 #define TEST_SORT_EXP 25
 

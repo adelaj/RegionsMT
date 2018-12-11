@@ -237,7 +237,7 @@ typedef void (*sort_callback)(void *restrict, size_t, size_t, cmp_callback, void
 
 static size_t comb_sort_gap_impl(size_t tot, size_t sz)
 {
-    size_t gap = (size_t) (.8017118471377937539 * (tot / sz)); // Magic constant suggested by 'ksort.h'. Generally any positive value < 1.0 is acceptable 
+    size_t gap = (size_t) (.8017118471377937539 * (tot / sz)); // Magic constant suggested by 'ksort.h'. Any positive value < 1.0 is acceptable 
     if (gap == 9 || gap == 10) gap = 11;
     return gap * sz;
 }
@@ -349,30 +349,38 @@ void quick_sort(void *restrict arr, size_t cnt, size_t sz, cmp_callback cmp, voi
 bool binary_search(size_t *p_ind, const void *key, const void *arr, size_t cnt, size_t sz, stable_cmp_callback cmp, void *context, enum binary_search_flags flags)
 {
     if (!cnt) return 0;
-    bool critical = !!(flags & BINARY_SEARCH_CRITICAL), rightmost = !!(flags & BINARY_SEARCH_RIGHTMOST);
+    bool rightmost = flags & BINARY_SEARCH_RIGHTMOST;
     size_t left = 0, right = cnt - 1;
     int res = 0;
-    while (left < right) for (;;)
+    while (left < right)
     {
-        size_t mid = left + ((right - left + rightmost) >> 1);
+        size_t mid = left + ((right - left + !rightmost) >> 1);
         res = cmp(key, (char *) arr + sz * mid, context);
-        if (res > 0) left = mid + 1;
-        else if (res < 0) right = mid - 1;
-        else
+        if (res > 0) left = mid + rightmost;
+        else if (res < 0) right = mid - !rightmost;
+        else if (flags & BINARY_SEARCH_CRITICAL)
         {
-            if (critical)
+            if (rightmost) left = mid;
+            else right = mid;
+            while (left < right)
             {
-                if (rightmost) left = mid;
+                mid = left + ((right - left + rightmost) >> 1);
+                res = cmp(key, (char *) arr + sz * mid, context);
+                if (res > 0) left = mid + 1;
+                else if (res < 0) right = mid - 1;
+                else if (rightmost) left = mid;
                 else right = mid;
-                if (left < right) continue;
             }
-            *p_ind = mid;
+            *p_ind = left;
             return 1;
         }
-        break;
+        else
+        {
+            *p_ind = mid;
+            return 1;            
+        }
     }
-    size_t ind = rightmost ? left : right;
-    if ((flags & BINARY_SEARCH_APPROX) || cmp(key, (char *) arr + sz * ind, context)) return 0;
-    *p_ind = ind;
+    if (!(flags & BINARY_SEARCH_INEXACT) && cmp(key, (char *) arr + sz * left, context)) return 0;
+    *p_ind = left;
     return 1;
 }

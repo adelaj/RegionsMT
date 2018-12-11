@@ -35,6 +35,19 @@ void print_time_stamp(char *buff, size_t *p_cnt)
     else *p_cnt = 1;
 }
 
+uint32_t uint32_log10_floor(uint32_t x)
+{
+    uint32_t ten[] = { 10, 100, 1000, 10000, 100000, 1000000, 10000000, 100000000, 1000000000 };
+    uint8_t left = 0, right = countof(ten) - 1;
+    while (left < right)
+    {
+        uint8_t mid = (left + right) >> 1;
+        if (x >= ten[mid]) left = mid + 1;
+        else right = mid - 1;
+    }
+    return 0;
+}
+
 static uint32_t uint32_dec_ctz(uint32_t x)
 {
     if (!x) return UINT32_MAX;
@@ -336,7 +349,7 @@ enum fmt_execute_flags {
 
 static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_flags, char *buff, size_t *p_cnt, va_list *p_arg, enum fmt_execute_flags flags)
 {
-    bool u = !!(int_flags & INT_FLAG_UNSIGNED);
+    bool u = int_flags & INT_FLAG_UNSIGNED;
     union {
         int i;
         int8_t ib;
@@ -740,5 +753,5 @@ bool log_message_fopen(struct log *restrict log, struct code_metric code_metric,
 
 bool log_message_fseek(struct log *restrict log, struct code_metric code_metric, enum message_type type, int64_t offset, const char *restrict path)
 {
-    return log_message_fmt(log, code_metric, type, "Unable to seek into the position %<>uq while reading the file %<>s!\n", log->style.num, offset, log->style.str, path);
+    return log_message_fmt(log, code_metric, type, "Unable to seek into the position %<>uq of the file %<>s!\n", log->style.num, offset, log->style.str, path);
 }

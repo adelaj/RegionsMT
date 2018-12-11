@@ -105,7 +105,7 @@ int Strnicmp(const char *a, const char *b, size_t len)
 
 bool file_is_tty(FILE *f)
 {
-    return !!_isatty(_fileno(f));
+    return _isatty(_fileno(f));
 }
 
 int64_t file_get_size(FILE *f)
@@ -148,7 +148,7 @@ uint64_t get_time()
 
 bool file_is_tty(FILE *f)
 {
-    return !!isatty(fileno(f));
+    return isatty(fileno(f));
 }
 
 int64_t file_get_size(FILE *f)
@@ -187,7 +187,7 @@ bool aligned_alloca_chk(size_t cnt, size_t sz, size_t al)
     size_t hi, res = size_mul(&hi, cnt, sz);
     if (hi) return 0;
     size_add(&hi, res, al - 1);
-    return !!hi;
+    return hi;
 }
 
 int Fclose(FILE *file)

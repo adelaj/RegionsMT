@@ -16,6 +16,7 @@ enum argv_status {
     ARGV_WARNING_UNHANDLED_OPT_LONG,
     ARGV_WARNING_UNHANDLED_OPT_SHRT,
     ARGV_WARNING_UNEXPECTED_VALUE_LONG,
+    ARGV_WARNING_UNEXPECTED_VALUE_SHRT, // Not used. Do not delete!
     ARGV_WARNING_INVALID_PAR_LONG,
     ARGV_WARNING_INVALID_PAR_SHRT,
     ARGV_WARNING_INVALID_UTF,
@@ -36,7 +37,8 @@ static bool log_message_warning_argv(struct log *restrict log, struct code_metri
     case ARGV_WARNING_UNHANDLED_OPT_SHRT:
         return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unable to handle the option %<>s* within the command-line argument no. %<>uz!\n", style, name_str, name_len, log->style.num, ind);
     case ARGV_WARNING_UNEXPECTED_VALUE_LONG:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Redundant value %<>s* for the option %<>s* within the command-line argument no. %<>uz!\n", log->style.str, val_str, val_len, log->style.str, name_str, name_len, log->style.num, ind);
+    case ARGV_WARNING_UNEXPECTED_VALUE_SHRT:
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Redundant value %<>s* for the option %<>s* within the command-line argument no. %<>uz!\n", log->style.str, val_str, val_len, style, name_str, name_len, log->style.num, ind);
     case ARGV_WARNING_INVALID_PAR_LONG:
     case ARGV_WARNING_INVALID_PAR_SHRT:
         return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Invalid identifier %<>s* within the command-line argument no. %<>uz!\n", style, name_str, name_len, log->style.num, ind);

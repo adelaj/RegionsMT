@@ -143,6 +143,22 @@ bool test_sort_generator_c_1(void *dst, size_t *p_context, struct log *log)
     return 0;
 }
 
+bool test_sort_generator_d_1(void *dst, size_t *p_context, struct log *log)
+{
+    size_t context = *p_context, cnt = context + 1;
+    uint64_t *arr;
+    if (!array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+    else
+    {
+        for (size_t i = 0; i < cnt; i++) arr[i] = UINT64_C(1) << i;
+        *(struct test_sort_d *) dst = (struct test_sort_d) { .arr = arr, .cnt = cnt };
+        if (context < UINT64_BIT) ++*p_context;
+        else *p_context = 0;
+        return 1;
+    }
+    return 0;
+}
+
 void test_sort_disposer_a(void *In)
 {
     struct test_sort_a *in = In;
@@ -268,6 +284,27 @@ bool test_sort_c_2(void *In, struct log *log)
         if (!binary_search(&res, in->arr + j, in->arr, in->cnt, sizeof(*in->arr), size_stable_cmp_asc, NULL, BINARY_SEARCH_CRITICAL | BINARY_SEARCH_RIGHTMOST) || res != j) return 0;
         if (!binary_search(&res, in->arr + j, in->arr, in->cnt, sizeof(*in->arr), size_stable_cmp_asc, NULL, BINARY_SEARCH_RIGHTMOST) || in->arr[res] != in->arr[j]) return 0;
         if (in->arr[j] != in->arr[i]) j = i;
+    }
+    return 1;
+}
+
+static int uint64_stable_cmp_asc_test(const void *A, const void *B, void *thunk)
+{
+    (void) thunk;
+    uint64_t a = *(uint64_t *) A, b = *(uint64_t *) B;
+    return (a > b) - (a < b);
+}
+
+bool test_sort_d_1(void *In, struct log *log)
+{
+    (void) log;
+    struct test_sort_c *in = In;
+    for (size_t i = 1; i < UINT64_BIT; i++)
+    {
+        size_t res;
+        uint64_t x = ((UINT64_C(1) << (i - 1)) + (UINT64_C(1) << i)) >> 1, y = ((UINT64_C(1) << (i - 1)) + (UINT64_C(1) << i) + 1) >> 1;
+        if (!binary_search(&res, &x, in->arr, in->cnt, sizeof(*in->arr), uint64_stable_cmp_asc_test, NULL, BINARY_SEARCH_INEXACT | BINARY_SEARCH_RIGHTMOST) || res != i) return 0;
+        if (!binary_search(&res, &y, in->arr, in->cnt, sizeof(*in->arr), uint64_stable_cmp_asc_test, NULL, BINARY_SEARCH_INEXACT) || res != i) return 0;
     }
     return 1;
 }

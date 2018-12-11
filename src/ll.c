@@ -426,7 +426,7 @@ bool bit_test2_range_acquire_p(volatile void *arr, const void *p_cnt)
 
 bool size_test_acquire(volatile size_t *mem)
 {
-    return !!size_load_acquire(mem);
+    return size_load_acquire(mem);
 }
 
 bool size_test_acquire_p(volatile void *mem, const void *arg)
@@ -540,7 +540,7 @@ uint32_t uint32_fused_mul_add(uint32_t *p_res, uint32_t m, uint32_t a)
 #define DECLARE_BIT_TEST(TYPE, PREFIX) \
     bool PREFIX ## _bit_test(TYPE *arr, size_t bit) \
     { \
-        return !!(arr[bit / (CHAR_BIT * sizeof(TYPE))] & ((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)))); \
+        return arr[bit / (CHAR_BIT * sizeof(TYPE))] & ((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE))); \
     }
 
 #define DECLARE_BIT_TEST_SET(TYPE, PREFIX) \

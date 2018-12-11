@@ -29,7 +29,7 @@
 static bool test_main(struct log *log)
 {
     const struct test_group group_arr[] = {
-        {
+        /*{
             NULL,
             sizeof(struct test_ll_a),
             CLII((test_generator_callback[]) {
@@ -83,7 +83,7 @@ static bool test_main(struct log *log)
                 test_sort_b_1,
                 test_sort_b_2
             })
-        },
+        },*/
         {
             test_sort_disposer_c,
             sizeof(struct test_sort_c),
@@ -365,6 +365,7 @@ static int Main(int argc, char **argv)
     //for (size_t i = 0; i < (size_t) argc; i++) fprintf(stderr, "%s\n", argv[i]);
     //fclose(f);
 
+    bool succ = 1;
     struct style style = {
         .ttl = { ENV_INIT_COL(FG_GREEN), ENV_INIT_COL(FG_RED), ENV_INIT_COL(FG_YELLOW), ENV_INIT_COL(FG_MAGENTA), ENV_INIT_COL(FG_CYAN) },
         .inf = ENV_INIT_COL(FG_BR_BLACK),
@@ -391,7 +392,7 @@ static int Main(int argc, char **argv)
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_TEST))
             {
-                test_main(&log);
+                succ = test_main(&log);
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CAT))
             {
@@ -451,7 +452,7 @@ static int Main(int argc, char **argv)
     }
     */
    
-    return EXIT_SUCCESS;
+    return succ ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
 #if _WIN32
@@ -471,10 +472,9 @@ int wmain(int argc, wchar_t **wargv)
     // Making console output UTF-8 friendly
     if (!SetConsoleOutputCP(CP_UTF8)) return EXIT_FAILURE;
     
-    int main_res = EXIT_FAILURE;
-
     // Translating UTF-16 command-line parameters to UTF-8
     char **argv;
+    int main_res = EXIT_FAILURE;
     if (array_init(&argv, NULL, argc, sizeof(*argv), 0, ARRAY_STRICT))
     {
         size_t base_cnt = 0, i;
