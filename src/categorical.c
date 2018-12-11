@@ -287,8 +287,9 @@ static double stat_chisq(size_t *table, size_t *outer, size_t gen_phen_mar, size
     size_t pr = gen_pop_cnt * phen_pop_cnt;
     for (size_t i = 0; i < pr; i++)
     {
-        size_t out = outer[i], diff = out - table[i] * gen_phen_mar;
-        stat += (double) (diff * diff) / (double) (out * gen_phen_mar);
+        size_t out = outer[i];
+        double diff = (double) out - (double) (table[i] * gen_phen_mar);
+        stat += diff * diff / (double) (out * gen_phen_mar);
     }
     return -log10(cdf_chisq_Q(stat, (double) (pr - gen_pop_cnt - phen_pop_cnt + 1)));
 }
@@ -307,9 +308,8 @@ static double qas_chisq(size_t *table, size_t *gen_mar, size_t *phen_mar, size_t
         size_t m = i * gen_mar[i];
         s += m, s2 += i * m;
     }
-    size_t bor;
-    double a = (double) size_sub(&bor, st * gen_phen_mar, s * t), b = sqrt((double) ((s2 * gen_phen_mar - s * s) * (t2 * gen_phen_mar - t * t)));
-    return bor ? .5 * (log10(b + a) - log10(b - a)) : .5 * (log10(b - a) - log10(b + a));
+    double a = (double) (st * gen_phen_mar) - (double) (s * t), b = sqrt(((double) (s2 * gen_phen_mar) - (double) (s * s)) * ((double) (t2 * gen_phen_mar) - (double) (t * t)));
+    return .5 * (log10(b + a) - log10(b - a));
 }
 
 static void perm_init(size_t *perm, size_t cnt, gsl_rng *rng)

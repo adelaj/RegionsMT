@@ -6,6 +6,7 @@
 #include "../sort.h"
 #include "categorical.h"
 
+#include <math.h>
 #include <string.h>
 #include <inttypes.h>
 
@@ -116,6 +117,18 @@ bool append_out(const char *path_out, struct maver_adj_res res, struct log *log)
 }
 */
 
+struct categorical_res condition(struct categorical_res x)
+{
+    struct categorical_res res;
+    for (size_t i = 0; i < 4; i++)
+    {
+        double a = pow(10, -x.nlpv[i]);
+        res.nlpv[i] = isfinite(a) ? a : -1.;
+        res.qas[i] = isfinite(x.qas[i]) ? x.qas[i] : -1.;
+    }
+    return res;
+}
+
 bool categorical_run_chisq(const char *path_phen, const char *path_gen, const char *path_out, struct log *log)
 {
     struct categorical_supp supp = { 0 };
@@ -148,7 +161,7 @@ bool categorical_run_chisq(const char *path_phen, const char *path_gen, const ch
 
     for (size_t i = 0; i < snp_cnt; i++)
     {
-        struct categorical_res x = categorical_impl(&supp, gen + i * phen_cnt, phen, phen_cnt, phen_ucnt, 15);
+        struct categorical_res x = condition(categorical_impl(&supp, gen + i * phen_cnt, phen, phen_cnt, phen_ucnt, 15));
         fprintf(f, 
             "%zu,%.15e,%.15e\n"
             "%zu,%.15e,%.15e\n"
@@ -162,6 +175,7 @@ bool categorical_run_chisq(const char *path_phen, const char *path_gen, const ch
     }
 
 error:
+    categorical_close(&supp);
     Fclose(f);
     free(phen_context.handler_context.str);
     free(phen);
