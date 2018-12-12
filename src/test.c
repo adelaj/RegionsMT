@@ -10,7 +10,7 @@
 bool test(const struct test_group *group_arr, size_t cnt, struct log *log)
 {
     bool succ = 0;
-    uint64_t start = get_time();
+    uint64_t all = get_time();
     size_t test_data_sz = 0;
     for (size_t i = 0; i < cnt; i++) if (test_data_sz < group_arr[i].test_sz) test_data_sz = group_arr[i].test_sz;
     void *test_data = NULL;
@@ -20,7 +20,7 @@ bool test(const struct test_group *group_arr, size_t cnt, struct log *log)
         succ = 1;
         for (size_t i = 0; i < cnt; i++)
         {
-            uint64_t group_start = get_time();
+            uint64_t start = get_time();
             const struct test_group *group = group_arr + i;
             for (size_t j = 0; j < group->test_generator_cnt; j++)
             {
@@ -32,7 +32,7 @@ bool test(const struct test_group *group_arr, size_t cnt, struct log *log)
                         for (size_t k = 0; k < group->test_cnt; k++)
                         {
                             bool res = group->test[k](test_data, log);
-                            if (!res) log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Test no. %<>uz of the group no. %<>uz failed under the input data instance no. %<>uz of the generator no. %<>uz!\n", log->style.num, k + 1, log->style.num, i + 1, log->style.num, ind, log->style.num, j + 1);
+                            if (!res) log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Test no. %<>uz of the group no. %<>uz failed under the input data instance no. %<>uz of the generator no. %<>uz!\n", log->style.num, k + 1, log->style.num, i + 1, log->style.num, ind + 1, log->style.num, j + 1);
                             succ &= res;
                         }
                         if (group->test_dispose) group->test_dispose(test_data);
@@ -41,9 +41,9 @@ bool test(const struct test_group *group_arr, size_t cnt, struct log *log)
                     succ = 0;
                 } while (context);
             }
-            log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution of the group no. %<>uz took %<>T.\n", log->style.num, i + 1, log->style.tmd, group_start, get_time());
+            log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution of the group no. %<>uz took %<>T.\n", log->style.num, i + 1, log->style.tmd, start, get_time());
         }
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution took %<>T.\n", log->style.tmd, start, get_time());
+        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution took %<>T.\n", log->style.tmd, all, get_time());
         free(test_data);
     }
     return succ;

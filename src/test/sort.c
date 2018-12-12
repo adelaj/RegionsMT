@@ -159,23 +159,17 @@ bool test_sort_generator_d_1(void *dst, size_t *p_context, struct log *log)
     return 0;
 }
 
-void test_sort_disposer_a(void *In)
-{
-    struct test_sort_a *in = In;
-    free(in->arr);
-}
+#define DECLARE_TEST_DISPOSER(SUFFIX) \
+    void test_sort_disposer_ ## SUFFIX(void *In) \
+    { \
+        struct test_sort_ ## SUFFIX *in = In; \
+        free(in->arr); \
+    }
 
-void test_sort_disposer_b(void *In)
-{
-    struct test_sort_b *in = In;
-    free(in->arr);
-}
-
-void test_sort_disposer_c(void *In)
-{
-    struct test_sort_c *in = In;
-    free(in->arr);
-}
+DECLARE_TEST_DISPOSER(a)
+DECLARE_TEST_DISPOSER(b)
+DECLARE_TEST_DISPOSER(c)
+DECLARE_TEST_DISPOSER(d)
 
 struct flt64_cmp_asc_test {
     size_t cnt;
@@ -265,9 +259,9 @@ bool test_sort_c_1(void *In, struct log *log)
     if (!in->cnt) return 1;
     for (size_t i = 1, j = 0; i < in->cnt; i++)
     {
-        size_t res;
-        if (!binary_search(&res, in->arr + j, in->arr, in->cnt, sizeof(*in->arr), size_stable_cmp_asc, NULL, BINARY_SEARCH_CRITICAL) || res != j) return 0;
-        if (!binary_search(&res, in->arr + j, in->arr, in->cnt, sizeof(*in->arr), size_stable_cmp_asc, NULL, 0) || in->arr[res] != in->arr[j]) return 0;
+        size_t tmp;
+        if (!binary_search(&tmp, in->arr + j, in->arr, in->cnt, sizeof(*in->arr), size_stable_cmp_asc, NULL, BINARY_SEARCH_CRITICAL) || tmp != j) return 0;
+        if (!binary_search(&tmp, in->arr + j, in->arr, in->cnt, sizeof(*in->arr), size_stable_cmp_asc, NULL, 0) || in->arr[tmp] != in->arr[j]) return 0;
         if (in->arr[j] != in->arr[i]) j = i;
     }
     return 1;
@@ -280,9 +274,9 @@ bool test_sort_c_2(void *In, struct log *log)
     if (!in->cnt) return 1;
     for (size_t i = in->cnt, j = in->cnt - 1; --i;)
     {
-        size_t res;
-        if (!binary_search(&res, in->arr + j, in->arr, in->cnt, sizeof(*in->arr), size_stable_cmp_asc, NULL, BINARY_SEARCH_CRITICAL | BINARY_SEARCH_RIGHTMOST) || res != j) return 0;
-        if (!binary_search(&res, in->arr + j, in->arr, in->cnt, sizeof(*in->arr), size_stable_cmp_asc, NULL, BINARY_SEARCH_RIGHTMOST) || in->arr[res] != in->arr[j]) return 0;
+        size_t tmp;
+        if (!binary_search(&tmp, in->arr + j, in->arr, in->cnt, sizeof(*in->arr), size_stable_cmp_asc, NULL, BINARY_SEARCH_CRITICAL | BINARY_SEARCH_RIGHTMOST) || tmp != j) return 0;
+        if (!binary_search(&tmp, in->arr + j, in->arr, in->cnt, sizeof(*in->arr), size_stable_cmp_asc, NULL, BINARY_SEARCH_RIGHTMOST) || in->arr[tmp] != in->arr[j]) return 0;
         if (in->arr[j] != in->arr[i]) j = i;
     }
     return 1;
@@ -298,13 +292,13 @@ static int uint64_stable_cmp_asc_test(const void *A, const void *B, void *thunk)
 bool test_sort_d_1(void *In, struct log *log)
 {
     (void) log;
-    struct test_sort_c *in = In;
-    for (size_t i = 1; i < UINT64_BIT; i++)
+    struct test_sort_d *in = In;
+    for (size_t i = 0; i < UINT64_BIT; i++)
     {
-        size_t res;
-        uint64_t x = ((UINT64_C(1) << (i - 1)) + (UINT64_C(1) << i)) >> 1, y = ((UINT64_C(1) << (i - 1)) + (UINT64_C(1) << i) + 1) >> 1;
-        if (!binary_search(&res, &x, in->arr, in->cnt, sizeof(*in->arr), uint64_stable_cmp_asc_test, NULL, BINARY_SEARCH_INEXACT | BINARY_SEARCH_RIGHTMOST) || res != i) return 0;
-        if (!binary_search(&res, &y, in->arr, in->cnt, sizeof(*in->arr), uint64_stable_cmp_asc_test, NULL, BINARY_SEARCH_INEXACT) || res != i) return 0;
+        uint64_t x = (UINT64_C(1) << i) + 1, y = x - 2;
+        size_t tmp, res_x = MIN(i + 1, in->cnt - 1), res_y = y ? MIN(i - 1, in->cnt - 1) : 0;
+        if (!binary_search(&tmp, &x, in->arr, in->cnt, sizeof(*in->arr), uint64_stable_cmp_asc_test, NULL, BINARY_SEARCH_INEXACT | BINARY_SEARCH_RIGHTMOST) || tmp != res_x) return 0;
+        if (!binary_search(&tmp, &y, in->arr, in->cnt, sizeof(*in->arr), uint64_stable_cmp_asc_test, NULL, BINARY_SEARCH_INEXACT) || tmp != res_y) return 0;
     }
     return 1;
 }

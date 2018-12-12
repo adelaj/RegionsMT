@@ -5,6 +5,13 @@
 #include "strproc.h"
 #include "utf8.h"
 
+enum fmt_execute_flags {
+    FMT_EXE_FLAG_PHONY = 1,
+    FMT_EXE_FLAG_BLANK = 2
+};
+
+typedef bool (*fmt_callback)(char *, size_t *, Va_list *, enum fmt_execute_flags);
+
 void print(char *, size_t *, const char *, size_t);
 bool print_fmt(char *, size_t *, ...);
 bool print_time_diff(char *, size_t *, uint64_t, uint64_t);
@@ -65,6 +72,11 @@ struct log {
 
 typedef bool (*message_callback)(char *, size_t *, void *, struct style);
 typedef bool (*message_callback_var)(char *, size_t *, void *, struct style, Va_list);
+
+union message_callback {
+    message_callback ord;
+    message_callback_var var;
+};
 
 struct code_metric {
     struct strl path, func;

@@ -215,11 +215,11 @@ size_t Strlncpy(char *dst, char *src, size_t cnt)
 
 void *Memrchr(void const *Str, int ch, size_t cnt)
 {
-    const __m128i test[] = {
-        _mm_set_epi64x(UINT64_MAX, 0),
-        _mm_set_epi32(UINT32_MAX, 0, UINT32_MAX, 0),
-        _mm_set_epi16(UINT16_MAX, 0, UINT16_MAX, 0, UINT16_MAX, 0, UINT16_MAX, 0),
-        _mm_set_epi8(UINT8_MAX, 0, UINT8_MAX, 0, UINT8_MAX, 0, UINT8_MAX, 0, UINT8_MAX, 0, UINT8_MAX, 0, UINT8_MAX, 0, UINT8_MAX, 0)
+    const __m128i test[] = { 
+        _mm_set_epi64x(-1, 0), 
+        _mm_set_epi32(-1, 0, -1, 0), 
+        _mm_set_epi16(-1, 0, -1, 0, -1, 0, -1, 0),
+        _mm_set_epi8(-1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0)
     };
     const __m128i msk = _mm_set1_epi8((char) ch);
 

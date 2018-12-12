@@ -34,6 +34,12 @@ typedef ptrdiff_t Ptrdiff_dom_t;
 typedef int Ptrdiff_dom_t;
 #endif
 
+#if INT_MAX < INTMAX_MAX
+typedef intmax_t Intmax_dom_t;
+#else
+typedef int Intmax_dom_t;
+#endif
+
 #if UINT_MAX < UINT8_MAX
 typedef uint8_t Uint8_dom_t;
 #else
@@ -62,4 +68,10 @@ typedef unsigned Uint64_dom_t;
 typedef size_t Size_dom_t;
 #else
 typedef unsigned Size_dom_t;
+#endif
+
+#if UINT_MAX < UINTMAX_MAX
+typedef uintmax_t Uintmax_dom_t;
+#else
+typedef unsigned Uintmax_dom_t;
 #endif

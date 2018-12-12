@@ -107,8 +107,8 @@ struct bool_handler_context {
 bool bool_handler(const char *str, size_t len, void *Ptr, void *Context)
 {
     (void) len;
-    char *test;
     uint8_t res;
+    const char *test;
     if (!str_to_uint8(str, &test, &res)) return 0;
     if (*test)
     {
@@ -123,22 +123,22 @@ bool bool_handler(const char *str, size_t len, void *Ptr, void *Context)
     return empty_handler(str, len, Ptr, context->context);    
 }
 
-#define DECLARE_INTEGER_HANDLER(TYPE, PREFIX, CONV) \
+#define DECLARE_INT_HANDLER(TYPE, PREFIX, CONV) \
     bool PREFIX ## _handler(const char *str, size_t len, void *Ptr, void *Context) \
     { \
         (void) len; \
         TYPE *ptr = Ptr; \
-        char *test; \
+        const char *test; \
         if (CONV(str, &test, ptr) || *test) return 0; \
         return empty_handler(str, len, Ptr, Context); \
     }
 
-DECLARE_INTEGER_HANDLER(uint64_t, uint64, str_to_uint64)
-DECLARE_INTEGER_HANDLER(uint32_t, uint32, str_to_uint32)
-DECLARE_INTEGER_HANDLER(uint16_t, uint16, str_to_uint16)
-DECLARE_INTEGER_HANDLER(uint8_t, uint8, str_to_uint8)
-DECLARE_INTEGER_HANDLER(size_t, size, str_to_size)
-DECLARE_INTEGER_HANDLER(double, flt64, str_to_flt64)
+DECLARE_INT_HANDLER(uint64_t, uint64, str_to_uint64)
+DECLARE_INT_HANDLER(uint32_t, uint32, str_to_uint32)
+DECLARE_INT_HANDLER(uint16_t, uint16, str_to_uint16)
+DECLARE_INT_HANDLER(uint8_t, uint8, str_to_uint8)
+DECLARE_INT_HANDLER(size_t, size, str_to_size)
+DECLARE_INT_HANDLER(double, flt64, str_to_flt64)
 
 bool str_tbl_handler(const char *str, size_t len, void *p_Off, void *Context)
 {

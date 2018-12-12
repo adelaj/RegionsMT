@@ -445,11 +445,6 @@ uint8_t uint8_bit_scan_forward(uint8_t x)
     return (uint8_t) uint32_bit_scan_forward((uint8_t) x);
 }
 
-size_t size_log2_ceiling(size_t x)
-{
-    return size_bit_scan_reverse(x) + !!(x && (x & (x - 1)));
-}
-
 size_t size_add_sat(size_t a, size_t b)
 {
     size_t car, res = size_add(&car, a, b);
@@ -547,7 +542,7 @@ uint32_t uint32_fused_mul_add(uint32_t *p_res, uint32_t m, uint32_t a)
     bool PREFIX ## _bit_test_set(TYPE *arr, size_t bit) \
     { \
         size_t ind = bit / (CHAR_BIT * sizeof(TYPE)); \
-        uint8_t msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)); \
+        TYPE msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)); \
         if (arr[ind] & msk) return 1; \
         arr[ind] |= msk; \
         return 0; \
@@ -557,7 +552,7 @@ uint32_t uint32_fused_mul_add(uint32_t *p_res, uint32_t m, uint32_t a)
     bool PREFIX ## _bit_test_reset(TYPE *arr, size_t bit) \
     { \
         size_t ind = bit / (CHAR_BIT * sizeof(TYPE)); \
-        uint8_t msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)); \
+        TYPE msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)); \
         if (arr[ind] & msk) \
         { \
             arr[ind] &= ~msk; \
@@ -583,3 +578,37 @@ DECLARE_BIT_TEST_SET(uint8_t, uint8)
 DECLARE_BIT_TEST_RESET(uint8_t, uint8)
 DECLARE_BIT_SET(uint8_t, uint8)
 DECLARE_BIT_RESET(uint8_t, uint8)
+
+size_t size_log2(size_t x, bool ceil)
+{
+    return size_bit_scan_reverse(x) + (ceil && x && (x & (x - 1)));
+}
+
+#define DECLARE_UINT_LOG10(TYPE, PREFIX, MAX, ...) \
+    TYPE PREFIX ## _log10(TYPE x, bool ceil) \
+    { \
+        static const TYPE arr[] = { __VA_ARGS__ }; \
+        if (!x) return (MAX); \
+        uint8_t left = 0, right = countof(arr) - 1; \
+        while (left < right) \
+        { \
+            uint8_t mid = (left + right + !ceil) >> 1; \
+            TYPE t = arr[mid]; \
+            if (x > t) left = mid + ceil; \
+            else if (x < t) right = mid - !ceil; \
+            else return mid; \
+        } \
+        return ceil && left == countof(arr) - 1 ? countof(arr) : left; \
+    }
+
+#define TEN5(X) 1 ## X, 10 ## X, 100 ## X, 1000 ## X, 10000 ## X
+#define TEN10(X) TEN5(X), TEN5(00000 ## X)
+#define TEN20(X) TEN10(X), TEN10(0000000000 ## X)
+DECLARE_UINT_LOG10(uint32_t, uint32, UINT32_MAX, TEN10(u))
+DECLARE_UINT_LOG10(uint64_t, uint64, UINT64_MAX, TEN20(u))
+
+#if defined _M_X64 || defined __x86_64__
+DECLARE_UINT_LOG10(size_t, size, SIZE_MAX, TEN20(u))
+#elif defined _M_IX86 || defined __i386__
+DECLARE_UINT_LOG10(size_t, size, SIZE_MAX, TEN10(u))
+#endif

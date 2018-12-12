@@ -29,7 +29,7 @@
 static bool test_main(struct log *log)
 {
     const struct test_group group_arr[] = {
-        /*{
+        {
             NULL,
             sizeof(struct test_ll_a),
             CLII((test_generator_callback[]) {
@@ -83,7 +83,7 @@ static bool test_main(struct log *log)
                 test_sort_b_1,
                 test_sort_b_2
             })
-        },*/
+        },
         {
             test_sort_disposer_c,
             sizeof(struct test_sort_c),
@@ -93,6 +93,16 @@ static bool test_main(struct log *log)
             CLII((test_callback[]) {
                 test_sort_c_1,
                 test_sort_c_2
+            })
+        },
+        {
+            test_sort_disposer_d,
+            sizeof(struct test_sort_d),
+            CLII((test_generator_callback[]) {
+                test_sort_generator_d_1
+            }),
+            CLII((test_callback[]) {
+                test_sort_d_1
             })
         },
         {
@@ -370,14 +380,14 @@ static int Main(int argc, char **argv)
         .ttl = { ENV_INIT_COL(FG_GREEN), ENV_INIT_COL(FG_RED), ENV_INIT_COL(FG_YELLOW), ENV_INIT_COL(FG_MAGENTA), ENV_INIT_COL(FG_CYAN) },
         .inf = ENV_INIT_COL(FG_BR_BLACK),
         .tmd = ENV_INIT_COL(FG_BR_YELLOW),
-        .pth = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_YELLOW, UTF8_RDQUO),
+        .pth = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_BLUE, UTF8_RDQUO),
         .str = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_MAGENTA, UTF8_RDQUO),
         .chr = ENV_INIT_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO),
         .num = ENV_INIT_COL(FG_BR_CYAN),        
     };
 
     struct log log;
-    if (log_init(&log, NULL, 1, 0, style, NULL))
+    if (log_init(&log, NULL, BLOCK_WRITE, 0, style, NULL))
     {
         size_t pos_cnt;
         char **pos_arr;

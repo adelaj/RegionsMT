@@ -40,3 +40,7 @@ bool test_sort_generator_c_1(void *, size_t *, struct log *);
 void test_sort_disposer_c(void *);
 bool test_sort_c_1(void *, struct log *);
 bool test_sort_c_2(void *, struct log *);
+
+bool test_sort_generator_d_1(void *, size_t *, struct log *);
+void test_sort_disposer_d(void *);
+bool test_sort_d_1(void *, struct log *);

@@ -68,7 +68,6 @@ size_t size_sum(size_t *, size_t *, size_t);
 size_t size_mul(size_t *, size_t, size_t);
 uint8_t uint8_bit_scan_reverse(uint8_t);
 uint8_t uint8_bit_scan_forward(uint8_t);
-size_t size_log2_ceiling(size_t);
 uint32_t uint32_bit_scan_reverse(uint32_t);
 uint32_t uint32_bit_scan_forward(uint32_t);
 uint32_t uint32_pop_cnt(uint32_t);
@@ -106,3 +105,8 @@ bool uint8_bit_test_set(uint8_t *, size_t);
 bool uint8_bit_test_reset(uint8_t *, size_t);
 void uint8_bit_set(uint8_t *, size_t);
 void uint8_bit_reset(uint8_t *, size_t);
+
+size_t size_log2(size_t, bool);
+uint32_t uint32_log10(uint32_t, bool);
+uint64_t uint64_log10(uint64_t, bool);
+size_t size_log10(size_t, bool);

@@ -24,26 +24,27 @@ enum argv_status {
 
 static bool log_message_warning_argv(struct log *restrict log, struct code_metric code_metric, char *name_str, size_t name_len, char *val_str, size_t val_len, size_t ind, enum argv_status status)
 {
+    static const char fmt[] = " the command-line argument no. %<>uz!\n";
     struct env style = status & 1 ? log->style.chr : log->style.str;
     switch (status)
     {
     case ARGV_WARNING_MISSING_VALUE_LONG:
     case ARGV_WARNING_MISSING_VALUE_SHRT:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Expected a value for the parameter %<>s* within the command-line argument no. %<>uz!\n", style, name_str, name_len, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Expected a value for the parameter %<>s* within%$", style, name_str, name_len, fmt, log->style.num, ind);
     case ARGV_WARNING_UNHANDLED_PAR_LONG:
     case ARGV_WARNING_UNHANDLED_PAR_SHRT:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unable to handle the value %<>s* of the parameter %<>s* near the command-line argument no. %<>uz!\n", log->style.str, val_str, val_len, style, name_str, name_len, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unable to handle the value %<>s* of the parameter %<>s* near%$", log->style.str, val_str, val_len, style, name_str, name_len, fmt, log->style.num, ind);
     case ARGV_WARNING_UNHANDLED_OPT_LONG:
     case ARGV_WARNING_UNHANDLED_OPT_SHRT:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unable to handle the option %<>s* within the command-line argument no. %<>uz!\n", style, name_str, name_len, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unable to handle the option %<>s* within%$", style, name_str, name_len, fmt, log->style.num, ind);
     case ARGV_WARNING_UNEXPECTED_VALUE_LONG:
     case ARGV_WARNING_UNEXPECTED_VALUE_SHRT:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Redundant value %<>s* for the option %<>s* within the command-line argument no. %<>uz!\n", log->style.str, val_str, val_len, style, name_str, name_len, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Redundant value %<>s* for the option %<>s* within%$", log->style.str, val_str, val_len, style, name_str, name_len, fmt, log->style.num, ind);
     case ARGV_WARNING_INVALID_PAR_LONG:
     case ARGV_WARNING_INVALID_PAR_SHRT:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Invalid identifier %<>s* within the command-line argument no. %<>uz!\n", style, name_str, name_len, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Invalid identifier %<>s* within%$", style, name_str, name_len, fmt, log->style.num, ind);
     case ARGV_WARNING_INVALID_UTF:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unexpected UTF-8 continuation byte at the position %<>uz within the command-line argument no. %<>uz!\n", log->style.num, name_len + 1, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unexpected UTF-8 continuation byte at the position %<>uz within%$", log->style.num, name_len + 1, fmt, log->style.num, ind);
     }
     return 0;
 }
