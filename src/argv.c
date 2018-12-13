@@ -83,7 +83,7 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
             {
                 bool shrt = capture < 0;
                 capture = 0;
-                if (par.mode != PAR_VALUED_OPTION || !hyph)
+                if (!(par.mode == PAR_VALUED_OPTION && hyph))
                 {
                     size_t tmp = strlen(argv[i]);
                     if (par.handler && !par.handler(argv[i], tmp, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, argv[i], tmp, i - 1, shrt ? ARGV_WARNING_UNHANDLED_PAR_SHRT : ARGV_WARNING_UNHANDLED_PAR_LONG);

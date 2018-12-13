@@ -30,7 +30,7 @@ typedef bool (*write_callback)(char *, size_t *, void *, void *); // Functional 
 typedef union { read_callback read; write_callback write; } rw_callback;
 
 struct handler_context {
-    size_t offset;
+    ptrdiff_t offset;
     size_t bit_pos;
 };
 
@@ -52,12 +52,17 @@ unsigned str_to_uint8_hex(const char *, const char **, uint8_t *);
 unsigned str_to_size_hex(const char *, const char **, size_t *);
 unsigned str_to_flt64(const char *, const char **, double *);
 
+struct bool_handler_context {
+    size_t bit_pos;
+    struct handler_context *context;
+};
+
 // Functions to be used as 'read_callback'
-// If the second argument is 'SIZE_MAX', it is considered undefined
 bool empty_handler(const char *, size_t, void *, void *);
 bool p_str_handler(const char *, size_t, void *, void *);
 bool str_handler(const char *, size_t, void *, void *);
 bool bool_handler(const char *, size_t, void *, void *);
+bool bool_handler2(const char *, size_t, void *, void *);
 bool uint64_handler(const char *, size_t, void *, void *);
 bool uint32_handler(const char *, size_t, void *, void *);
 bool uint16_handler(const char *, size_t, void *, void *);

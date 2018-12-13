@@ -99,11 +99,6 @@ unsigned str_to_flt64(const char *str, const char **ptr, double *p_res)
     return err ? err == ERANGE ? CVT_OUT_OF_RANGE : 0 : 1;
 }
 
-struct bool_handler_context {
-    size_t bit_pos;
-    struct handler_context *context;
-};
-
 bool bool_handler(const char *str, size_t len, void *Ptr, void *Context)
 {
     (void) len;
@@ -120,7 +115,13 @@ bool bool_handler(const char *str, size_t len, void *Ptr, void *Context)
     struct bool_handler_context *context = Context;
     if (!context) return 1;
     (res ? uint8_bit_set : uint8_bit_reset)((uint8_t *) Ptr, context->bit_pos);
-    return empty_handler(str, len, Ptr, context->context);    
+    return empty_handler(str, len, Ptr, context->context);
+}
+
+bool bool_handler2(const char *str, size_t len, void *Ptr, void *Context)
+{
+    return str && len ? bool_handler(str, len, Ptr, Context) : 
+        empty_handler(str, len, Ptr, &(struct handler_context) { .bit_pos = ((struct bool_handler_context *) Context)->bit_pos });
 }
 
 #define DECLARE_INT_HANDLER(TYPE, PREFIX, CONV) \
@@ -129,7 +130,7 @@ bool bool_handler(const char *str, size_t len, void *Ptr, void *Context)
         (void) len; \
         TYPE *ptr = Ptr; \
         const char *test; \
-        if (CONV(str, &test, ptr) || *test) return 0; \
+        if (!CONV(str, &test, ptr) || *test) return 0; \
         return empty_handler(str, len, Ptr, Context); \
     }
 

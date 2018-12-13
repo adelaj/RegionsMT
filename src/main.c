@@ -182,17 +182,18 @@ static int Main(int argc, char **argv)
     // All names should be sorted according to 'strncmp'!!!
     struct argv_par_sch argv_par_sch =
     {
-        CLII((struct tag[]) { { STRI("help"), 0 }, { STRI("log"), 1 }, { STRI("test"), 2 }, { STRI("threads"), 3 }}),
+        CLII((struct tag[]) { { STRI("fancy"), 7 }, { STRI("help"), 0 }, { STRI("log"), 1 }, { STRI("test"), 2 }, { STRI("threads"), 3 }}),
         CLII((struct tag[]) { { STRI("C"), 4 }, { STRI("F"), 6 }, { STRI("L"), 5 }, { STRI("T"), 2 }, { STRI("h"), 0 }, { STRI("l"), 1 }, { STRI("t"), 3 } }),
         CLII((struct par_sch[])
         {
-            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_HELP }, empty_handler, 1 },
-            { offsetof(struct main_args, log_path), NULL, p_str_handler, 0 },
-            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_TEST }, empty_handler, 1 },
-            { offsetof(struct main_args, thread_cnt), &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_THREAD_CNT }, size_handler, 0 },
-            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CAT }, empty_handler, 1 },
-            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_LDE }, empty_handler, 1 },
-            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CHISQ }, empty_handler, 1 },
+            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_HELP }, empty_handler, PAR_OPTION },
+            { offsetof(struct main_args, log_path), NULL, p_str_handler, PAR_VALUED },
+            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_TEST }, empty_handler, PAR_OPTION },
+            { offsetof(struct main_args, thread_cnt), &(struct handler_context) { offsetof(struct main_args, bits) - offsetof(struct main_args, thread_cnt), MAIN_ARGS_BIT_POS_THREAD_CNT }, size_handler, PAR_VALUED },
+            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CAT }, empty_handler, PAR_OPTION },
+            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_LDE }, empty_handler, PAR_OPTION },
+            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CHISQ }, empty_handler, PAR_OPTION },
+            { offsetof(struct main_args, bits), &(struct bool_handler_context) { MAIN_ARGS_BIT_POS_FANCY, &(struct handler_context) { 0, MAIN_ARGS_BIT_POS_FANCY_USER } }, bool_handler2, PAR_VALUED_OPTION },
         })
     };
 
@@ -387,7 +388,7 @@ static int Main(int argc, char **argv)
     };
 
     struct log log;
-    if (log_init(&log, NULL, BLOCK_WRITE, 0, style, NULL))
+    if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, style, NULL))
     {
         size_t pos_cnt;
         char **pos_arr;
@@ -395,6 +396,23 @@ static int Main(int argc, char **argv)
         if (argv_parse(argv_par_selector, &argv_par_sch, &main_args, argv, argc, &pos_arr, &pos_cnt, &log))
         {
             main_args = main_args_override(main_args, main_args_default());
+            /*
+            if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY))
+            {
+                if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY_USER))
+                    log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: ON.\n");
+                else
+                    log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: set to DEFAULT.\n");
+            }
+            else
+            {
+                if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY_USER))
+                    log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: OFF.\n");
+                else
+                    log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: DEFAULT.\n");
+            }
+            */
+
             if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_HELP))
             {
                 // Help mode
