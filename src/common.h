@@ -43,18 +43,17 @@
     ((x) > (y) ? 1 : (x) < (y) ? -1 : 0)
 
 // Number of elements of array
-#define countof(ARR) \
-    (sizeof(ARR) / sizeof((ARR)[0]))
+#define countof(ARR) (sizeof(ARR) / sizeof((ARR)[0]))
 
 // Length of string literal (without null-terminator)
-#define lengthof(STR) \
-    (countof((STR)) - 1)
+#define lengthof(STR) (countof((STR)) - 1)
+
+#define dimxof(DIMY, MAT) (countof(MAT) / (DIMY))
+#define dimyof(DIMX, MAT) (countof(MAT) / (DIMX))
 
 // Helper macros evaluating and inserting the count of arguments
-#define INIT(T, ...) \
-    { __VA_ARGS__ }, countof(((T []) { __VA_ARGS__ }))
-#define ARG(T, ...) \
-    ((T []) { __VA_ARGS__ }), countof(((T []) { __VA_ARGS__ }))
+#define INIT(T, ...) { __VA_ARGS__ }, countof(((T []) { __VA_ARGS__ }))
+#define ARG(T, ...) ((T []) { __VA_ARGS__ }), countof(((T []) { __VA_ARGS__ }))
 
 // Convert value (which is often represented by a macro) to the string literal
 #define TOSTRING_EXPAND(Z) #Z
@@ -64,6 +63,8 @@
 #define STRI(STR) { STRC(STR) }
 #define ARRC(ARR) (ARR), countof(ARR)
 #define ARRI(ARR) { ARRC(ARR) }
+#define MATCX(DIMY, ...) (__VA_ARGS__), dimxof(DIMY, (__VA_ARGS__)), DIMY, countof((__VA_ARGS__))
+#define MATCY(DIMX, ...) (__VA_ARGS__), DIMX, dimyof(DIMX, (__VA_ARGS__)), countof((__VA_ARGS__))
 
 // In the case of compound literal extra parentheses should be added
 #define CLII(...) ARRI((__VA_ARGS__))

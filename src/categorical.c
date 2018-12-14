@@ -122,7 +122,7 @@ static void gen_shuffle_alt_impl(size_t alt, size_t *dst, size_t *src, uint8_t *
 }
 
 struct categorical_snp_data {
-    size_t gen_mar[GEN_CNT * ALT_CNT], gen_phen_mar[ALT_CNT], cnt, gen_pop_cnt_alt[ALT_CNT], flags_pop_cnt;
+    size_t gen_mar[GEN_CNT * ALT_CNT], mar[ALT_CNT], cnt, gen_pop_cnt_alt[ALT_CNT], flags_pop_cnt;
     uint8_t gen_bits[UINT8_CNT(GEN_CNT)];
 };
 
@@ -139,7 +139,7 @@ bool categorical_init(struct categorical_supp *supp, size_t phen_cnt, size_t phe
     if ((!phen_ucnt || (supp->phen_mar && supp->phen_bits)) &&
         (!phen_cnt || supp->filter) &&
         array_init(&supp->outer, NULL, phen_ucnt, GEN_CNT * sizeof(*supp->outer), 0, ARRAY_STRICT) &&
-        array_init(&supp->table, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->table), 0, ARRAY_STRICT)) return 1;
+        array_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->tbl), 0, ARRAY_STRICT)) return 1;
 
     categorical_close(supp);
     return 1;
@@ -151,7 +151,7 @@ void categorical_close(struct categorical_supp *supp)
     free(supp->phen_bits);
     free(supp->filter);
     free(supp->outer);
-    free(supp->table);
+    free(supp->tbl);
 }
 
 bool maver_adj_init(struct maver_adj_supp *supp, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt)
@@ -166,7 +166,7 @@ bool maver_adj_init(struct maver_adj_supp *supp, size_t snp_cnt, size_t phen_cnt
         array_init(&supp->snp_data, NULL, snp_cnt, sizeof(*supp->snp_data), 0, ARRAY_STRICT) &&
         array_init(&supp->filter, NULL, snp_cnt * phen_cnt, sizeof(*supp->filter), 0, ARRAY_STRICT) && // Result of 'snp_cnt * phen_cnt' is assumed not to be wrapped due to the validness of the 'gen' array
         array_init(&supp->outer, NULL, phen_ucnt, GEN_CNT * sizeof(*supp->outer), 0, ARRAY_STRICT) &&
-        array_init(&supp->table, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->table), 0, ARRAY_STRICT)) return 1;
+        array_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->tbl), 0, ARRAY_STRICT)) return 1;
     
     maver_adj_close(supp);
     return 0;
@@ -180,7 +180,7 @@ void maver_adj_close(struct maver_adj_supp *supp)
     free(supp->snp_data);
     free(supp->filter);
     free(supp->outer);
-    free(supp->table);
+    free(supp->tbl);
 }
 
 static size_t filter_init(size_t *filter, uint8_t *gen, size_t phen_cnt)
@@ -203,19 +203,18 @@ static size_t gen_pop_cnt_alt_init(size_t *gen_pop_cnt_alt, uint8_t *gen_bits, s
     return res;
 }
 
-static void contingency_table_init(size_t *table, uint8_t *gen, size_t *phen, size_t cnt, size_t *filter)
+static void contingency_table_init(size_t *tbl, uint8_t *gen, size_t *phen, size_t cnt, size_t *filter)
 {
     for (size_t i = 0; i < cnt; i++)
     {
         size_t ind = filter[i];
-        table[gen[ind] + GEN_CNT * phen[ind]]++;
+        tbl[gen[ind] + GEN_CNT * phen[ind]]++;
     }
 }
 
 static void contingency_table_shuffle_alt_impl(size_t alt, size_t *dst, size_t *src, uint8_t *gen_bits, size_t gen_pop_cnt, uint8_t *phen_bits, size_t phen_pop_cnt)
 {
-    size_t off = 0;
-    for (size_t i = 0, j = 0; i < phen_pop_cnt; i++, j += GEN_CNT)
+    for (size_t i = 0, j = 0, off = 0; i < phen_pop_cnt; i++, j += GEN_CNT)
     {
         if (!uint8_bit_test(phen_bits, i)) continue;
         gen_shuffle_alt_impl(alt, dst + off, src + j, gen_bits);
@@ -223,50 +222,49 @@ static void contingency_table_shuffle_alt_impl(size_t alt, size_t *dst, size_t *
     }
 }
 
-static void gen_phen_mar_init(size_t *table, size_t *gen_mar, size_t *phen_mar, size_t *p_gen_phen_mar, size_t gen_pop_cnt, size_t phen_pop_cnt)
+void mar_init(size_t *tbl, size_t *xmar, size_t *ymar, size_t *p_mar, size_t dimx, size_t dimy)
 {
-    size_t gen_phen_mar = 0;
-    for (size_t t = 0; t < phen_pop_cnt; gen_phen_mar += phen_mar[t], t++) for (size_t s = 0; s < gen_pop_cnt; s++)
+    size_t mar = 0;
+    for (size_t i = 0; i < dimy; mar += ymar[i], i++) for (size_t j = 0; j < dimx; j++)
     {
-        size_t el = table[s + gen_pop_cnt * t];
-        gen_mar[s] += el;
-        phen_mar[t] += el;
+        size_t el = tbl[j + dimx * i];
+        xmar[j] += el;
+        ymar[i] += el;
     }
-    *p_gen_phen_mar = gen_phen_mar;
+    *p_mar = mar;
 }
 
-static void phen_mar_init(size_t *table, size_t *phen_mar, size_t gen_pop_cnt, size_t phen_pop_cnt)
+void ymar_init(size_t *tbl, size_t *ymar, size_t dimx, size_t dimy)
 {
-    for (size_t i = 0; i < phen_pop_cnt; i++) for (size_t j = 0; j < gen_pop_cnt; phen_mar[i] += table[j + gen_pop_cnt * i], j++);
+    for (size_t i = 0; i < dimy; i++) for (size_t j = 0; j < dimx; ymar[i] += tbl[j + dimx * i], j++);
 }
 
-static void outer_prod_chisq_impl(size_t *outer, size_t *gen_mar, size_t *phen_mar, size_t gen_pop_cnt, size_t phen_pop_cnt)
+void outer_chisq_init(size_t *outer, size_t *xmar, size_t *ymar, size_t dimx, size_t dimy)
 {
-    for (size_t i = 0; i < phen_pop_cnt; i++) for (size_t j = 0; j < gen_pop_cnt; j++)
-        outer[j + gen_pop_cnt * i] = gen_mar[j] * phen_mar[i];
+    for (size_t i = 0; i < dimy; i++) for (size_t j = 0; j < dimx; j++) outer[j + dimx * i] = xmar[j] * ymar[i];
 }
 
-static bool outer_prod_combined_impl(size_t *outer, size_t *gen_mar, size_t *phen_mar, size_t gen_phen_mar, size_t gen_pop_cnt, size_t phen_pop_cnt)
+bool outer_combined_init(size_t *outer, size_t *xmar, size_t *ymar, size_t mar, size_t dimx, size_t dimy)
 {
-    if (gen_pop_cnt > 2 || phen_pop_cnt > 2)
+    if (dimx > 2 || dimy > 2)
     {
-        outer_prod_chisq_impl(outer, gen_mar, phen_mar, gen_pop_cnt, phen_pop_cnt);
+        outer_chisq_init(outer, xmar, ymar, dimx, dimy);
         return 1;
     }
-    size_t lim = 5 * gen_phen_mar;
-    for (size_t i = 0; i < phen_pop_cnt; i++) for (size_t j = 0; j < gen_pop_cnt; j++)
+    size_t lim = 5 * mar;
+    for (size_t i = 0; i < dimy; i++) for (size_t j = 0; j < dimx; j++)
     {
-        size_t tmp = gen_mar[j] * phen_mar[i];
-        if (tmp >= lim) outer[j + gen_pop_cnt * i] = tmp;
+        size_t tmp = xmar[j] * ymar[i];
+        if (tmp >= lim) outer[j + dimx * i] = tmp;
         else return 0;
     }
     return 1;
 }
 
-double stat_exact(size_t *table, size_t *gen_mar, size_t *phen_mar)
+double stat_exact(size_t *tbl, size_t *xmar, size_t *ymar)
 {
-    size_t g0 = gen_mar[0], p0 = phen_mar[0], p1 = phen_mar[1], lo = size_sub_sat(g0, p1), hi = MIN(g0, p0);
-    double hyp_comp = pdf_hypergeom(table[0], p0, p1, g0), a = 0., b = 0.;
+    size_t g0 = xmar[0], p0 = ymar[0], p1 = ymar[1], lo = size_sub_sat(g0, p1), hi = MIN(g0, p0);
+    double hyp_comp = pdf_hypergeom(tbl[0], p0, p1, g0), a = 0., b = 0.;
     for (size_t i = lo; i <= hi; i++)
     {
         double hyp = pdf_hypergeom(i, p0, p1, g0);
@@ -276,39 +274,39 @@ double stat_exact(size_t *table, size_t *gen_mar, size_t *phen_mar)
     return log10(a) - log10(b);
 }
 
-double qas_exact(size_t *table)
+double qas_exact(size_t *tbl)
 {
-    return log10((double) table[0]) + log10((double) table[3]) - (log10((double) table[1]) + log10((double) table[2]));
+    return log10((double) tbl[0]) + log10((double) tbl[3]) - (log10((double) tbl[1]) + log10((double) tbl[2]));
 }
 
-static double stat_chisq(size_t *table, size_t *outer, size_t gen_phen_mar, size_t gen_pop_cnt, size_t phen_pop_cnt)
+double stat_chisq(size_t *tbl, size_t *outer, size_t mar, size_t dimx, size_t dimy)
 {
     double stat = 0.;
-    size_t pr = gen_pop_cnt * phen_pop_cnt;
+    size_t pr = dimx * dimy;
     for (size_t i = 0; i < pr; i++)
     {
         size_t out = outer[i];
-        double diff = (double) out - (double) (table[i] * gen_phen_mar);
-        stat += diff * diff / (double) (out * gen_phen_mar);
+        double diff = (double) out - (double) (tbl[i] * mar);
+        stat += diff * diff / (double) (out * mar);
     }
-    return -log10(cdf_chisq_Q(stat, (double) (pr - gen_pop_cnt - phen_pop_cnt + 1)));
+    return -log10(cdf_chisq_Q(stat, (double) (pr - dimx - dimy + 1)));
 }
 
-static double qas_chisq(size_t *table, size_t *gen_mar, size_t *phen_mar, size_t gen_phen_mar, size_t gen_pop_cnt, size_t phen_pop_cnt)
+double qas_chisq(size_t *tbl, size_t *xmar, size_t *ymar, size_t mar, size_t dimx, size_t dimy)
 {
     size_t s = 0, t = 0, s2 = 0, t2 = 0, st = 0;
-    for (size_t i = 1; i < phen_pop_cnt; i++)
+    for (size_t i = 1; i < dimy; i++)
     {
-        for (size_t j = 1; j < gen_pop_cnt; j++) st += i * j * table[j + gen_pop_cnt * i];
-        size_t m = i * phen_mar[i];
+        for (size_t j = 1; j < dimx; j++) st += i * j * tbl[j + dimx * i];
+        size_t m = i * ymar[i];
         t += m, t2 += i * m;
     }
-    for (size_t i = 1; i < gen_pop_cnt; i++)
+    for (size_t i = 1; i < dimx; i++)
     {
-        size_t m = i * gen_mar[i];
+        size_t m = i * xmar[i];
         s += m, s2 += i * m;
     }
-    double a = (double) (st * gen_phen_mar) - (double) (s * t), b = sqrt(((double) (s2 * gen_phen_mar) - (double) (s * s)) * ((double) (t2 * gen_phen_mar) - (double) (t * t)));
+    double a = (double) (st * mar) - (double) (s * t), b = sqrt(((double) (s2 * mar) - (double) (s * s)) * ((double) (t2 * mar) - (double) (t * t)));
     return .5 * (log10(b + a) - log10(b - a));
 }
 
@@ -346,8 +344,8 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
     if (phen_pop_cnt < 2) return res;
 
     // Building contingency table
-    memset(supp->table + table_disp, 0, table_disp * sizeof(*supp->table));
-    contingency_table_init(supp->table + table_disp, gen, phen, cnt, supp->filter);
+    memset(supp->tbl + table_disp, 0, table_disp * sizeof(*supp->tbl));
+    contingency_table_init(supp->tbl + table_disp, gen, phen, cnt, supp->filter);
 
     // Performing computations for each alternative
     for (size_t i = 0; i < ALT_CNT; i++)
@@ -355,23 +353,23 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
         size_t gen_pop_cnt = gen_pop_cnt_alt[i];
         if (!gen_pop_cnt) continue;
 
-        contingency_table_shuffle_alt_impl(i, supp->table, supp->table + table_disp, gen_bits, gen_pop_cnt, supp->phen_bits, phen_pop_cnt);
+        contingency_table_shuffle_alt_impl(i, supp->tbl, supp->tbl + table_disp, gen_bits, gen_pop_cnt, supp->phen_bits, phen_pop_cnt);
 
         // Computing sums
-        size_t gen_mar[GEN_CNT] = { 0 }, gen_phen_mar = 0;
+        size_t gen_mar[GEN_CNT] = { 0 }, mar = 0;
         memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
-        gen_phen_mar_init(supp->table, gen_mar, supp->phen_mar, &gen_phen_mar, gen_pop_cnt, phen_pop_cnt);
+        mar_init(supp->tbl, gen_mar, supp->phen_mar, &mar, gen_pop_cnt, phen_pop_cnt);
 
         // Computing test statistic and qas
-        if (outer_prod_combined_impl(supp->outer, gen_mar, supp->phen_mar, gen_phen_mar, gen_pop_cnt, phen_pop_cnt))
+        if (outer_combined_init(supp->outer, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt))
         {
-            res.nlpv[i] = stat_chisq(supp->table, supp->outer, gen_phen_mar, gen_pop_cnt, phen_pop_cnt);
-            res.qas[i] = qas_chisq(supp->table, gen_mar, supp->phen_mar, gen_phen_mar, gen_pop_cnt, phen_pop_cnt);
+            res.nlpv[i] = stat_chisq(supp->tbl, supp->outer, mar, gen_pop_cnt, phen_pop_cnt);
+            res.qas[i] = qas_chisq(supp->tbl, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt);
         }
         else
         {
-            res.nlpv[i] = stat_exact(supp->table, gen_mar, supp->phen_mar);
-            res.qas[i] = qas_exact(supp->table);
+            res.nlpv[i] = stat_exact(supp->tbl, gen_mar, supp->phen_mar);
+            res.qas[i] = qas_exact(supp->tbl);
         }
     }
     return res;
@@ -404,8 +402,8 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
         if (phen_pop_cnt < 2) continue;
 
         // Building contingency table
-        memset(supp->table + table_disp, 0, table_disp * sizeof(*supp->table));
-        contingency_table_init(supp->table + table_disp, gen + off, phen, cnt, supp->filter + off);
+        memset(supp->tbl + table_disp, 0, table_disp * sizeof(*supp->tbl));
+        contingency_table_init(supp->tbl + table_disp, gen + off, phen, cnt, supp->filter + off);
 
         // Performing computations for each alternative
         for (size_t j = 0; j < ALT_CNT; j++)
@@ -413,13 +411,13 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
             size_t gen_pop_cnt = supp->snp_data[i].gen_pop_cnt_alt[j];
             if (!gen_pop_cnt) continue;
 
-            contingency_table_shuffle_alt_impl(j, supp->table, supp->table + table_disp, supp->snp_data[i].gen_bits, gen_pop_cnt, supp->phen_bits, phen_pop_cnt);
+            contingency_table_shuffle_alt_impl(j, supp->tbl, supp->tbl + table_disp, supp->snp_data[i].gen_bits, gen_pop_cnt, supp->phen_bits, phen_pop_cnt);
 
             // Computing sums
             memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
-            gen_phen_mar_init(supp->table, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, supp->snp_data[i].gen_phen_mar + j, gen_pop_cnt, phen_pop_cnt);
-            outer_prod_chisq_impl(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-            density[j] += stat_chisq(supp->table, supp->outer, supp->snp_data[i].gen_phen_mar[j], gen_pop_cnt, phen_pop_cnt);
+            mar_init(supp->tbl, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, supp->snp_data[i].mar + j, gen_pop_cnt, phen_pop_cnt);
+            outer_chisq_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
+            density[j] += stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt);
             density_cnt[j]++;
         }
     }
@@ -454,8 +452,8 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
             if (phen_pop_cnt < 2) continue;
 
             // Building contingency table
-            memset(supp->table + table_disp, 0, table_disp * sizeof(*supp->table));
-            contingency_table_init(supp->table + table_disp, gen + off, supp->phen_perm, cnt, supp->filter + off);
+            memset(supp->tbl + table_disp, 0, table_disp * sizeof(*supp->tbl));
+            contingency_table_init(supp->tbl + table_disp, gen + off, supp->phen_perm, cnt, supp->filter + off);
 
             // Performing computations for each alternative
             for (size_t j = 0; j < ALT_CNT; j++) if (alt_rpl[j])
@@ -463,13 +461,13 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
                 size_t gen_pop_cnt = supp->snp_data[i].gen_pop_cnt_alt[j];
                 if (!gen_pop_cnt) continue;
 
-                contingency_table_shuffle_alt_impl(j, supp->table, supp->table + table_disp, supp->snp_data[i].gen_bits, gen_pop_cnt, supp->phen_bits, phen_pop_cnt);
+                contingency_table_shuffle_alt_impl(j, supp->tbl, supp->tbl + table_disp, supp->snp_data[i].gen_bits, gen_pop_cnt, supp->phen_bits, phen_pop_cnt);
 
                 // Computing sums
                 memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
-                phen_mar_init(supp->table, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-                outer_prod_chisq_impl(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-                density_perm[j] += stat_chisq(supp->table, supp->outer, supp->snp_data[i].gen_phen_mar[j], gen_pop_cnt, phen_pop_cnt);
+                ymar_init(supp->tbl, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
+                outer_chisq_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
+                density_perm[j] += stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt);
                 density_perm_cnt[j]++;
             }
         }

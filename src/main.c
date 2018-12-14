@@ -21,6 +21,7 @@
 #ifndef TEST_DEACTIVATE
 
 #   include "test.h"
+#   include "test/categorical.h"
 #   include "test/ll.h"
 #   include "test/np.h"
 #   include "test/sort.h"
@@ -117,6 +118,16 @@ static bool test_main(struct log *log)
                 test_utf8_decode,
                 test_utf16_encode,
                 test_utf16_decode
+            })
+        },
+        {
+            test_categorical_disposer_a,
+            sizeof(struct test_categorical_a),
+            CLII((test_generator_callback[]) {
+                test_categorical_generator_a,
+            }),
+            CLII((test_callback[]) {
+                test_categorical_a,
             })
         }
     };

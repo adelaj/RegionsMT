@@ -4,5 +4,5 @@
 
 struct input_res {
     size_t *ind;
-    void *table[];
+    void *tbl[];
 };

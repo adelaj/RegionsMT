@@ -15,7 +15,7 @@ enum categorical_flags {
 
 struct categorical_supp {
     uint8_t *phen_bits;
-    size_t *filter, *table, *phen_mar, *outer;
+    size_t *filter, *tbl, *phen_mar, *outer;
 };
 
 struct categorical_res {
@@ -24,7 +24,7 @@ struct categorical_res {
 
 struct maver_adj_supp {
     uint8_t *phen_bits;
-    size_t *filter, *table, *phen_mar, *phen_perm, *outer;
+    size_t *filter, *tbl, *phen_mar, *phen_perm, *outer;
     struct categorical_snp_data *snp_data;    
 };
 
@@ -33,8 +33,14 @@ struct maver_adj_res {
     size_t rpl[ALT_CNT];
 };
 
+void mar_init(size_t *, size_t *, size_t *, size_t *, size_t, size_t);
+void ymar_init(size_t *, size_t *, size_t, size_t);
+void outer_chisq_init(size_t *, size_t *, size_t *, size_t, size_t);
+bool outer_combined_init(size_t *, size_t *, size_t *, size_t, size_t, size_t);
 double stat_exact(size_t *, size_t *, size_t *);
 double qas_exact(size_t *);
+double stat_chisq(size_t *, size_t *, size_t, size_t, size_t);
+double qas_chisq(size_t *, size_t *, size_t *, size_t, size_t, size_t);
 
 bool categorical_init(struct categorical_supp *, size_t, size_t);
 struct categorical_res categorical_impl(struct categorical_supp *, uint8_t *, size_t *, size_t, size_t, enum categorical_flags);

@@ -3,6 +3,12 @@
 #include "../log.h"
 
 struct test_categorical_a {
-    double a, b;
-    int res_dsc, res_dsc_abs, res_dsc_nan;
+    size_t *tbl, dimx, dimy, cnt;
+    double nlpv, qas;
 };
+
+#define REL_ERROR 1e-6
+
+bool test_categorical_generator_a(void *, size_t *, struct log *);
+void test_categorical_disposer_a(void *);
+bool test_categorical_a(void *, struct log *);

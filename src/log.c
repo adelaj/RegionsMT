@@ -243,7 +243,7 @@ static bool fmt_decode_utf(uint32_t *p_val, enum fmt_arg_mode *p_mode, const cha
 static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
 {
     size_t pos = *p_pos;
-    *res = (struct fmt_res) { 0 };
+    memset(res, 0, sizeof(*res));
     for (;; pos++)
     {
         enum fmt_flags tmp = 0;
@@ -356,7 +356,7 @@ static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_f
         unsigned short uh;
         unsigned long ul;
         unsigned long long ull;
-    } val = { 0 };
+    } val = { .uj = 0 };
     switch (int_spec)
     {
     /*
