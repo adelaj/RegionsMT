@@ -120,7 +120,7 @@ void *queue_fetch(struct queue *queue, size_t offset, size_t sz)
 }
 
 // This function should be called ONLY if 'queue_test' succeeds
-static void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
+void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
 {
     size_t bor, left = size_sub(&bor, queue->begin, queue->cap - queue->cnt);
     if (bor) left += queue->cap;
@@ -137,7 +137,7 @@ static void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, s
 }
 
 // This function should be called ONLY if 'queue_test' succeeds
-static void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
+void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
 {
     size_t bor, diff = size_sub(&bor, cnt, queue->begin);
     if (!bor && diff) // cnt > queue->begin
