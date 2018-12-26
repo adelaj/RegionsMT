@@ -30,9 +30,9 @@ typedef DWORD tls_handle;
 #   include <pthread.h>
 
 #define thread_callback_convention
-typedef void *(*thread_callback)(void *);
-typedef pthread_t thread_handle;
 typedef void *thread_return;
+typedef thread_return (thread_callback_convention *thread_callback)(void *);
+typedef pthread_t thread_handle;
 typedef pthread_mutex_t mutex_handle;
 typedef pthread_cond_t condition_handle;
 typedef pthread_key_t tls_handle;

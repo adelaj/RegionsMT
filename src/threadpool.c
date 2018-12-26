@@ -16,6 +16,7 @@ struct thread_storage {
     char data[]; // Array with thread-local data 
 };
 
+/*
 struct thread_pool {
     struct task_queue *queue;
     spinlock_handle spinlock, startuplock;
@@ -27,6 +28,28 @@ struct thread_pool {
     size_t cnt;
     uint8_t *thread_bits;
     thread_handle thread_arr[];
+};
+*/
+
+struct thread_data {
+    thread_handle handle;
+    void *storage, *volatile ptr;
+};
+
+struct thread_pool {
+    spinlock_handle queue_lock;
+    struct queue queue;
+    size_t cnt;
+    struct persistent_array thread_data;
+    /*spinlock_handle spinlock, startuplock;
+    mutex_handle mutex;
+    condition_handle condition;
+    tls_handle tls;
+    struct thread_storage **storage;
+    volatile size_t active, terminate;
+    size_t cnt;
+    uint8_t *thread_bits;
+    thread_handle thread_arr[];*/
 };
 
 static struct task_queue *task_queue_create(size_t cap)
@@ -115,6 +138,7 @@ static void task_queue_dequeue(struct task_queue *restrict queue, size_t offset)
     if (queue->begin >= queue->cap) queue->begin -= queue->cap;
 }
 
+/*
 // Searches and removes tasks from thread pool queue (commonly used by cleanup routines to remove pending tasks which will be never executed)
 size_t thread_pool_remove_tasks(struct thread_pool *pool, struct task *tasks, size_t cnt)
 {
@@ -137,7 +161,9 @@ size_t thread_pool_remove_tasks(struct thread_pool *pool, struct task *tasks, si
     spinlock_release(&pool->spinlock);
     return fndr;
 }
+*/
 
+/*
 bool thread_pool_enqueue_tasks(struct thread_pool *pool, struct task *tasks, size_t tasks_cnt, bool hi)
 {
     spinlock_acquire(&pool->spinlock);
@@ -155,24 +181,25 @@ bool thread_pool_enqueue_tasks(struct thread_pool *pool, struct task *tasks, siz
         
     return 1;
 }
+*/
 
 size_t thread_pool_get_count(struct thread_pool *pool)
 {
-    return pool->cnt;
+    //return pool->cnt;
 }
 
 // Determines current thread identifier. Returns '-1' for the main thread.
 size_t thread_pool_get_thread_id(struct thread_pool *pool)
 {
-    struct thread_storage **p_storage = tls_fetch(&pool->tls);
-    if (p_storage) return (*p_storage)->id;
+    //struct thread_storage **p_storage = tls_fetch(&pool->tls);
+    //if (p_storage) return (*p_storage)->id;
     return SIZE_MAX;
 }
 
 // Returns pointer to the thread-local data for the current thread. Returns 'NULL' for the main thread.
 void *thread_pool_get_thread_data(struct thread_pool *pool, size_t *p_thread_id, size_t *p_thread_data_sz)
 {
-    struct thread_storage **p_storage = tls_fetch(&pool->tls);
+    /*struct thread_storage **p_storage = tls_fetch(&pool->tls);
     if (p_storage)
     {
         struct thread_storage *storage = *p_storage;
@@ -181,10 +208,11 @@ void *thread_pool_get_thread_data(struct thread_pool *pool, size_t *p_thread_id,
         return storage->data;
     }
     if (p_thread_id) *p_thread_id = SIZE_MAX;
-    if (p_thread_data_sz) *p_thread_data_sz = 0;
+    if (p_thread_data_sz) *p_thread_data_sz = 0;*/
     return NULL;
 }
 
+/*
 static inline size_t threadproc_startup(struct thread_pool *pool)
 {
     size_t res = SIZE_MAX;    
@@ -213,7 +241,44 @@ static inline void threadproc_shutdown(struct thread_pool *pool, size_t id)
     spinlock_release(&pool->startuplock);
 }
 
-static thread_return thread_callback_convention thread_proc(void *Pool) // General thread routine
+struct thread_arg {
+    void *volatile *ptr;
+    struct thread_pool *pool;
+};
+
+static thread_return thread_callback_convention thread_proc(void *Arg)
+{
+    struct thread_arg *arg = Thread_data;
+    for (;;)
+    {
+        struct task *tsk = ptr_load_acquire(thread_data->ptr);
+        for (; !tsk ; tsk = ptr_load_acquire(thread_data->ptr)) _mm_pause();
+        if (!tsk->callback || tsk->callback(tsk->arg, tsk->context))
+        {
+            if (tsk->a_succ) tsk->a_succ(tsk->a_succ_mem, tsk->a_succ_arg);
+        }
+        else
+        {
+            if (tsk->a_fail) tsk->a_fail(tsk->a_fail_mem, tsk->a_fail_arg);
+        }
+        ptr_store_release(thread_data->ptr, NULL);
+    }
+}
+
+void thread_pool_schedule(struct thread_pool *pool)
+{
+    for (size_t i = 0; i < pool->queue->cnt)
+
+    for (size_t i = 0, j = 0; i < pool->cnt; i++)
+    {
+        ptr_interlocked_compare_exchange()
+        
+        struct task *tsk = queue_fetch(pool->queue, j, sizeof(*tsk));
+        
+    }
+}
+
+static thread_return thread_callback_convention thread_proc2(void *Pool) // General thread routine
 {
     struct thread_pool *restrict pool = Pool;
     size_t id = threadproc_startup(pool);
@@ -358,3 +423,4 @@ size_t thread_pool_dispose(struct thread_pool *pool, size_t *p_pend)
     free(pool);
     return res;
 }
+*/

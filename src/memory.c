@@ -176,53 +176,43 @@ void queue_dequeue(struct queue *queue, size_t offset, size_t sz)
     if (queue->begin == queue->cap) queue->begin = 0;
 }
 
-struct persistent_array *persistent_array_create(size_t cnt, size_t sz)
+bool persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz)
 {
-    struct persistent_array *res;
-    if (cnt)
+    if (!cnt)
     {
-        size_t off = size_log2(cnt, 0);
-        if (array_init(&res, NULL, SIZE_BIT - off, sizeof(*res->ptr), sizeof(*res), ARRAY_STRICT | ARRAY_CLEAR))
-        {
-            size_t cap = res->cap = ((size_t) 2 << (res->off = off)) - 1;
-            if (array_init(res->ptr, NULL, cap, sz, 0, ARRAY_STRICT)) return res;
-            free(res);
-        }        
+        memset(arr, 0, sizeof(*arr));
+        return 1;
     }
-    else if (array_init(&res, NULL, SIZE_BIT, sizeof(*res->ptr), sizeof(*res), ARRAY_STRICT | ARRAY_CLEAR)) return res;
-    return NULL;
+    size_t off = arr->off = size_log2(cnt, 0);
+    if (!array_init(&arr->ptr, NULL, 1, sizeof(*arr->ptr), 0, ARRAY_STRICT)) return 0;
+    size_t cap = ((size_t) 2 << off) - 1;
+    if (array_init(arr->ptr, &arr->cap, cap, sz, 0, ARRAY_STRICT)) return 1;
+    free(arr->ptr);
+    return 0;    
 }
 
-void persistent_array_dispose(struct persistent_array *arr)
+void persistent_array_close(struct persistent_array *arr)
 {
-    if (!arr) return;
+    if (!arr->cap) return;
     size_t cnt = size_log2(arr->cap, 0) - arr->off + 1;
     for (size_t i = 0; i < cnt; free(arr->ptr[i++]));
-    free(arr);
 }
 
 unsigned persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz)
 {
-    size_t bor = 0, diff = size_sub(&bor, cnt, arr->cap - arr->cnt);
-    if (!bor && diff) // cnt + arr->cnt > arr->cap
+    if (cnt <= arr->cap) return 1 | ARRAY_UNTOUCHED;
+    size_t log2 = size_log2(cnt, 0), off = log2 - size_log2(arr->cap, 0), tot = log2 - arr->off + 1;
+    if (!array_test(&arr->ptr, NULL, sizeof(*arr->ptr), 0, ARRAY_CLEAR, tot)) return 0;
+    for (size_t i = off, j = (size_t) 2 << off; i < tot; i++, j <<= 1)
     {
-        size_t off = size_log2(arr->cap, 0) - arr->off + 1, cap = (size_t) 1 << off;
-        for (;;) 
-        {
-            if (!array_init(arr->ptr + off, NULL, cap, sz, 0, ARRAY_STRICT)) return 0;
-            arr->cap += cap;
-            diff = size_sub(&bor, diff, cap);
-            if (bor || !diff) break;
-            cap <<= 1;
-            off++;
-        }
-        return 1;
+        if (!array_init(arr->ptr + i, NULL, j, sz, 0, ARRAY_STRICT)) return 0;
+        arr->cap += j;
     }
-    return 1 | ARRAY_UNTOUCHED;
+    return 1;    
 }
 
 void *persistent_array_fetch(struct persistent_array *arr, size_t ind, size_t sz)
 {
-    size_t off = size_log2(ind, 0) - arr->off + 1;
-    return (char *) arr->ptr[off] + (ind - (((size_t) 1 << off) >> 1)) * sz;
+    size_t off = size_sub_sat(size_log2(ind + 1, 0), arr->off);
+    return (char *) arr->ptr[off] + (off ? ind - ((size_t) 2 << off) + 1 : ind) * sz;
 }

@@ -154,7 +154,7 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                     .a_succ_arg = snc->a_succ_arg
                 };
 
-                if (thread_pool_enqueue_tasks(pool, res->tasks, m_cnt + s_cnt, 1)) return res;
+                //if (thread_pool_enqueue_tasks(pool, res->tasks, m_cnt + s_cnt, 1)) return res;
             }            
         }
         else
@@ -174,7 +174,7 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                     .a_succ_arg = snc->a_succ_arg
                 };
 
-                if (thread_pool_enqueue_tasks(pool, res->tasks, 1, 1)) return res;
+                //if (thread_pool_enqueue_tasks(pool, res->tasks, 1, 1)) return res;
             }
         }
         sort_mt_dispose(res);

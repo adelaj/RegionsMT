@@ -9,13 +9,13 @@ bool thread_init(thread_handle *p_thread, thread_callback callback, void *args)
 
 /*void thread_terminate(thread_handle *p_thread)
 {
-    (void) TerminateThread(*p_thread, 0);
+    TerminateThread(*p_thread, 0);
 }*/
 
 void thread_wait(thread_handle *p_thread, thread_return *p_out)
 {
-    (void) WaitForSingleObject(*p_thread, INFINITE);
-    (void) GetExitCodeThread(*p_thread, (LPDWORD) p_out);
+    WaitForSingleObject(*p_thread, INFINITE);
+    GetExitCodeThread(*p_thread, (LPDWORD) p_out);
 }
 
 void thread_close(thread_handle *p_thread)
@@ -25,8 +25,7 @@ void thread_close(thread_handle *p_thread)
 
 bool mutex_init(mutex_handle *p_mutex)
 {
-    InitializeCriticalSectionAndSpinCount(p_mutex, 0);
-    return 1;
+    return InitializeCriticalSectionAndSpinCount(p_mutex, 0);
 }
 
 void mutex_acquire(mutex_handle *p_mutex)
@@ -77,7 +76,7 @@ bool tls_init(tls_handle *p_tls)
 
 void tls_assign(tls_handle *p_tls, void *ptr)
 {
-    (void) TlsSetValue(*p_tls, ptr);
+    TlsSetValue(*p_tls, ptr);
 }
 
 void *tls_fetch(tls_handle *p_tls)
@@ -87,7 +86,7 @@ void *tls_fetch(tls_handle *p_tls)
 
 void tls_close(tls_handle *p_tls)
 {
-    (void) TlsFree(*p_tls);
+    TlsFree(*p_tls);
 }
 
 #elif defined __unix__ || defined __APPLE__ || ((defined _WIN32 || defined _WIN64) && defined FORCE_POSIX_THREADS)
@@ -99,13 +98,13 @@ bool thread_init(thread_handle *p_thread, thread_callback callback, void *args)
 
 /*void thread_terminate(thread_handle *p_thread)
 {
-    (void) pthread_cancel(*p_thread);
-    (void) pthread_join(*p_thread, NULL);
+    pthread_cancel(*p_thread);
+    pthread_join(*p_thread, NULL);
 }*/
 
 void thread_wait(thread_handle *p_thread, thread_return *p_out)
 {
-    (void) pthread_join(*p_thread, p_out);
+    pthread_join(*p_thread, p_out);
 }
 
 void thread_close(thread_handle *p_thread)
@@ -120,12 +119,12 @@ bool mutex_init(mutex_handle *p_mutex)
 
 void mutex_acquire(mutex_handle *p_mutex)
 {
-    (void) pthread_mutex_lock(p_mutex);
+    pthread_mutex_lock(p_mutex);
 }
 
 void mutex_release(mutex_handle *p_mutex)
 {
-    (void) pthread_mutex_unlock(p_mutex);
+    pthread_mutex_unlock(p_mutex);
 }
 
 void mutex_close(mutex_handle *p_mutex)
@@ -140,17 +139,17 @@ bool condition_init(condition_handle *p_condition)
 
 void condition_signal(condition_handle *p_condition)
 {
-    (void) pthread_cond_signal(p_condition);
+    pthread_cond_signal(p_condition);
 }
 
 void condition_broadcast(condition_handle *p_condition)
 {
-    (void) pthread_cond_broadcast(p_condition);
+    pthread_cond_broadcast(p_condition);
 }
 
 void condition_sleep(condition_handle *p_condition, mutex_handle *pmutex)
 {
-    (void) pthread_cond_wait(p_condition, pmutex);
+    pthread_cond_wait(p_condition, pmutex);
 }
 
 void condition_close(condition_handle *p_condition)
@@ -165,7 +164,7 @@ bool tls_init(tls_handle *p_tls)
 
 void tls_assign(tls_handle *p_tls, void *ptr)
 {
-    (void) pthread_setspecific(*p_tls, ptr);
+    pthread_setspecific(*p_tls, ptr);
 }
 
 void *tls_fetch(tls_handle *p_tls)
@@ -175,7 +174,7 @@ void *tls_fetch(tls_handle *p_tls)
 
 void tls_close(tls_handle *p_tls)
 {
-    (void) pthread_key_delete(*p_tls);
+    pthread_key_delete(*p_tls);
 }
 
 #endif

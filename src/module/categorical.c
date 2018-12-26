@@ -7,6 +7,7 @@
 #include "categorical.h"
 
 #include <math.h>
+#include <float.h>
 #include <string.h>
 #include <inttypes.h>
 
@@ -124,7 +125,8 @@ struct categorical_res condition(struct categorical_res x)
     {
         double a = pow(10, -x.nlpv[i]);
         res.nlpv[i] = isfinite(a) ? a : -1.;
-        res.qas[i] = isfinite(x.qas[i]) ? x.qas[i] : -1.;
+        double qas = x.qas[i];
+        res.qas[i] = isfinite(qas) ? qas : qas < 0 ? -DBL_MAX : DBL_MAX;
     }
     return res;
 }

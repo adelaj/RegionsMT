@@ -41,8 +41,8 @@ unsigned queue_enqueue(struct queue *restrict, bool, void *restrict, size_t, siz
 void queue_dequeue(struct queue *, size_t, size_t);
 
 struct persistent_array {
-    size_t cap, cnt, off;
-    void *ptr[];
+    void **ptr;
+    size_t cap, off;
 };
 
 struct persistent_array *persistent_array_create(size_t, size_t);
