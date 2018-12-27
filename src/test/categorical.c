@@ -49,12 +49,12 @@ bool test_categorical_a(void *In, struct log *log)
         if (outer_combined_init(outer, xmar, ymar, mar, in->dimx, in->dimy))
         {
             nlpv = stat_chisq(in->tbl, outer, mar, in->dimx, in->dimy);
-            qas = qas_fisher(in->tbl, xmar, ymar, mar, in->dimx, in->dimy);
+            //qas = qas_fisher(in->tbl, xmar, ymar, mar, in->dimx, in->dimy);
         }
         else
         {
             nlpv = stat_exact(in->tbl, xmar, ymar);
-            qas = qas_lor(in->tbl);
+            //qas = qas_lor(in->tbl);
         }
         if (fabs(nlpv - in->nlpv) >= nlpv * REL_ERROR) log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Relative error is too large!\n");
         else succ = 1;
