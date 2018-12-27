@@ -302,13 +302,13 @@ static void val_init(size_t *val, uint8_t *bits, size_t cnt)
 double qas_fisher(size_t *tbl, size_t *xval, size_t *yval, size_t *xmar, size_t *ymar, size_t mar, size_t dimx, size_t dimy)
 {
     size_t s = 0, t = 0, s2 = 0, t2 = 0, st = 0;
-    for (size_t i = 0; i < dimy; i++)
+    for (size_t i = !yval[0]; i < dimy; i++)
     {
-        for (size_t j = 0; j < dimx; j++) st += yval[i] * xval[j] * tbl[j + dimx * i];
+        for (size_t j = !xval[0]; j < dimx; j++) st += yval[i] * xval[j] * tbl[j + dimx * i];
         size_t m = yval[i] * ymar[i];
         t += m, t2 += yval[i] * m;
     }
-    for (size_t i = 0; i < dimx; i++)
+    for (size_t i = !xval[0]; i < dimx; i++)
     {
         size_t m = xval[i] * xmar[i];
         s += m, s2 += xval[i] * m;
