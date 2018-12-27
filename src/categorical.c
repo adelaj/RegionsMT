@@ -274,7 +274,7 @@ double stat_exact(size_t *tbl, size_t *xmar, size_t *ymar)
     return log10(a) - log10(b);
 }
 
-double qas_exact(size_t *tbl)
+double qas_lor(size_t *tbl)
 {
     return log10((double) tbl[0]) + log10((double) tbl[3]) - (log10((double) tbl[1]) + log10((double) tbl[2]));
 }
@@ -292,7 +292,7 @@ double stat_chisq(size_t *tbl, size_t *outer, size_t mar, size_t dimx, size_t di
     return -log10(cdf_chisq_Q(stat, (double) (pr - dimx - dimy + 1)));
 }
 
-double qas_chisq(size_t *tbl, size_t *xmar, size_t *ymar, size_t mar, size_t dimx, size_t dimy)
+double qas_fisher(size_t *tbl, size_t *xmar, size_t *ymar, size_t mar, size_t dimx, size_t dimy)
 {
     size_t s = 0, t = 0, s2 = 0, t2 = 0, st = 0;
     for (size_t i = 1; i < dimy; i++)
@@ -361,16 +361,11 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
         mar_init(supp->tbl, gen_mar, supp->phen_mar, &mar, gen_pop_cnt, phen_pop_cnt);
 
         // Computing test statistic and qas
-        if (outer_combined_init(supp->outer, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt))
-        {
-            res.nlpv[i] = stat_chisq(supp->tbl, supp->outer, mar, gen_pop_cnt, phen_pop_cnt);
-            res.qas[i] = qas_chisq(supp->tbl, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt);
-        }
-        else
-        {
-            res.nlpv[i] = stat_exact(supp->tbl, gen_mar, supp->phen_mar);
-            res.qas[i] = qas_exact(supp->tbl);
-        }
+        res.nlpv[i] = 
+            outer_combined_init(supp->outer, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt) ? 
+            stat_chisq(supp->tbl, supp->outer, mar, gen_pop_cnt, phen_pop_cnt) : 
+            stat_exact(supp->tbl, gen_mar, supp->phen_mar);
+        res.qas[i] = i && phen_pop_cnt == 2 ? qas_lor(supp->tbl) : qas_fisher(supp->tbl, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt);
     }
     return res;
 }
