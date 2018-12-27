@@ -302,13 +302,13 @@ static void val_init(size_t *val, uint8_t *bits, size_t cnt)
 double qas_fisher(size_t *tbl, size_t *xval, size_t *yval, size_t *xmar, size_t *ymar, size_t mar, size_t dimx, size_t dimy)
 {
     size_t s = 0, t = 0, s2 = 0, t2 = 0, st = 0;
-    for (size_t i = 1; i < dimy; i++)
+    for (size_t i = 0; i < dimy; i++)
     {
-        for (size_t j = 1; j < dimx; j++) st += yval[i] * xval[j] * tbl[j + dimx * i];
+        for (size_t j = 0; j < dimx; j++) st += yval[i] * xval[j] * tbl[j + dimx * i];
         size_t m = yval[i] * ymar[i];
         t += m, t2 += yval[i] * m;
     }
-    for (size_t i = 1; i < dimx; i++)
+    for (size_t i = 0; i < dimx; i++)
     {
         size_t m = xval[i] * xmar[i];
         s += m, s2 += xval[i] * m;
@@ -376,11 +376,13 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
             stat_exact(supp->tbl, gen_mar, supp->phen_mar);
         
         // Computing qas
-        val_init(gen_val, gen_bits, GEN_CNT);
-        val_init(supp->phen_val, supp->phen_bits, phen_ucnt);
-        res.qas[i] = i && phen_ucnt == 2 ?
-            qas_lor(supp->tbl) : 
-            qas_fisher(supp->tbl, gen_val, supp->phen_val, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt);
+        if (i && phen_ucnt == 2) res.qas[i] = qas_lor(supp->tbl);
+        else
+        {
+            val_init(gen_val, gen_bits, GEN_CNT);
+            val_init(supp->phen_val, supp->phen_bits, phen_ucnt);
+            res.qas[i] = qas_fisher(supp->tbl, gen_val, supp->phen_val, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt);
+        }
     }
     return res;
 }
