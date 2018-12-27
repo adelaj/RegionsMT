@@ -132,11 +132,12 @@ _Static_assert((GEN_CNT * sizeof(double)) / GEN_CNT == sizeof(double), "Multipli
 bool categorical_init(struct categorical_supp *supp, size_t phen_cnt, size_t phen_ucnt)
 {
     if (phen_ucnt > phen_cnt) return 0; // Wrong parameter    
+    supp->phen_val = malloc(phen_ucnt * sizeof(*supp->phen_val));
     supp->phen_mar = malloc(phen_ucnt * sizeof(*supp->phen_mar));
     supp->phen_bits = malloc(UINT8_CNT(phen_ucnt) * sizeof(*supp->phen_bits));
     supp->filter = malloc(phen_cnt * sizeof(*supp->filter));
 
-    if ((!phen_ucnt || (supp->phen_mar && supp->phen_bits)) &&
+    if ((!phen_ucnt || (supp->phen_val && supp->phen_mar && supp->phen_bits)) &&
         (!phen_cnt || supp->filter) &&
         array_init(&supp->outer, NULL, phen_ucnt, GEN_CNT * sizeof(*supp->outer), 0, ARRAY_STRICT) &&
         array_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->tbl), 0, ARRAY_STRICT)) return 1;
@@ -147,6 +148,7 @@ bool categorical_init(struct categorical_supp *supp, size_t phen_cnt, size_t phe
 
 void categorical_close(struct categorical_supp *supp)
 {
+    free(supp->phen_val);
     free(supp->phen_mar);
     free(supp->phen_bits);
     free(supp->filter);
@@ -292,19 +294,24 @@ double stat_chisq(size_t *tbl, size_t *outer, size_t mar, size_t dimx, size_t di
     return -log10(cdf_chisq_Q(stat, (double) (pr - dimx - dimy + 1)));
 }
 
-double qas_fisher(size_t *tbl, size_t *xmar, size_t *ymar, size_t mar, size_t dimx, size_t dimy)
+static void val_init(size_t *val, uint8_t *bits, size_t cnt)
+{
+    for (size_t i = 0, j = 0; i < cnt; i++) if (uint8_bit_test(bits, i)) val[j++] = i;
+}
+
+double qas_fisher(size_t *tbl, size_t *xval, size_t *yval, size_t *xmar, size_t *ymar, size_t mar, size_t dimx, size_t dimy)
 {
     size_t s = 0, t = 0, s2 = 0, t2 = 0, st = 0;
     for (size_t i = 1; i < dimy; i++)
     {
-        for (size_t j = 1; j < dimx; j++) st += i * j * tbl[j + dimx * i];
-        size_t m = i * ymar[i];
-        t += m, t2 += i * m;
+        for (size_t j = 1; j < dimx; j++) st += yval[i] * xval[j] * tbl[j + dimx * i];
+        size_t m = yval[i] * ymar[i];
+        t += m, t2 += yval[i] * m;
     }
     for (size_t i = 1; i < dimx; i++)
     {
-        size_t m = i * xmar[i];
-        s += m, s2 += i * m;
+        size_t m = xval[i] * xmar[i];
+        s += m, s2 += xval[i] * m;
     }
     double a = (double) (st * mar) - (double) (s * t), b = sqrt(((double) (s2 * mar) - (double) (s * s)) * ((double) (t2 * mar) - (double) (t * t)));
     return .5 * (log10(b + a) - log10(b - a));
@@ -324,6 +331,10 @@ static void perm_init(size_t *perm, size_t cnt, gsl_rng *rng)
 struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *gen, size_t *phen, size_t phen_cnt, size_t phen_ucnt, enum categorical_flags flags)
 {    
     struct categorical_res res;
+    uint8_t gen_bits[UINT8_CNT(GEN_CNT)] = { 0 };
+    size_t gen_pop_cnt_alt[ALT_CNT] = { 0 };
+    size_t gen_val[GEN_CNT];
+
     array_broadcast(res.nlpv, countof(res.nlpv), sizeof(*res.nlpv), &(double) { nan(__func__) });
     array_broadcast(res.qas, countof(res.qas), sizeof(*res.qas), &(double) { nan(__func__) });
 
@@ -334,8 +345,6 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
     if (!cnt) return res;
     
     // Counting unique genotypes
-    uint8_t gen_bits[UINT8_CNT(GEN_CNT)] = { 0 };
-    size_t gen_pop_cnt_alt[ALT_CNT] = { 0 };
     if (!gen_pop_cnt_alt_init(gen_pop_cnt_alt, gen_bits, gen_bits_init(gen_bits, cnt, GEN_CNT, supp->filter, gen), flags)) return res;
     
     // Counting unique phenotypes
@@ -360,12 +369,18 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
         memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
         mar_init(supp->tbl, gen_mar, supp->phen_mar, &mar, gen_pop_cnt, phen_pop_cnt);
 
-        // Computing test statistic and qas
+        // Computing test statistic
         res.nlpv[i] = 
             outer_combined_init(supp->outer, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt) ? 
             stat_chisq(supp->tbl, supp->outer, mar, gen_pop_cnt, phen_pop_cnt) : 
             stat_exact(supp->tbl, gen_mar, supp->phen_mar);
-        res.qas[i] = i && phen_pop_cnt == 2 ? qas_lor(supp->tbl) : qas_fisher(supp->tbl, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt);
+        
+        // Computing qas
+        val_init(gen_val, gen_bits, GEN_CNT);
+        val_init(supp->phen_val, supp->phen_bits, phen_ucnt);
+        res.qas[i] = i && phen_ucnt == 2 ?
+            qas_lor(supp->tbl) : 
+            qas_fisher(supp->tbl, gen_val, supp->phen_val, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt);
     }
     return res;
 }

@@ -15,7 +15,7 @@ enum categorical_flags {
 
 struct categorical_supp {
     uint8_t *phen_bits;
-    size_t *filter, *tbl, *phen_mar, *outer;
+    size_t *filter, *tbl, *phen_val, *phen_mar, *outer;
 };
 
 struct categorical_res {
@@ -40,7 +40,7 @@ bool outer_combined_init(size_t *, size_t *, size_t *, size_t, size_t, size_t);
 double stat_exact(size_t *, size_t *, size_t *);
 double qas_lor(size_t *);
 double stat_chisq(size_t *, size_t *, size_t, size_t, size_t);
-double qas_fisher(size_t *, size_t *, size_t *, size_t, size_t, size_t);
+double qas_fisher(size_t *, size_t *, size_t *, size_t *, size_t *, size_t, size_t, size_t);
 
 bool categorical_init(struct categorical_supp *, size_t, size_t);
 struct categorical_res categorical_impl(struct categorical_supp *, uint8_t *, size_t *, size_t, size_t, enum categorical_flags);
