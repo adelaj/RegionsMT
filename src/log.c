@@ -137,6 +137,10 @@ struct fmt_res {
         } str_arg;
         struct {
             enum fmt_arg_mode mode;
+            size_t rep;
+        } char_arg;
+        struct {
+            enum fmt_arg_mode mode;
             uint32_t val;
         } utf_arg;
     };
@@ -490,6 +494,17 @@ static void fmt_execute_default(size_t len, enum fmt_arg_mode mode, size_t *p_cn
     if (!(flags & FMT_EXE_FLAG_PHONY)) *p_cnt = len;
 }
 
+static void fmt_execute_char(size_t rep, enum fmt_arg_mode mode, char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
+{
+    int ch = Va_arg(*p_arg, int);
+    if (mode == ARG_FETCH) rep = Va_arg(*p_arg, Size_dom_t);
+    if (!(flags & FMT_EXE_FLAG_PHONY))
+    {
+        //memset(buff, ch, rep * sizeof(buff));
+        //print(buff, p_cnt, str, mode == ARG_DEFAULT ? Strnlen(str, *p_cnt) : len);
+    }
+}
+
 static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
     const char *fmt = Va_arg(*p_arg, const char *);
@@ -568,8 +583,10 @@ static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_exec
         case TYPE_CALLBACK:
             if (!Va_arg(*p_arg, fmt_callback)(buff + cnt, &len, p_arg, tf)) return 0;
             break;
-        case TYPE_FLT: // NOT IMPLEMENTED!
         case TYPE_CHAR:
+            fmt_execute_char(res.char_arg.rep, res.char_arg.mode, buff + cnt, &len, p_arg, tf);
+            break;
+        case TYPE_FLT: // NOT IMPLEMENTED!
         case TYPE_PERC:
         case TYPE_UTF:
             if (!(tf & FMT_EXE_FLAG_PHONY)) i++;
