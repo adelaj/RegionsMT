@@ -498,11 +498,9 @@ static void fmt_execute_char(size_t rep, enum fmt_arg_mode mode, char *buff, siz
 {
     int ch = Va_arg(*p_arg, int);
     if (mode == ARG_FETCH) rep = Va_arg(*p_arg, Size_dom_t);
-    if (!(flags & FMT_EXE_FLAG_PHONY))
-    {
-        //memset(buff, ch, rep * sizeof(buff));
-        //print(buff, p_cnt, str, mode == ARG_DEFAULT ? Strnlen(str, *p_cnt) : len);
-    }
+    if (flags & FMT_EXE_FLAG_PHONY) return;
+    if (rep <= *p_cnt) memset(buff, ch, rep * sizeof(buff));
+    *p_cnt = rep;
 }
 
 static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
