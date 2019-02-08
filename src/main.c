@@ -401,6 +401,8 @@ static int Main(int argc, char **argv)
     struct log log;
     if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, style, NULL))
     {
+        log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "AA%!-s1%1C.\n", "B");
+        
         size_t pos_cnt;
         char **pos_arr;
         struct main_args main_args = { 0 };

@@ -9,15 +9,21 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void print_unterminated(char *buff, size_t *p_cnt, const char *str, size_t len)
+{
+    size_t cnt = *p_cnt;
+    *p_cnt = len;
+    if (cnt < len) return;
+    memcpy(buff, str, len);
+}
+
 void print(char *buff, size_t *p_cnt, const char *str, size_t len)
 {
     size_t cnt = *p_cnt;
-    if (cnt && cnt - 1 >= len)
-    {
-        memcpy(buff, str, len);
-        buff[len] = '\0';
-    }
     *p_cnt = len;
+    if (!cnt || cnt - 1 < len) return;
+    memcpy(buff, str, len);
+    buff[len] = '\0';
 }
 
 void print_time_stamp(char *buff, size_t *p_cnt)
@@ -283,7 +289,8 @@ static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
         return fmt_decode_int(&res->int_arg.spec, &res->int_arg.flags, fmt, p_pos);
     case 'c':
         res->type = TYPE_CHAR;
-        break;
+        *p_pos = pos + 1;
+        return fmt_decode_str(&res->char_arg.rep, &res->char_arg.mode, fmt, p_pos);
     case 's':
         res->type = TYPE_STR;
         *p_pos = pos + 1;
@@ -499,6 +506,7 @@ static void fmt_execute_char(size_t rep, enum fmt_arg_mode mode, char *buff, siz
     int ch = Va_arg(*p_arg, int);
     if (mode == ARG_FETCH) rep = Va_arg(*p_arg, Size_dom_t);
     if (flags & FMT_EXE_FLAG_PHONY) return;
+    if (mode == ARG_DEFAULT) rep = 1;
     if (rep <= *p_cnt) memset(buff, ch, rep * sizeof(buff));
     *p_cnt = rep;
 }
@@ -536,10 +544,17 @@ static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_exec
         else if (res.flags & FMT_OVERPRINT) tmp = len = *p_cnt - (cnt = off);
         i = 1;
     case 1:
-        off = Strchrnul(fmt + pos, '%'); 
-        print(buff + cnt, &len, fmt + pos, off);
-        if (fmt[pos += off]) pos++;
-        else i = SIZE_MAX; // Exit loop if there are no more arguments
+        off = Strchrnul(fmt + pos, '%');
+        if (fmt[pos + off])
+        {
+            print_unterminated(buff + cnt, &len, fmt + pos, off);
+            pos += off + 1;
+        }
+        else
+        {
+            print(buff + cnt, &len, fmt + pos, off);
+            i = SIZE_MAX; // Exit loop if there are no more arguments
+        }
         off = cnt = size_add_sat(cnt, len);
         break;
     case 3:
@@ -549,7 +564,7 @@ static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_exec
         if (res.flags & (FMT_ENV_BEGIN | FMT_ENV_END))
         {
             env = Va_arg(*p_arg, struct env);
-            if (!(tf & FMT_EXE_FLAG_PHONY) && (res.flags & FMT_ENV_BEGIN)) print(buff + cnt, &len, STRL(env.begin));
+            if (!(tf & FMT_EXE_FLAG_PHONY) && (res.flags & FMT_ENV_BEGIN)) print_unterminated(buff + cnt, &len, STRL(env.begin));
             else i++;
         }
         else i++;
@@ -592,7 +607,7 @@ static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_exec
         if (tf & FMT_EXE_FLAG_PHONY) i++;
         break;
     case 7:        
-        if (!(tf & FMT_EXE_FLAG_PHONY) && (res.flags & FMT_ENV_END)) print(buff + cnt, &len, STRL(env.end));
+        if (!(tf & FMT_EXE_FLAG_PHONY) && (res.flags & FMT_ENV_END)) print_unterminated(buff + cnt, &len, STRL(env.end));
         else i++;
     }
     if (!(flags & FMT_EXE_FLAG_PHONY)) *p_cnt = cnt;
