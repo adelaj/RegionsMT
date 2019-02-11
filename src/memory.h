@@ -49,3 +49,8 @@ struct persistent_array *persistent_array_create(size_t, size_t);
 void persistent_array_dispose(struct persistent_array *);
 unsigned persistent_array_test(struct persistent_array *, size_t, size_t);
 void *persistent_array_fetch(struct persistent_array *, size_t, size_t);
+
+struct hash_table {
+    size_t buck, cnt, cap, right, *flags;
+    void *key, *val;
+};

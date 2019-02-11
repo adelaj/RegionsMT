@@ -218,3 +218,11 @@ void *persistent_array_fetch(struct persistent_array *arr, size_t ind, size_t sz
     size_t off = size_sub_sat(size_log2(ind + 1, 0), arr->off);
     return (char *) arr->ptr[off] + (off ? ind - ((size_t) 2 << off) + 1 : ind) * sz;
 }
+
+#define FLAGS_CNT(FLAGS) TYPE_CNT(FLAGS, CHAR_BIT * sizeof(size_t) >> 2)
+
+// Heavily based on the 'khash.h'
+unsigned hash_table_test(struct hash_table *tbl, size_t cnt, size_t sz)
+{
+
+}

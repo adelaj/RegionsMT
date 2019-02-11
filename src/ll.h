@@ -16,8 +16,8 @@ typedef volatile long spinlock_handle;
 #define BIT_TEST2_MASK (0x5555555555555555ull & UINT8_MAX)
 _Static_assert(((BIT_TEST2_MASK | (BIT_TEST2_MASK << 1)) & UINT8_MAX) == UINT8_MAX, "Wrong constant provided!");
 
-#define TYPE_CNT(BIT, TOT) (((BIT) / (TOT)) + !!((BIT) & ((TOT) - 1))) // Not always equal to ((BIT) + (TOT) - 1) / (TOT)
-#define NIBBLE_CNT(BIT) TYPE_CNT(BIT, CHAR_BIT * sizeof(uint8_t) >> 1)
+#define TYPE_CNT(BIT, TOT) ((BIT) / (TOT) + !!((BIT) % (TOT))) // Not always equals to ((BIT) + (TOT) - 1) / (TOT)
+#define NIBBLE_CNT(NIBBLE) TYPE_CNT(NIBBLE, CHAR_BIT * sizeof(uint8_t) >> 1)
 #define UINT8_CNT(BIT) TYPE_CNT(BIT, CHAR_BIT * sizeof(uint8_t))
 
 #define SIZE_BIT (sizeof(size_t) * CHAR_BIT)
@@ -115,3 +115,9 @@ bool uint8_bit_test_set(uint8_t *, size_t);
 bool uint8_bit_test_reset(uint8_t *, size_t);
 void uint8_bit_set(uint8_t *, size_t);
 void uint8_bit_reset(uint8_t *, size_t);
+
+bool size_bit_test(size_t *, size_t);
+bool size_bit_test_set(size_t *, size_t);
+bool size_bit_test_reset(size_t *, size_t);
+void size_bit_set(size_t *, size_t);
+void size_bit_reset(size_t *, size_t);
