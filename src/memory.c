@@ -26,11 +26,12 @@ unsigned array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, 
         {
             if (!(flags & ARRAY_REDUCE)) return 1 | ARRAY_UNTOUCHED;
             size_t tot = cnt * sz + diff; // No checks for overflows
-            void *res = realloc(src, tot);
+            void *res = realloc(src, tot); // Array shrinking
             if (!res) return !tot;
             *p_src = res;
-            *p_cap = cnt;
-            return !tot || res;
+            bool succ = !tot || res;
+            if (succ) *p_cap = cnt;
+            return succ;
         }
         else if (!tmp) return 1 | ARRAY_UNTOUCHED; // cnt == cap            
     }
@@ -46,24 +47,20 @@ unsigned array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, 
         if (!car)
         {
             void *res;
-            if (src && p_cap && (flags & ARRAY_REALLOC))
+            if (src && (flags & ARRAY_REALLOC))
             {
                 res = realloc(src, tot);
-                if (!res) return !tot;
-                else if (flags & ARRAY_CLEAR)
+                if (res && p_cap && (flags & ARRAY_CLEAR))
                 {
                     size_t off = *p_cap * sz + diff;
                     memset((char *) res + off, 0, tot - off);
-                }                
-                *p_cap = cnt;
+                }
             }
-            else
-            {
-                res = flags & ARRAY_CLEAR ? calloc(tot, 1) : malloc(tot);
-                if (p_cap) *p_cap = cnt;
-            }
+            else res = flags & ARRAY_CLEAR ? calloc(tot, 1) : malloc(tot);
             *p_src = res;
-            return !tot || res;
+            bool succ = !tot || res;
+            if (succ && p_cap) *p_cap = cnt;
+            return succ;
         }
     }
     errno = ERANGE;
@@ -186,37 +183,34 @@ bool persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz)
         return 1;
     }
     size_t off = arr->off = size_log2(cnt, 0);
-    if (!array_init(&arr->ptr, NULL, 1, sizeof(*arr->ptr), 0, ARRAY_STRICT)) return 0;
-    if (array_init(arr->ptr, &arr->cap, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT)) return 1;
+    if (!array_init(&arr->ptr, &arr->tot, 1, sizeof(*arr->ptr), 0, ARRAY_STRICT)) return 0;
+    if (array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT)) return 1;
     free(arr->ptr);
     return 0;    
 }
 
 void persistent_array_close(struct persistent_array *arr)
 {
-    if (!arr->cap) return;
-    size_t cnt = size_log2(arr->cap, 0) - arr->off + 1;
-    for (size_t i = 0; i < cnt; free(arr->ptr[i++]));
+    for (size_t i = 0; i < arr->tot; free(arr->ptr[i++]));
+    free(arr->ptr);
 }
 
 unsigned persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz)
 {
-    if (cnt <= arr->cap) return 1 | ARRAY_UNTOUCHED;
-    if (!arr->cap) return persistent_array_init(arr, cnt, sz);
-    size_t log2 = size_log2(cnt, 0), off = log2 - size_log2(arr->cap, 0), tot = log2 - arr->off + 1;
-    if (!array_test(&arr->ptr, NULL, sizeof(*arr->ptr), 0, ARRAY_CLEAR, tot)) return 0;
-    for (size_t i = off, j = (size_t) 2 << off; i < tot; i++, j <<= 1)
-    {
-        if (!array_init(arr->ptr + i, NULL, j, sz, 0, ARRAY_STRICT)) return 0;
-        arr->cap += j;
-    }
+    size_t cap = (size_t) 1 << arr->tot << arr->off;
+    if (cnt <= cap - 1) return 1 | ARRAY_UNTOUCHED;
+    if (!arr->tot) return persistent_array_init(arr, cnt, sz);
+    size_t tot = arr->tot;
+    if (!array_test(&arr->ptr, &arr->tot, sizeof(*arr->ptr), 0, ARRAY_CLEAR, size_log2(cnt, 1) - arr->off)) return 0;
+    for (size_t i = tot; i < arr->tot; i++, cap <<= 1) 
+        if (!array_init(arr->ptr + i, NULL, cap, sz, 0, ARRAY_STRICT)) return 0;
     return 1;    
 }
 
 void *persistent_array_fetch(struct persistent_array *arr, size_t ind, size_t sz)
 {
     size_t off = size_sub_sat(size_log2(ind + 1, 0), arr->off);
-    return (char *) arr->ptr[off] + (off ? ind - ((size_t) 2 << off) + 1 : ind) * sz;
+    return (char *) arr->ptr[off] + (off ? ind + 1 - ((size_t) 1 << arr->off << off) : ind) * sz;
 }
 
 #define FLAGS_CNT(FLAGS) TYPE_CNT(FLAGS, CHAR_BIT * sizeof(size_t) >> 2)
