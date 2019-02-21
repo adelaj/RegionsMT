@@ -387,6 +387,12 @@ static int Main(int argc, char **argv)
     //for (size_t i = 0; i < (size_t) argc; i++) fprintf(stderr, "%s\n", argv[i]);
     //fclose(f);
 
+    struct persistent_array arr = { 0 };
+    persistent_array_init(&arr, 126, 8);
+    persistent_array_test(&arr, 512, 8);
+    *(size_t *) persistent_array_fetch(&arr, 127, 8) = 10;
+    *(size_t *) persistent_array_fetch(&arr, 510, 8) = 10;
+
     bool succ = 1;
     struct style style = {
         .ttl = { ENV_INIT_COL(FG_GREEN), ENV_INIT_COL(FG_RED), ENV_INIT_COL(FG_YELLOW), ENV_INIT_COL(FG_MAGENTA), ENV_INIT_COL(FG_CYAN) },

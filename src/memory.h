@@ -42,7 +42,7 @@ void queue_dequeue(struct queue *, size_t, size_t);
 
 struct persistent_array {
     void **ptr;
-    size_t off, tot;
+    size_t off, tot, cap;
 };
 
 struct persistent_array *persistent_array_create(size_t, size_t);

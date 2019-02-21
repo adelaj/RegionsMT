@@ -175,6 +175,40 @@ void queue_dequeue(struct queue *queue, size_t offset, size_t sz)
     if (queue->begin == queue->cap) queue->begin = 0;
 }
 
+struct queue_pos {
+    size_t pos, len;
+};
+
+struct hash_queue {
+    struct queue queue;
+    struct queue_pos *arr;
+    size_t cnt, cap, off, *fr, fr_cnt, fr_cap;
+};
+
+bool hash_queue_init(struct hash_queue *hash_queue, size_t cnt, size_t sz)
+{
+    if (queue_init(&hash_queue->queue, cnt, sz))
+    {
+        if (array_init(&hash_queue->arr, &hash_queue->cap, cnt, sizeof(*hash_queue->arr) << 1, 0, 0))
+        {
+            hash_queue->off = hash_queue->cap >> 1;
+            hash_queue->fr = NULL;
+            hash_queue->cnt = hash_queue->fr_cnt = hash_queue->fr_cap = 0;
+            return 1;
+        }
+        queue_close(&hash_queue->queue);
+    }
+    return 0;
+}
+
+unsigned hash_queue_enqueue(struct queue *restrict queue, bool hi, void *restrict arr, size_t cnt, size_t sz, size_t *hash)
+{
+    unsigned res = queue_test(queue, cnt, sz);
+    if (!res) return 0;
+    (hi ? queue_enqueue_hi : queue_enqueue_lo)(queue, arr, cnt, sz);
+    return res;
+}
+
 bool persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz)
 {
     if (!cnt)
@@ -183,7 +217,7 @@ bool persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz)
         return 1;
     }
     size_t off = arr->off = size_log2(cnt, 0);
-    if (!array_init(&arr->ptr, &arr->tot, 1, sizeof(*arr->ptr), 0, ARRAY_STRICT)) return 0;
+    if (!array_init(&arr->ptr, &arr->cap, arr->tot = 1, sizeof(*arr->ptr), 0, 0)) return 0;
     if (array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT)) return 1;
     free(arr->ptr);
     return 0;    
@@ -198,12 +232,17 @@ void persistent_array_close(struct persistent_array *arr)
 unsigned persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz)
 {
     size_t cap = (size_t) 1 << arr->tot << arr->off;
-    if (cnt <= cap - 1) return 1 | ARRAY_UNTOUCHED;
+    if (cnt < cap) return 1 | ARRAY_UNTOUCHED;
     if (!arr->tot) return persistent_array_init(arr, cnt, sz);
-    size_t tot = arr->tot;
-    if (!array_test(&arr->ptr, &arr->tot, sizeof(*arr->ptr), 0, ARRAY_CLEAR, size_log2(cnt, 1) - arr->off)) return 0;
-    for (size_t i = tot; i < arr->tot; i++, cap <<= 1) 
-        if (!array_init(arr->ptr + i, NULL, cap, sz, 0, ARRAY_STRICT)) return 0;
+    size_t tot = size_log2(cnt + 1, 1) - arr->off;
+    if (!array_test(&arr->ptr, &arr->cap, sizeof(*arr->ptr), 0, 0, tot)) return 0;
+    for (size_t i = arr->tot; i < tot; i++, cap <<= 1)
+    {
+        if (array_init(arr->ptr + i, NULL, cap, sz, 0, ARRAY_STRICT)) continue;
+        arr->tot = i;
+        return 0;
+    }
+    arr->tot = tot;
     return 1;    
 }
 
