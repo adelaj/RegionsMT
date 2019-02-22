@@ -13,8 +13,9 @@ typedef volatile int spinlock_handle;
 typedef volatile long spinlock_handle;
 #endif
 
-#define BIT_TEST2_MASK (0x5555555555555555ull & UINT8_MAX)
-_Static_assert(((BIT_TEST2_MASK | (BIT_TEST2_MASK << 1)) & UINT8_MAX) == UINT8_MAX, "Wrong constant provided!");
+#define BIT_TEST2_MASK01 (0x5555555555555555ull & UINT8_MAX)
+#define BIT_TEST2_MASK10 (0xAAAAAAAAAAAAAAAAull & UINT8_MAX)
+_Static_assert(BIT_TEST2_MASK01 | BIT_TEST2_MASK10 == UINT8_MAX, "Wrong constant provided!");
 
 #define TYPE_CNT(BIT, TOT) ((BIT) / (TOT) + !!((BIT) % (TOT))) // Not always equals to ((BIT) + (TOT) - 1) / (TOT)
 #define NIBBLE_CNT(NIBBLE) TYPE_CNT(NIBBLE, CHAR_BIT * sizeof(uint8_t) >> 1)
@@ -85,7 +86,7 @@ bool bit_test_range_acquire(volatile uint8_t *, size_t);
 bool bit_test_range_acquire_p(volatile void *, const void *);
 
 // Tests if first N pairs of bits are '01' or '11' where N specified by 2nd argument 
-bool bit_test2_range_acquire(volatile uint8_t *, size_t);
+bool bit_test2_range01_acquire(volatile uint8_t *, size_t);
 bool bit_test2_range_acquire_p(volatile void *, const void *);
 
 bool size_test_acquire(volatile size_t *);

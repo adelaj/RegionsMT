@@ -135,12 +135,31 @@ void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, size_t c
     queue->cnt += cnt;
 }
 
+typedef void (*generator_callback)(void *, size_t, void *);
+
+void queue_enqueue_yield_lo(struct queue *restrict queue, generator_callback genetator, void *context, size_t cnt, size_t sz)
+{
+    size_t bor, left = size_sub(&bor, queue->begin, queue->cap - queue->cnt);
+    if (bor) left += queue->cap;
+    size_t diff = queue->cap - left; // Never overflows
+    size_t bor2, diff2 = size_sub(&bor2, cnt, diff);
+    if (!bor2 && diff2) // cnt > queue->cap - left
+    {
+        size_t ind = 0;
+        for (size_t i = left * sz; ind < diff; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
+        for (size_t i = 0; ind < cnt; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
+    }
+    else for (size_t i = left * sz, ind = 0; ind < cnt; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
+    queue->cnt += cnt;
+}
+
 // This function should be called ONLY if 'queue_test' succeeds
 void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
 {
-    size_t bor, diff = size_sub(&bor, cnt, queue->begin);
-    if (!bor && diff) // cnt > queue->begin
+    size_t bor, diff = size_sub(&bor, queue->begin, cnt);
+    if (bor && diff) // cnt > queue->begin
     {
+        diff = 0 - diff;
         size_t tot = diff * sz, left = queue->cap - diff;
         memcpy((char *) queue->arr + left * sz, arr, tot);
         memcpy(queue->arr, (char *) arr + tot, queue->begin * sz);
@@ -149,7 +168,26 @@ void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, size_t c
     else
     {
         memcpy((char *) queue->arr + diff * sz, arr, cnt * sz);
-        queue->begin = 0 - diff;
+        queue->begin = diff;
+    }
+    queue->cnt += cnt;
+}
+
+static void task_queue_enqueue_yield_hi(struct queue *restrict queue, generator_callback genetator, void *context, size_t cnt, size_t sz)
+{
+    size_t bor, diff = size_sub(&bor, queue->begin, cnt);
+    if (bor && diff) // cnt > queue->begin
+    {
+        diff = 0 - diff;
+        size_t left = queue->cap - diff, ind = 0;
+        for (size_t i = left; ind < diff; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
+        for (size_t i = 0; ind < cnt; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
+        queue->begin = left;
+    }
+    else
+    {
+        for (size_t i = diff, ind = 0; ind < cnt; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
+        queue->begin = diff;
     }
     queue->cnt += cnt;
 }
@@ -173,40 +211,6 @@ void queue_dequeue(struct queue *queue, size_t offset, size_t sz)
     queue->cnt--;
     queue->begin++;
     if (queue->begin == queue->cap) queue->begin = 0;
-}
-
-struct queue_pos {
-    size_t pos, len;
-};
-
-struct hash_queue {
-    struct queue queue;
-    struct queue_pos *arr;
-    size_t cnt, cap, off, *fr, fr_cnt, fr_cap;
-};
-
-bool hash_queue_init(struct hash_queue *hash_queue, size_t cnt, size_t sz)
-{
-    if (queue_init(&hash_queue->queue, cnt, sz))
-    {
-        if (array_init(&hash_queue->arr, &hash_queue->cap, cnt, sizeof(*hash_queue->arr) << 1, 0, 0))
-        {
-            hash_queue->off = hash_queue->cap >> 1;
-            hash_queue->fr = NULL;
-            hash_queue->cnt = hash_queue->fr_cnt = hash_queue->fr_cap = 0;
-            return 1;
-        }
-        queue_close(&hash_queue->queue);
-    }
-    return 0;
-}
-
-unsigned hash_queue_enqueue(struct queue *restrict queue, bool hi, void *restrict arr, size_t cnt, size_t sz, size_t *hash)
-{
-    unsigned res = queue_test(queue, cnt, sz);
-    if (!res) return 0;
-    (hi ? queue_enqueue_hi : queue_enqueue_lo)(queue, arr, cnt, sz);
-    return res;
 }
 
 bool persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz)
