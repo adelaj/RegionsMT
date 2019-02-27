@@ -3,16 +3,34 @@
 #include "common.h"
 #include "ll.h"
 
-typedef bool (*task_callback)(void *, void *);
-typedef bool (*condition_callback)(volatile void *, const void *);
-typedef void (*aggregator_callback)(volatile void *, const void *);
+enum {
+    TASK_FAIL = 0,
+    TASK_SUCCESS,
+    TASK_YIELD
+};
+
+enum {
+    COND_WAIT = 0,
+    COND_EXECUTE,
+    COND_DROP
+};
+
+enum {
+    AGGR_FAIL = 0,
+    AGGR_SUCCESS,
+    AGGR_DROP
+};
+
+typedef unsigned (*task_callback)(void *, void *);
+typedef unsigned (*condition_callback)(volatile void *, const void *);
+typedef void (*aggregator_callback)(volatile void *, const void *, unsigned);
 
 struct task {
     task_callback callback;
     condition_callback cond;
-    aggregator_callback a_succ, a_fail;
-    void *arg, *context, *cond_arg, *a_succ_arg, *a_fail_arg;
-    volatile void *cond_mem, *a_succ_mem, *a_fail_mem;
+    aggregator_callback aggr;
+    void *arg, *context, *cond_arg, *aggr_arg;
+    volatile void *cond_mem, *aggr_mem;
 };
 
 // Opaque structure with OS-dependent implementation

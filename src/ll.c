@@ -449,15 +449,25 @@ bool bit_test2_range01_acquire(volatile uint8_t *arr, size_t cnt)
 {
     size_t div = cnt / CHAR_BIT, rem = cnt % CHAR_BIT;
     for (size_t i = 0; i < div; i++) if ((uint8_load_acquire(arr + i) & BIT_TEST2_MASK01) != BIT_TEST2_MASK01) return 0;
-    if (rem)
-    {
-        uint8_t msk = ((1u << rem) - 1) & BIT_TEST2_MASK01;
-        return (uint8_load_acquire(arr + div) & msk) == msk;
-    }
-    return 1;
+    if (!rem) return 1;
+    uint8_t msk = ((1u << rem) - 1) & BIT_TEST2_MASK01;
+    return (uint8_load_acquire(arr + div) & msk) == msk;
 }
 
-bool bit_test2_range_acquire_p(volatile void *arr, const void *p_cnt)
+bool bit_test2_range_acquire(volatile uint8_t *arr, size_t cnt)
+{
+    size_t div = cnt / CHAR_BIT, rem = cnt % CHAR_BIT;
+    for (size_t i = 0; i < div; i++)
+    {
+        uint8_t res = uint8_load_acquire(arr + i);
+        if (((res | res >> 1) & BIT_TEST2_MASK01) != BIT_TEST2_MASK01) return 0;
+    }
+    if (!rem) return 1;
+    uint8_t res = uint8_load_acquire(arr + div), msk = ((1u << rem) - 1) & BIT_TEST2_MASK01;
+    return ((res | (res >> 1)) & msk) == msk;
+}
+
+bool bit_test2_range01_acquire_p(volatile void *arr, const void *p_cnt)
 {
     return bit_test2_range01_acquire(arr, *(const size_t *) p_cnt);
 }

@@ -114,13 +114,13 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                     res->tasks[i] = (struct task) {
                         .callback = sort_thread_proc,
                         .cond = snc->cond,
-                        .a_succ = bit_set_interlocked_p,
+                        .aggr = bit_set_interlocked_p,
                         .arg = &res->s_args[i],
                         .context = &res->context,
                         .cond_mem = snc->cond_mem,
-                        .a_succ_mem = res->sync,
+                        .aggr_mem = res->sync,
                         .cond_arg = snc->cond_arg,
-                        .a_succ_arg = &res->args[i]
+                        .aggr_arg = &res->args[i]
                     };
                 }
 
