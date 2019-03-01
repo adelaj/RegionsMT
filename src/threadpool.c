@@ -6,6 +6,54 @@
 #include <string.h>
 #include <stdlib.h>
 
+void bit_set_interlocked_p(volatile void *arr, const void *p_bit)
+{
+    bit_set_interlocked(arr, *(const size_t *) p_bit);
+}
+
+void bit_reset_interlocked_p(volatile void *arr, const void *p_bit)
+{
+    bit_reset_interlocked(arr, *(const size_t *) p_bit);
+}
+
+void bit_set2_interlocked_p(volatile void *arr, const void *p_bit)
+{
+    bit_set2_interlocked(arr, *(const size_t *) p_bit);
+}
+
+void size_inc_interlocked_p(volatile void *mem, const void *arg)
+{
+    (void) arg;
+    size_inc_interlocked(mem);
+}
+
+void size_dec_interlocked_p(volatile void *mem, const void *arg)
+{
+    (void) arg;
+    size_dec_interlocked(mem);
+}
+
+bool bit_test2_acquire_p(volatile void *arr, const void *p_bit)
+{
+    return bit_test2_acquire(arr, *(const size_t *) p_bit);
+}
+
+bool bit_test_range_acquire_p(volatile void *arr, const void *p_cnt)
+{
+    return bit_test_range_acquire(arr, *(const size_t *) p_cnt);
+}
+
+bool bit_test2_range01_acquire_p(volatile void *arr, const void *p_cnt)
+{
+    return bit_test2_range01_acquire(arr, *(const size_t *) p_cnt);
+}
+
+bool size_test_acquire_p(volatile void *mem, const void *arg)
+{
+    (void) arg;
+    return size_test_acquire(mem);
+}
+
 struct task_queue {
     size_t cap, begin, cnt;
     struct task *tasks[]; // Array with copies of task pointers

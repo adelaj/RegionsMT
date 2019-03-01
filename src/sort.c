@@ -386,3 +386,32 @@ bool binary_search(size_t *p_ind, const void *key, const void *arr, size_t cnt, 
     *p_ind = left;
     return 1;
 }
+
+typedef size_t (*hash_callback)(const void *, void *);
+
+// Heavily based on the 'khash.h'
+unsigned hash_table_insert(struct hash_table *tbl, size_t cnt, size_t sz, hash_callback hash)
+{
+
+}
+
+enum {
+    FLAG_DELETED = 1,
+    FLAG_NOT_EMPTY = 2
+};
+
+bool hash_table_search(struct hash_table *tbl, size_t *p_ind, void *key, size_t sz, hash_callback hash, cmp_callback cmp, void *context)
+{
+    if (!tbl->cnt) return 0;
+    size_t msk = ((size_t) 1 << tbl->lcap) - 1, h = hash(key, context) & msk;
+    for (size_t i = 0, j = h;;)
+    {
+        uint8_t flags = (tbl->flags[h / (SIZE_BIT >> 1)] >> (h % (SIZE_BIT >> 1))) & 3;
+        if (!(flags | FLAG_NOT_EMPTY)) return 0;
+        if (!(flags | FLAG_DELETED) && !cmp((char *) tbl->key + h * sz, key, context)) break;
+        h = (h + ++i) & msk;
+        if (h == j) return 0;
+    }
+    *p_ind = h;
+    return 1;
+}

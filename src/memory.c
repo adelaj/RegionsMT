@@ -213,18 +213,18 @@ void queue_dequeue(struct queue *queue, size_t offset, size_t sz)
     if (queue->begin == queue->cap) queue->begin = 0;
 }
 
-bool persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz)
+unsigned persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz)
 {
     if (!cnt)
     {
         memset(arr, 0, sizeof(*arr));
-        return 1;
+        return 1 | ARRAY_UNTOUCHED;
     }
     size_t off = arr->off = size_log2(cnt, 0);
     if (!array_init(&arr->ptr, &arr->cap, arr->tot = 1, sizeof(*arr->ptr), 0, 0)) return 0;
     if (array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT)) return 1;
     free(arr->ptr);
-    return 0;    
+    return 0;
 }
 
 void persistent_array_close(struct persistent_array *arr)
@@ -254,12 +254,4 @@ void *persistent_array_fetch(struct persistent_array *arr, size_t ind, size_t sz
 {
     size_t off = size_sub_sat(size_log2(ind + 1, 0), arr->off);
     return (char *) arr->ptr[off] + (off ? ind + 1 - ((size_t) 1 << arr->off << off) : ind) * sz;
-}
-
-#define FLAGS_CNT(FLAGS) TYPE_CNT(FLAGS, CHAR_BIT * sizeof(size_t) >> 2)
-
-// Heavily based on the 'khash.h'
-unsigned hash_table_test(struct hash_table *tbl, size_t cnt, size_t sz)
-{
-
 }
