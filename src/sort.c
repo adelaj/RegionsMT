@@ -390,10 +390,6 @@ bool binary_search(size_t *p_ind, const void *key, const void *arr, size_t cnt, 
 typedef size_t (*hash_callback)(const void *, void *);
 
 // Heavily based on the 'khash.h'
-unsigned hash_table_insert(struct hash_table *tbl, size_t cnt, size_t sz, hash_callback hash)
-{
-
-}
 
 enum {
     FLAG_DELETED = 1,
@@ -414,4 +410,36 @@ bool hash_table_search(struct hash_table *tbl, size_t *p_ind, void *key, size_t 
     }
     *p_ind = h;
     return 1;
+}
+
+unsigned hash_table_test(struct hash_table *tbl, size_t cnt, size_t szk, size_t szv, hash_callback hash)
+{
+    size_t cap = ((size_t) 1 << tbl->lcap), log2 = size_log2(cnt, 1);
+    if (log2 < 2) log2 = 2;
+    else if (log2 == SIZE_BIT)
+    {
+        errno = ERANGE;
+        return 0;
+    }
+    size_t req = (size_t) 1 << log2;
+    if (tbl->cnt >= (size_t) ((double) req * .77 + .5)) return 1 | ARRAY_UNTOUCHED;
+    uint8_t *flags;
+    if (!array_init(&flags, NULL, NIBBLE_CNT(req), sizeof(*flags), 0, ARRAY_CLEAR | ARRAY_STRICT)) return 0;
+    if (array_test(&tbl->key, &tbl->capk, szk, 0, 0, req))
+    {
+        res = array_test(&tbl->val, &tbl->capv, szv, 0, 0, req);
+    }
+}
+
+unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t sz, hash_callback hash)
+{
+    uint8_t *flags = NULL;
+
+}
+
+unsigned hash_table_remove(struct hash_table *tbl, size_t ind)
+{
+    size_t div = ind / (SIZE_BIT >> 1), rem = ind % (SIZE_BIT >> 1);
+    if (((tbl->flags[div] >> rem) & 3) != FLAG_NOT_EMPTY) return;
+    tbl->flags[div] |= FLAG_DELETED << rem;
 }
