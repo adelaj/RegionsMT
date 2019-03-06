@@ -396,15 +396,41 @@ enum {
     FLAG_NOT_EMPTY = 2
 };
 
-bool hash_table_search(struct hash_table *tbl, size_t *p_ind, void *key, size_t sz, hash_callback hash, cmp_callback cmp, void *context)
+static uint8_t flags_fetch(uint8_t *flags, size_t pos)
+{
+    return (flags[pos / (SIZE_BIT >> 1)] >> (pos % (SIZE_BIT >> 1))) & 3;
+}
+
+static bool flags_test_set(uint8_t *flags, size_t pos, uint8_t flag)
+{
+    size_t div = pos / (SIZE_BIT >> 1), rem = pos % (SIZE_BIT >> 1);
+    if ((flags[div] >> rem) & flag) return 1;
+    flags[div] |= flag << rem;
+    return 0;
+}
+
+static bool flags_remove(uint8_t *flags, size_t pos)
+{
+    size_t div = pos / (SIZE_BIT >> 1), rem = pos % (SIZE_BIT >> 1);
+    if (((flags[div] >> rem) & 3) != FLAG_NOT_EMPTY) return 0;
+    flags[div] |= FLAG_DELETED << rem;
+    return 1;
+}
+
+bool hash_table_remove(struct hash_table *tbl, size_t ind)
+{
+    return flags_remove(tbl->flags, ind);
+}
+
+bool hash_table_search(struct hash_table *tbl, size_t *p_ind, void *key, size_t szk, hash_callback hash, cmp_callback cmp, void *context)
 {
     if (!tbl->cnt) return 0;
     size_t msk = ((size_t) 1 << tbl->lcap) - 1, h = hash(key, context) & msk;
     for (size_t i = 0, j = h;;)
     {
-        uint8_t flags = (tbl->flags[h / (SIZE_BIT >> 1)] >> (h % (SIZE_BIT >> 1))) & 3;
+        uint8_t flags = flags_fetch(tbl->flags, h);
         if (!(flags | FLAG_NOT_EMPTY)) return 0;
-        if (!(flags | FLAG_DELETED) && !cmp((char *) tbl->key + h * sz, key, context)) break;
+        if (!(flags | FLAG_DELETED) && !cmp((char *) tbl->key + h * szk, key, context)) break;
         h = (h + ++i) & msk;
         if (h == j) return 0;
     }
@@ -412,7 +438,7 @@ bool hash_table_search(struct hash_table *tbl, size_t *p_ind, void *key, size_t 
     return 1;
 }
 
-unsigned hash_table_test(struct hash_table *tbl, size_t cnt, size_t szk, size_t szv, hash_callback hash)
+unsigned hash_table_test(struct hash_table *tbl, size_t cnt, size_t szk, size_t szv, hash_callback hash, void *context)
 {
     size_t cap = ((size_t) 1 << tbl->lcap), log2 = size_log2(cnt, 1);
     if (log2 < 2) log2 = 2;
@@ -425,21 +451,38 @@ unsigned hash_table_test(struct hash_table *tbl, size_t cnt, size_t szk, size_t 
     if (tbl->cnt >= (size_t) ((double) req * .77 + .5)) return 1 | ARRAY_UNTOUCHED;
     uint8_t *flags;
     if (!array_init(&flags, NULL, NIBBLE_CNT(req), sizeof(*flags), 0, ARRAY_CLEAR | ARRAY_STRICT)) return 0;
-    if (array_test(&tbl->key, &tbl->capk, szk, 0, 0, req))
+    if (array_test(&tbl->key, &tbl->capk, szk, 0, 0, req) && array_test(&tbl->val, &tbl->capv, szv, 0, 0, req))
     {
-        res = array_test(&tbl->val, &tbl->capv, szv, 0, 0, req);
+        void *restrict key = Alloca(szk), *restrict val = Alloca(szv);
+        size_t msk = req - 1;
+        for (size_t i = 0; i < cap; i++)
+        {
+            if (!flags_remove(flags, i)) continue;
+            for (;;)
+            {
+                size_t h = hash((char *) tbl->key + i * szk, context) & msk;
+                for (size_t j = 0; flags_test_set(tbl->flags, h, FLAG_NOT_EMPTY); h = (h + ++j) & msk);
+                if (h >= cap || !flags_remove(tbl->flags, h))
+                {
+                    memcpy((char *) tbl->key + h * szk, (char *) tbl->key + i * szk, szk);
+                    memcpy((char *) tbl->val + h * szv, (char *) tbl->val + i * szv, szv);
+                    break;
+                }
+                swap((char *) tbl->key + i * szk, (char *) tbl->key + h * szk, key, szk);
+                swap((char *) tbl->val + i * szv, (char *) tbl->val + h * szv, val, szv);
+            }
+        }
+        free(tbl->flags);
+        tbl->flags = flags;
+
+        return 1;
     }
+    free(flags);
+    return 0;
 }
 
 unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t sz, hash_callback hash)
 {
     uint8_t *flags = NULL;
 
-}
-
-unsigned hash_table_remove(struct hash_table *tbl, size_t ind)
-{
-    size_t div = ind / (SIZE_BIT >> 1), rem = ind % (SIZE_BIT >> 1);
-    if (((tbl->flags[div] >> rem) & 3) != FLAG_NOT_EMPTY) return;
-    tbl->flags[div] |= FLAG_DELETED << rem;
 }
