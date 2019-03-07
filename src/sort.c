@@ -472,9 +472,12 @@ unsigned hash_table_test(struct hash_table *tbl, size_t cnt, size_t szk, size_t 
                 swap((char *) tbl->val + i * szv, (char *) tbl->val + h * szv, val, szv);
             }
         }
+        
+
         free(tbl->flags);
         tbl->flags = flags;
-
+        tbl->lcap = log2;
+        tbl->tot = tbl->cnt;
         return 1;
     }
     free(flags);

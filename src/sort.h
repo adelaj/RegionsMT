@@ -35,6 +35,7 @@ enum binary_search_flags {
 bool binary_search(size_t *, const void *restrict, const void *restrict, size_t, size_t, stable_cmp_callback, void *, enum binary_search_flags);
 
 struct hash_table {
-    size_t cnt, lcap, capk, capv, right, *flags;
+    uint8_t *flags;
+    size_t cnt, tot, lcap, capk, capv;
     void *key, *val;
 };
