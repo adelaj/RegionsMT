@@ -173,7 +173,7 @@ void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, size_t c
     queue->cnt += cnt;
 }
 
-static void task_queue_enqueue_yield_hi(struct queue *restrict queue, generator_callback genetator, void *context, size_t cnt, size_t sz)
+static void queue_enqueue_yield_hi(struct queue *restrict queue, generator_callback genetator, void *context, size_t cnt, size_t sz)
 {
     size_t bor, diff = size_sub(&bor, queue->begin, cnt);
     if (bor && diff) // cnt > queue->begin
@@ -197,6 +197,14 @@ unsigned queue_enqueue(struct queue *restrict queue, bool hi, void *restrict arr
     unsigned res = queue_test(queue, cnt, sz);
     if (!res) return 0;
     (hi ? queue_enqueue_hi : queue_enqueue_lo)(queue, arr, cnt, sz);
+    return res;
+}
+
+unsigned queue_enqueue_yield(struct queue *restrict queue, bool hi, generator_callback genetator, void *context, size_t cnt, size_t sz)
+{
+    unsigned res = queue_test(queue, cnt, sz);
+    if (!res) return 0;
+    (hi ? queue_enqueue_yield_hi : queue_enqueue_yield_lo)(queue, genetator, context, cnt, sz);
     return res;
 }
 

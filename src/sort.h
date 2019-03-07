@@ -36,6 +36,13 @@ bool binary_search(size_t *, const void *restrict, const void *restrict, size_t,
 
 struct hash_table {
     uint8_t *flags;
-    size_t cnt, tot, lcap, capk, capv;
+    size_t cnt, lcap, capk, capv;
     void *key, *val;
+};
+
+enum {
+    HASH_FAILURE = ARRAY_FAILURE,
+    HASH_SUCCESS = ARRAY_SUCCESS,
+    HASH_UNTOUCHED = ARRAY_UNTOUCHED,
+    HASH_PRESENT = 4,
 };
