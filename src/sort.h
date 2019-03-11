@@ -36,13 +36,23 @@ bool binary_search(size_t *, const void *restrict, const void *restrict, size_t,
 
 struct hash_table {
     uint8_t *flags;
-    size_t cnt, lcap, capk, capv;
+    size_t cnt, lcap;
     void *key, *val;
 };
 
+typedef size_t (*hash_callback)(const void *, void *);
+
 enum {
-    HASH_FAILURE = ARRAY_FAILURE,
-    HASH_SUCCESS = ARRAY_SUCCESS,
-    HASH_UNTOUCHED = ARRAY_UNTOUCHED,
+    HASH_FAILURE = 0,
+    HASH_SUCCESS = 1,
+    HASH_UNTOUCHED = 2,
     HASH_PRESENT = 4,
 };
+
+// Heavily based on the 'khash.h'
+bool hash_table_remove(struct hash_table *, size_t);
+bool hash_table_search(struct hash_table *, void *, size_t, void *, size_t, hash_callback, cmp_callback, void *);
+unsigned hash_table_test(struct hash_table *, size_t, size_t, size_t, hash_callback, void *);
+unsigned hash_table_insert(struct hash_table *, void *, size_t, void *, size_t, hash_callback, cmp_callback, void *);
+
+size_t str_x33_hash(void *Key, void *context);

@@ -131,13 +131,13 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                     res->tasks[j] = (struct task) {
                         .callback = merge_thread_proc,
                         .cond = bit_test2_acquire_p,
-                        .a_succ = bit_set_interlocked_p,
+                        .aggr = bit_set_interlocked_p,
                         .arg = &res->m_args[i],
                         .context = &res->context,
                         .cond_mem = res->sync,
-                        .a_succ_mem = res->sync,
+                        .aggr_mem = res->sync,
                         .cond_arg = &res->args[i << 1],
-                        .a_succ_arg = &res->args[j]
+                        .aggr_arg = &res->args[j]
                     };
                 }
 
@@ -145,13 +145,13 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                 res->tasks[s_cnt + m_cnt - 1] = (struct task) {
                     .callback = merge_thread_proc,
                     .cond = bit_test2_acquire_p,
-                    .a_succ = snc->a_succ,
+                    .aggr = snc->a_succ,
                     .arg = &res->m_args[m_cnt - 1],
                     .context = &res->context,
                     .cond_mem = res->sync,
-                    .a_succ_mem = snc->a_succ_mem,
+                    .aggr_mem = snc->a_succ_mem,
                     .cond_arg = &res->args[(m_cnt - 1) << 1],
-                    .a_succ_arg = snc->a_succ_arg
+                    .aggr_arg = snc->a_succ_arg
                 };
 
                 //if (thread_pool_enqueue_tasks(pool, res->tasks, m_cnt + s_cnt, 1)) return res;
@@ -165,13 +165,13 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                 {
                     .callback = sort_thread_proc,
                     .cond = snc->cond,
-                    .a_succ = snc->a_succ,
+                    .aggr = snc->a_succ,
                     .arg = &res->s_args[0],
                     .context = &res->context,
                     .cond_mem = snc->cond_mem,
-                    .a_succ_mem = snc->a_succ_mem,
+                    .aggr_mem = snc->a_succ_mem,
                     .cond_arg = snc->cond_arg,
-                    .a_succ_arg = snc->a_succ_arg
+                    .aggr_arg = snc->a_succ_arg
                 };
 
                 //if (thread_pool_enqueue_tasks(pool, res->tasks, 1, 1)) return res;

@@ -387,10 +387,6 @@ bool binary_search(size_t *p_ind, const void *key, const void *arr, size_t cnt, 
     return 1;
 }
 
-typedef size_t (*hash_callback)(const void *, void *);
-
-// Heavily based on the 'khash.h'
-
 enum {
     FLAG_DELETED = 1,
     FLAG_NOT_EMPTY = 2
@@ -400,7 +396,6 @@ static uint8_t flags_fetch(uint8_t *flags, size_t pos)
 {
     return (flags[pos / (SIZE_BIT >> 1)] >> (pos % (SIZE_BIT >> 1))) & 3;
 }
-
 
 static bool flags_test_set(uint8_t *flags, size_t pos, uint8_t flag)
 {
@@ -413,8 +408,7 @@ static bool flags_test_set(uint8_t *flags, size_t pos, uint8_t flag)
 static void flags_set_present(uint8_t *flags, size_t pos)
 {
     size_t div = pos / (SIZE_BIT >> 1), rem = pos % (SIZE_BIT >> 1);
-    flags[div] |= FLAG_NOT_EMPTY << rem;
-    flags[div] &= ~(FLAG_DELETED << rem);
+    flags[div] = (flags[div] | (FLAG_NOT_EMPTY << rem)) & ~(FLAG_DELETED << rem);
 }
 
 static bool flags_set_delete(uint8_t *flags, size_t pos)
@@ -432,62 +426,69 @@ bool hash_table_remove(struct hash_table *tbl, size_t ind)
     return 1;
 }
 
-bool hash_table_search(struct hash_table *tbl, void *key, size_t szk, void *p_Val, size_t szv, hash_callback hash, cmp_callback cmp, void *context)
+bool hash_table_search(struct hash_table *tbl, void *key, size_t szk, void *val, size_t szv, hash_callback hash, cmp_callback eq, void *context)
 {
     if (!tbl->cnt) return 0;
     size_t msk = ((size_t) 1 << tbl->lcap) - 1, h = hash(key, context) & msk;
     for (size_t i = 0, j = h;;)
     {
         uint8_t flags = flags_fetch(tbl->flags, h);
-        if (!(flags | FLAG_NOT_EMPTY)) return 0;
-        if (!(flags | FLAG_DELETED) && !cmp((char *) tbl->key + h * szk, key, context)) break;
+        if (!(flags & FLAG_NOT_EMPTY)) return 0;
+        if (!(flags & FLAG_DELETED) && !eq((char *) tbl->key + h * szk, key, context)) break;
         h = (h + ++i) & msk;
         if (h == j) return 0;
     }
-    *(void **) p_Val = (char *) tbl->val + h * szv;
+    memcpy(val, (char *) tbl->val + h * szv, szv);
+    return 1;
+}
+
+bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context)
+{
+    void *restrict key = Alloca(szk), *restrict val = Alloca(szv);
+    size_t cnt = (size_t) 1 << lcnt, msk = cnt - 1, cap = (size_t) 1 << tbl->lcap;
+    uint8_t *flags;
+    if (!array_init(&flags, NULL, NIBBLE_CNT(cnt), sizeof(*flags), 0, ARRAY_CLEAR | ARRAY_STRICT)) return 0;
+    for (size_t i = 0; i < cap; i++)
+    {
+        if (!flags_set_delete(flags, i)) continue;
+        for (;;)
+        {
+            size_t h = hash((char *) tbl->key + i * szk, context) & msk;
+            for (size_t j = 0; flags_test_set(tbl->flags, h, FLAG_NOT_EMPTY); h = (h + ++j) & msk);
+            if (h >= cap || !flags_set_delete(tbl->flags, h))
+            {
+                memcpy((char *) tbl->key + h * szk, (char *) tbl->key + i * szk, szk);
+                memcpy((char *) tbl->val + h * szv, (char *) tbl->val + i * szv, szv);
+                break;
+            }
+            swap((char *) tbl->key + i * szk, (char *) tbl->key + h * szk, key, szk);
+            swap((char *) tbl->val + i * szv, (char *) tbl->val + h * szv, val, szv);
+        }
+    }
+    free(tbl->flags);
+    tbl->flags = flags;
+    tbl->lcap = lcnt;
     return 1;
 }
 
 unsigned hash_table_test(struct hash_table *tbl, size_t diff, size_t szk, size_t szv, hash_callback hash, void *context)
 {
     size_t car, cnt = size_add(&car, tbl->cnt, diff), log2 = size_log2(cnt, 1);
-    if (car || log2 == SIZE_BIT) return !!(errno = ERANGE);
+    if (car || log2 == SIZE_BIT)
+    {
+        errno = ERANGE;
+        return 0;
+    }
     if (log2 < 2) log2 = 2;
     size_t req = (size_t) 1 << log2, cap = (size_t) 1 << tbl->lcap;
-    if (tbl->cnt >= (size_t) ((double) req * .77 + .5)) return 1 | ARRAY_UNTOUCHED;
-    uint8_t *flags;
-    if (!array_init(&flags, NULL, NIBBLE_CNT(req), sizeof(*flags), 0, ARRAY_CLEAR | ARRAY_STRICT)) return 0;
-    if (array_test(&tbl->key, &tbl->capk, szk, 0, 0, req) && array_test(&tbl->val, &tbl->capv, szv, 0, 0, req))
-    {
-        void *restrict key = Alloca(szk), *restrict val = Alloca(szv);
-        size_t msk = req - 1;
-        for (size_t i = 0; i < cap; i++)
-        {
-            if (!flags_set_delete(flags, i)) continue;
-            for (;;)
-            {
-                size_t h = hash((char *) tbl->key + i * szk, context) & msk;
-                for (size_t j = 0; flags_test_set(tbl->flags, h, FLAG_NOT_EMPTY); h = (h + ++j) & msk);
-                if (h >= cap || !flags_set_delete(tbl->flags, h))
-                {
-                    memcpy((char *) tbl->key + h * szk, (char *) tbl->key + i * szk, szk);
-                    memcpy((char *) tbl->val + h * szv, (char *) tbl->val + i * szv, szv);
-                    break;
-                }
-                swap((char *) tbl->key + i * szk, (char *) tbl->key + h * szk, key, szk);
-                swap((char *) tbl->val + i * szv, (char *) tbl->val + h * szv, val, szv);
-            }
-        }
-        free(tbl->flags);
-        tbl->flags = flags;
-        tbl->lcap = log2;
-        return 1;
-    }
-    free(flags);
-    return 0;
+    if (tbl->cnt >= (size_t) ((double) req * .77 + .5) || req <= cap) return 1 | ARRAY_UNTOUCHED;
+    return 
+        array_init(&tbl->key, NULL, req, szk, 0, ARRAY_STRICT | ARRAY_REALLOC) && 
+        array_init(&tbl->val, NULL, req, szv, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
+        hash_table_rehash(tbl, log2, szk, szv, hash, context);
 }
 
-unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *val, size_t szv, hash_callback hash, cmp_callback cmp, void *context)
+unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *val, size_t szv, hash_callback hash, cmp_callback eq, void *context)
 {
     unsigned res = hash_table_test(tbl, 1, szk, szv, hash, context);
     if (!res) return 0;
@@ -495,9 +496,9 @@ unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *
     for (size_t i = 0, j = h;;)
     {
         uint8_t flags = flags_fetch(tbl->flags, h);
-        if (!(flags | FLAG_NOT_EMPTY)) break;
-        if (flags | FLAG_DELETED) tmp = h;
-        else if (!cmp((char *) tbl->key + h * szk, key, context)) return res | HASH_PRESENT;
+        if (!(flags & FLAG_NOT_EMPTY)) break;
+        if (flags & FLAG_DELETED) tmp = h;
+        else if (!eq((char *) tbl->key + h * szk, key, context)) return res | HASH_PRESENT;
         h = (h + ++i) & msk;
         if (h != j) continue;
         pos = tmp;
@@ -509,4 +510,13 @@ unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *
     memcpy((char *) tbl->val + h * szv, val, szv);
     tbl->cnt++;
     return res;
+}
+
+size_t str_x33_hash(void *Key, void *context)
+{
+    (void) context;
+    char *key = Key;
+    size_t hash = 5381;
+    for (char ch = *key++; ch; ch = *key++) hash = (hash << 5) + hash + ch;
+    return hash;
 }
