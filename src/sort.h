@@ -36,7 +36,7 @@ bool binary_search(size_t *, const void *restrict, const void *restrict, size_t,
 
 struct hash_table {
     uint8_t *flags;
-    size_t cnt, lcap;
+    size_t cnt, lcap, tot, lim;
     void *key, *val;
 };
 

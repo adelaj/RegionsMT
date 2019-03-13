@@ -24,6 +24,7 @@ void lm_test()
     res = hash_table_insert(&tbl, off + 0, sizeof(*off), val + 0, sizeof(*val), str_off_x33_hash, str_off_eq, str);
     res = hash_table_insert(&tbl, off + 0, sizeof(*off), val + 0, sizeof(*val), str_off_x33_hash, str_off_eq, str);
     res = hash_table_insert(&tbl, off + 1, sizeof(*off), val + 1, sizeof(*val), str_off_x33_hash, str_off_eq, str);
+    //hash_table_remove(&tbl, )
     res = hash_table_insert(&tbl, off + 1, sizeof(*off), val + 1, sizeof(*val), str_off_x33_hash, str_off_eq, str);
     res = hash_table_search(&tbl, off + 1, sizeof(*off), &tmp, sizeof(tmp), str_off_x33_hash, str_off_eq, str);
     res = hash_table_search(&tbl, off + 2, sizeof(*off), &tmp, sizeof(tmp), str_off_x33_hash, str_off_eq, str);
