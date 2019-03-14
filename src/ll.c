@@ -553,12 +553,9 @@ uint32_t uint32_fused_mul_add(uint32_t *p_res, uint32_t m, uint32_t a)
     { \
         size_t ind = bit / (CHAR_BIT * sizeof(TYPE)); \
         TYPE msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)); \
-        if (arr[ind] & msk) \
-        { \
-            arr[ind] &= ~msk; \
-            return 1; \
-        } \
-        return 0; \
+        if (!(arr[ind] & msk)) return 0; \
+        arr[ind] &= ~msk; \
+        return 1; \
     }
 
 #define DECLARE_BIT_SET(TYPE, PREFIX) \

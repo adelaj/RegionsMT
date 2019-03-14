@@ -392,6 +392,42 @@ enum {
     FLAG_NOT_EMPTY = 2
 };
 
+#define DECLARE_BIT_FETCH_BURST(TYPE, PREFIX, STRIDE) \
+    TYPE PREFIX ## _bit_fetch_burst ## STRIDE(TYPE *arr, size_t pos) \
+    { \
+        return (arr[pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE))] >> (pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)))) & (((TYPE) 1 << (STRIDE)) - 1); \
+    }
+
+#define DECLARE_BIT_FETCH_SET_BURST(TYPE, PREFIX, STRIDE) \
+    TYPE PREFIX ## _bit_fetch_set_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
+    { \
+        size_t div = pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE)), rem = pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)); \
+        TYPE res = arr[div] >> rem; \
+        arr[ind] |= msk << rem; \
+        return res; \
+    }
+
+#define DECLARE_BIT_FETCH_RESET_BURST(TYPE, PREFIX, STRIDE) \
+    TYPE PREFIX ## _bit_fetch_set_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
+    { \
+        size_t div = pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE)), rem = pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)); \
+        TYPE res = arr[div] >> rem; \
+        arr[ind] &= ~(msk << rem); \
+        return res; \
+    }
+
+#define DECLARE_BIT_SET_BURST(TYPE, PREFIX, STRIDE) \
+    void PREFIX ## _bit_set_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
+    { \
+        return (arr[pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE))] |= msk << (pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE))); \
+    }
+
+#define DECLARE_BIT_RESET_BURST(TYPE, PREFIX, STRIDE) \
+    TYPE PREFIX ## _bit_reset_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
+    { \
+        return (arr[pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE))] &= ~(msk << (pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)))); \
+    }
+
 static uint8_t flags_fetch(uint8_t *flags, size_t pos)
 {
     return (flags[pos / (SIZE_BIT >> 1)] >> (pos % (SIZE_BIT >> 1))) & 3;
@@ -534,11 +570,7 @@ unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *
         break;
     }
     if (pos == cap) pos = tmp == cap ? h : tmp;
-    if (flags_test_reset(tbl->flags, h, FLAG_REMOVED))
-    {
-
-    }
-    else if (!flags_test_set(tbl->flags, h, FLAG_NOT_EMPTY)) tbl->tot++;
+    if (!flags_test_reset(tbl->flags, h, FLAG_REMOVED) && !flags_test_set(tbl->flags, h, FLAG_NOT_EMPTY)) tbl->tot++;
     memcpy((char *) tbl->key + h * szk, key, szk);
     memcpy((char *) tbl->val + h * szv, val, szv);
     tbl->cnt++;
