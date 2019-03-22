@@ -30,8 +30,9 @@ void lm_test()
     res = hash_table_search(&tbl, off + 2, sizeof(*off), &tmp, sizeof(tmp), str_off_x33_hash, str_off_eq, str);
 }
 
-struct {
-
+struct covariate {
+    size_t *deg;
+    uint8_t *bits;
 };
 
 void lm_parse(const char *eq)

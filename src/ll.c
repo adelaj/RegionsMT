@@ -541,20 +541,20 @@ uint32_t uint32_fused_mul_add(uint32_t *p_res, uint32_t m, uint32_t a)
 #define DECLARE_BIT_TEST_SET(TYPE, PREFIX) \
     bool PREFIX ## _bit_test_set(TYPE *arr, size_t bit) \
     { \
-        size_t ind = bit / (CHAR_BIT * sizeof(TYPE)); \
+        size_t div = bit / (CHAR_BIT * sizeof(TYPE)); \
         TYPE msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)); \
-        if (arr[ind] & msk) return 1; \
-        arr[ind] |= msk; \
+        if (arr[div] & msk) return 1; \
+        arr[div] |= msk; \
         return 0; \
     }
 
 #define DECLARE_BIT_TEST_RESET(TYPE, PREFIX) \
     bool PREFIX ## _bit_test_reset(TYPE *arr, size_t bit) \
     { \
-        size_t ind = bit / (CHAR_BIT * sizeof(TYPE)); \
+        size_t div = bit / (CHAR_BIT * sizeof(TYPE)); \
         TYPE msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)); \
-        if (!(arr[ind] & msk)) return 0; \
-        arr[ind] &= ~msk; \
+        if (!(arr[div] & msk)) return 0; \
+        arr[div] &= ~msk; \
         return 1; \
     }
 
@@ -570,11 +570,53 @@ uint32_t uint32_fused_mul_add(uint32_t *p_res, uint32_t m, uint32_t a)
         arr[bit / (CHAR_BIT * sizeof(TYPE))] &= ~((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE))); \
     }
 
+#define DECLARE_BIT_FETCH_BURST(TYPE, PREFIX, STRIDE) \
+    TYPE PREFIX ## _bit_fetch_burst ## STRIDE(TYPE *arr, size_t pos) \
+    { \
+        return (arr[pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE))] >> (pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)))) & (((TYPE) 1 << (STRIDE)) - 1); \
+    }
+
+#define DECLARE_BIT_FETCH_SET_BURST(TYPE, PREFIX, STRIDE) \
+    TYPE PREFIX ## _bit_fetch_set_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
+    { \
+        size_t div = pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE)), rem = pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)); \
+        TYPE res = (arr[div] >> rem) & msk; \
+        if (res != msk) arr[div] |= msk << rem; \
+        return res; \
+    }
+
+#define DECLARE_BIT_FETCH_RESET_BURST(TYPE, PREFIX, STRIDE) \
+    TYPE PREFIX ## _bit_fetch_reset_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
+    { \
+        size_t div = pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE)), rem = pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)); \
+        TYPE res = (arr[div] >> rem) & msk; \
+        if (res) arr[div] &= ~(msk << rem); \
+        return res; \
+    }
+
+#define DECLARE_BIT_SET_BURST(TYPE, PREFIX, STRIDE) \
+    void PREFIX ## _bit_set_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
+    { \
+        arr[pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE))] |= msk << (pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE))); \
+    }
+
+#define DECLARE_BIT_RESET_BURST(TYPE, PREFIX, STRIDE) \
+    void PREFIX ## _bit_reset_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
+    { \
+        arr[pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE))] &= ~(msk << (pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)))); \
+    }
+
 DECLARE_BIT_TEST(uint8_t, uint8)
 DECLARE_BIT_TEST_SET(uint8_t, uint8)
 DECLARE_BIT_TEST_RESET(uint8_t, uint8)
 DECLARE_BIT_SET(uint8_t, uint8)
 DECLARE_BIT_RESET(uint8_t, uint8)
+
+DECLARE_BIT_FETCH_BURST(uint8_t, uint8, 2)
+DECLARE_BIT_FETCH_SET_BURST(uint8_t, uint8, 2)
+DECLARE_BIT_FETCH_RESET_BURST(uint8_t, uint8, 2)
+DECLARE_BIT_SET_BURST(uint8_t, uint8, 2)
+DECLARE_BIT_RESET_BURST(uint8_t, uint8, 2)
 
 DECLARE_BIT_TEST(size_t, size)
 DECLARE_BIT_TEST_SET(size_t, size)

@@ -392,78 +392,13 @@ enum {
     FLAG_NOT_EMPTY = 2
 };
 
-#define DECLARE_BIT_FETCH_BURST(TYPE, PREFIX, STRIDE) \
-    TYPE PREFIX ## _bit_fetch_burst ## STRIDE(TYPE *arr, size_t pos) \
-    { \
-        return (arr[pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE))] >> (pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)))) & (((TYPE) 1 << (STRIDE)) - 1); \
-    }
-
-#define DECLARE_BIT_FETCH_SET_BURST(TYPE, PREFIX, STRIDE) \
-    TYPE PREFIX ## _bit_fetch_set_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
-    { \
-        size_t div = pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE)), rem = pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)); \
-        TYPE res = arr[div] >> rem; \
-        arr[ind] |= msk << rem; \
-        return res; \
-    }
-
-#define DECLARE_BIT_FETCH_RESET_BURST(TYPE, PREFIX, STRIDE) \
-    TYPE PREFIX ## _bit_fetch_set_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
-    { \
-        size_t div = pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE)), rem = pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)); \
-        TYPE res = arr[div] >> rem; \
-        arr[ind] &= ~(msk << rem); \
-        return res; \
-    }
-
-#define DECLARE_BIT_SET_BURST(TYPE, PREFIX, STRIDE) \
-    void PREFIX ## _bit_set_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
-    { \
-        return (arr[pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE))] |= msk << (pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE))); \
-    }
-
-#define DECLARE_BIT_RESET_BURST(TYPE, PREFIX, STRIDE) \
-    TYPE PREFIX ## _bit_reset_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
-    { \
-        return (arr[pos / (CHAR_BIT * sizeof(TYPE) >> (STRIDE))] &= ~(msk << (pos % (CHAR_BIT * sizeof(TYPE) >> (STRIDE)))); \
-    }
-
-static uint8_t flags_fetch(uint8_t *flags, size_t pos)
-{
-    return (flags[pos / (SIZE_BIT >> 1)] >> (pos % (SIZE_BIT >> 1))) & 3;
-}
-
-static bool flags_test_set(uint8_t *flags, size_t pos, uint8_t flag)
-{
-    size_t div = pos / (SIZE_BIT >> 1), rem = pos % (SIZE_BIT >> 1);
-    if ((flags[div] >> rem) & flag) return 1;
-    flags[div] |= flag << rem;
-    return 0;
-}
-
-static bool flags_test_reset(uint8_t *flags, size_t pos, uint8_t flag)
-{
-    size_t div = pos / (SIZE_BIT >> 1), rem = pos % (SIZE_BIT >> 1);
-    if ((flags[div] >> rem) & flag) return 1;
-    flags[div] &= ~(flag << rem);
-    return 0;
-}
-
-static bool flags_set_remove(uint8_t *flags, size_t pos)
-{
-    size_t div = pos / (SIZE_BIT >> 1), rem = pos % (SIZE_BIT >> 1);
-    if (((flags[div] >> rem) & 3) != FLAG_NOT_EMPTY) return 0;
-    flags[div] |= FLAG_REMOVED << rem;
-    return 1;
-}
-
 static bool hash_table_search_impl(struct hash_table *tbl, size_t *p_h, void *key, size_t szk, hash_callback hash, cmp_callback eq, void *context)
 {
     if (!tbl->cnt) return 0;
     size_t msk = ((size_t) 1 << tbl->lcap) - 1, h = hash(key, context) & msk;
     for (size_t i = 0, j = h;;)
     {
-        uint8_t flags = flags_fetch(tbl->flags, h);
+        uint8_t flags = uint8_bit_fetch_burst2(tbl->flags, h);
         if (!(flags & FLAG_NOT_EMPTY)) return 0;
         if (!(flags & FLAG_REMOVED) && !eq((char *) tbl->key + h * szk, key, context)) break;
         h = (h + ++i) & msk;
@@ -498,17 +433,19 @@ bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t s
     if (!array_init(&flags, NULL, NIBBLE_CNT(cnt), sizeof(*flags), 0, ARRAY_CLEAR | ARRAY_STRICT)) return 0;
     for (size_t i = 0; i < cap; i++)
     {
-        if (!flags_set_remove(tbl->flags, i)) continue;
+        if (uint8_bit_fetch_burst2(tbl->flags, i) != FLAG_NOT_EMPTY) continue;
+        uint8_bit_set_burst2(tbl->flags, i, FLAG_REMOVED);
         for (;;)
         {
             size_t h = hash((char *) tbl->key + i * szk, context) & msk;
-            for (size_t j = 0; flags_test_set(flags, h, FLAG_NOT_EMPTY); h = (h + ++j) & msk);
-            if (h >= cap || !flags_set_remove(tbl->flags, h))
+            for (size_t j = 0; uint8_bit_fetch_set_burst2(flags, h, FLAG_NOT_EMPTY); h = (h + ++j) & msk);
+            if (h >= cap || uint8_bit_fetch_burst2(tbl->flags, h) != FLAG_NOT_EMPTY)
             {
                 memcpy((char *) tbl->key + h * szk, (char *) tbl->key + i * szk, szk);
                 memcpy((char *) tbl->val + h * szv, (char *) tbl->val + i * szv, szv);
                 break;
             }
+            uint8_bit_set_burst2(tbl->flags, h, FLAG_REMOVED);
             swap((char *) tbl->key + i * szk, (char *) tbl->key + h * szk, key, szk);
             swap((char *) tbl->val + i * szv, (char *) tbl->val + h * szv, val, szv);
         }
@@ -553,14 +490,13 @@ unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *
         else lcnt = size_log2(cap - 1, 1);
         if (lcnt < 2) lcnt = 2;
         res = hash_table_test(tbl, lcnt, szk, szv, hash, context);
+        if (!res) return 0;
     }
     else res = 1 | HASH_UNTOUCHED;
-    unsigned res = hash_table_test(tbl, 1, szk, szv, hash, context);
-    if (!res) return 0;
     size_t msk = cap - 1, h = hash(key, context) & msk, pos = cap, tmp = cap;
     for (size_t i = 0, j = h;;)
     {
-        uint8_t flags = flags_fetch(tbl->flags, h);
+        uint8_t flags = uint8_bit_fetch_burst2(tbl->flags, h);
         if (!(flags & FLAG_NOT_EMPTY)) break;
         if (flags & FLAG_REMOVED) tmp = h;
         else if (!eq((char *) tbl->key + h * szk, key, context)) return res | HASH_PRESENT;
@@ -570,7 +506,8 @@ unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *
         break;
     }
     if (pos == cap) pos = tmp == cap ? h : tmp;
-    if (!flags_test_reset(tbl->flags, h, FLAG_REMOVED) && !flags_test_set(tbl->flags, h, FLAG_NOT_EMPTY)) tbl->tot++;
+    if (!uint8_bit_fetch_reset_burst2(tbl->flags, h, FLAG_REMOVED)) tbl->tot++;
+    uint8_bit_set_burst2(tbl->flags, h, FLAG_NOT_EMPTY);
     memcpy((char *) tbl->key + h * szk, key, szk);
     memcpy((char *) tbl->val + h * szv, val, szv);
     tbl->cnt++;

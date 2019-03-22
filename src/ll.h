@@ -109,6 +109,12 @@ bool uint8_bit_test_reset(uint8_t *, size_t);
 void uint8_bit_set(uint8_t *, size_t);
 void uint8_bit_reset(uint8_t *, size_t);
 
+uint8_t uint8_bit_fetch_burst2(uint8_t *, size_t);
+uint8_t uint8_bit_fetch_set_burst2(uint8_t *, size_t, uint8_t);
+uint8_t uint8_bit_fetch_reset_burst2(uint8_t *, size_t, uint8_t);
+void uint8_bit_set_burst2(uint8_t *, size_t, uint8_t);
+void uint8_bit_reset_burst2(uint8_t *, size_t, uint8_t);
+
 bool size_bit_test(size_t *, size_t);
 bool size_bit_test_set(size_t *, size_t);
 bool size_bit_test_reset(size_t *, size_t);
