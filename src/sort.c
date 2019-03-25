@@ -392,6 +392,40 @@ enum {
     FLAG_NOT_EMPTY = 2
 };
 
+bool hash_table_init(struct hash_table *tbl, size_t cnt, size_t szk, size_t szv)
+{
+    size_t lcnt = size_log2(size_add_sat(cnt, 1), 1);
+    if (lcnt == SIZE_BIT)
+    {
+        errno = ERANGE;
+        return 0;
+    }
+    if (lcnt < 2) lcnt = 2;
+    cnt = (size_t) 1 << lcnt;
+    if (array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC))
+    {
+        if (array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC))
+        {
+            if (array_init(&tbl->flags, NULL, NIBBLE_CNT(cnt), sizeof(*tbl->flags), 0, ARRAY_CLEAR | ARRAY_STRICT))
+            {
+                tbl->cnt = tbl->tot = tbl->lim = 0;
+                tbl->lcap = lcnt;
+                return 1;
+            }
+            free(tbl->val);
+        }
+        free(tbl->key);
+    }
+    return 0;
+}
+
+void hash_table_close(struct hash_table *tbl)
+{
+    free(tbl->flags);
+    free(tbl->val);
+    free(tbl->key);
+}
+
 static bool hash_table_search_impl(struct hash_table *tbl, size_t *p_h, void *key, size_t szk, hash_callback hash, cmp_callback eq, void *context)
 {
     if (!tbl->cnt) return 0;
@@ -412,20 +446,20 @@ bool hash_table_remove(struct hash_table *tbl, void *key, size_t szk, hash_callb
 {
     size_t h;
     if (!(hash_table_search_impl(tbl, &h, key, szk, hash, eq, context))) return 0;
-    tbl->flags[h / (SIZE_BIT >> 1)] |= FLAG_REMOVED << (h % (SIZE_BIT >> 1));
+    uint8_bit_set_burst2(tbl->flags, h, FLAG_REMOVED);
     tbl->cnt--;
     return 1;
 }
 
-bool hash_table_search(struct hash_table *tbl, void *key, size_t szk, void *val, size_t szv, hash_callback hash, cmp_callback eq, void *context)
+bool hash_table_search(struct hash_table *tbl, void *key, size_t szk, void *p_val, size_t szv, hash_callback hash, cmp_callback eq, void *context)
 {
     size_t h;
     if (!hash_table_search_impl(tbl, &h, key, szk, hash, eq, context)) return 0;
-    memcpy(val, (char *) tbl->val + h * szv, szv);
+    *(void **) p_val = (char *) tbl->val + h * szv;
     return 1;
 }
 
-bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context)
+static bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context)
 {
     void *restrict key = Alloca(szk), *restrict val = Alloca(szv);
     size_t cnt = (size_t) 1 << lcnt, msk = cnt - 1, cap = (size_t) 1 << tbl->lcap;
@@ -461,7 +495,7 @@ bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t s
 unsigned hash_table_test(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context)
 {
     size_t cnt = (size_t) 1 << lcnt, cap = (size_t) 1 << tbl->lcap;
-    if (tbl->cnt >= (size_t) ((double) cnt * .77 + .5)) return 1 | HASH_UNTOUCHED;
+    if (tbl->cnt >= (size_t) ((double) cnt * .77 + .5) || cap == cnt) return 1 | HASH_UNTOUCHED;
     return cap < cnt ?
         array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
         array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
@@ -490,6 +524,7 @@ unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *
         else lcnt = size_log2(cap - 1, 1);
         if (lcnt < 2) lcnt = 2;
         res = hash_table_test(tbl, lcnt, szk, szv, hash, context);
+        if (!(res & HASH_UNTOUCHED)) cap = (size_t) 1 << lcnt;
         if (!res) return 0;
     }
     else res = 1 | HASH_UNTOUCHED;
