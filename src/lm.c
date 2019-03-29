@@ -1,5 +1,6 @@
 #include "lm.h"
 #include "log.h"
+#include "memory.h"
 #include "sort.h"
 #include "strproc.h"
 #include "utf8.h"
@@ -66,17 +67,43 @@ unsigned lmf_name_finalize_impl(void *Context, struct text_metric metric, struct
 
 }
 
-unsigned lmf_compile(void *Context, struct utf8 *utf8, struct text_metric metric, struct log log)
+
+struct lmf_expr_context {
+    unsigned st;
+};
+
+enum {
+    LMF_EXPR_BEGIN = 0,
+    LMF_EXPR_NAME,
+
+};
+
+bool lmf_expr_impl(size_t fr, void **stk, struct utf8 utf8, struct text_metric metric, struct log log)
 {
-    switch (utf8->val)
+    struct lmf_expr_context *context = stk[fr];
+    if (utf8_is_whitespace_len(utf8.val, utf8.len))
+    {
+
+    }
+    switch (utf8.val)
     {
     case '^':
 
+        break;
 
     case '*':
+        break;
+
     case '+':
+        break;
+    
     default:
-        if (utf8_is_whitespace_len(utf8->val, utf8->len)) return 1;
-        else
+
+
     }
+}
+
+bool lmf_compile(void *Context, struct utf8 utf8, struct text_metric metric, struct log log)
+{
+
 }
