@@ -1,6 +1,8 @@
 #include "lm.h"
+#include "log.h"
 #include "sort.h"
 #include "strproc.h"
+#include "utf8.h"
 
 #include <string.h>
 
@@ -38,14 +40,43 @@ struct entry {
     uint8_t *bits;
 };
 
+struct utf8 {
+    uint8_t byte[UTF8_COUNT], len, context;
+    uint32_t val;
+};
 
+enum {
+    STATUS_FAILURE = 0,
+    STATUS_SUCCESS,
+    STATUS_REPEAT,
+};
 
-void lm_parse(const char *eq)
+struct lmf_name_context {
+    char *buff;
+    size_t cnt, cap;
+};
+
+unsigned lmf_name_impl(void *Context, struct utf8 *utf8, struct text_metric metric, struct log log)
 {
-    switch (*eq)
+
+}
+
+unsigned lmf_name_finalize_impl(void *Context, struct text_metric metric, struct log log)
+{
+
+}
+
+unsigned lmf_compile(void *Context, struct utf8 *utf8, struct text_metric metric, struct log log)
+{
+    switch (utf8->val)
     {
     case '^':
+
+
     case '*':
     case '+':
+    default:
+        if (utf8_is_whitespace_len(utf8->val, utf8->len)) return 1;
+        else
     }
 }
