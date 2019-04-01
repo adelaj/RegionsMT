@@ -32,3 +32,8 @@ bool utf8_decode(uint8_t, uint32_t *restrict, uint8_t *restrict, uint8_t *restri
 
 void utf16_encode(uint32_t, uint16_t *restrict, uint8_t *restrict);
 bool utf16_decode(uint16_t, uint32_t *restrict, uint16_t *restrict, uint8_t *restrict, uint8_t *restrict);
+
+struct utf8 {
+    uint8_t byte[UTF8_COUNT], len, context;
+    uint32_t val;
+};

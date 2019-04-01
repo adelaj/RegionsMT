@@ -41,11 +41,6 @@ struct entry {
     uint8_t *bits;
 };
 
-struct utf8 {
-    uint8_t byte[UTF8_COUNT], len, context;
-    uint32_t val;
-};
-
 enum {
     STATUS_FAILURE = 0,
     STATUS_SUCCESS,
@@ -62,7 +57,7 @@ unsigned lmf_name_impl(void *Context, struct utf8 *utf8, struct text_metric metr
 
 }
 
-unsigned lmf_name_finalize_impl(void *Context, struct text_metric metric, struct log log)
+unsigned lmf_name_finalize(void *Context, struct text_metric metric, struct log log)
 {
 
 }
@@ -70,6 +65,7 @@ unsigned lmf_name_finalize_impl(void *Context, struct text_metric metric, struct
 
 struct lmf_expr_context {
     unsigned st;
+    struct buff buff;
 };
 
 enum {
@@ -78,9 +74,9 @@ enum {
 
 };
 
-bool lmf_expr_impl(size_t fr, void **stk, struct utf8 utf8, struct text_metric metric, struct log log)
+bool lmf_expr_impl(void *Context, struct utf8 utf8, struct text_metric metric, struct log log)
 {
-    struct lmf_expr_context *context = stk[fr];
+    struct lmf_expr_context *context = Context;
     if (utf8_is_whitespace_len(utf8.val, utf8.len))
     {
 
@@ -96,11 +92,17 @@ bool lmf_expr_impl(size_t fr, void **stk, struct utf8 utf8, struct text_metric m
 
     case '+':
         break;
-    
+
     default:
 
+        context->st = LMF_EXPR_NAME;
 
     }
+}
+
+bool lmf_expr_finalize(void *Context, struct text_metric metric, struct log log)
+{
+
 }
 
 bool lmf_compile(void *Context, struct utf8 utf8, struct text_metric metric, struct log log)

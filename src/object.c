@@ -90,16 +90,6 @@ bool xml_object_execute(struct xml_object *obj, void *in)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-struct utf8 {
-    uint8_t byte[UTF8_COUNT], len, context;
-    uint32_t val;
-};
-
-struct buff {
-    char *str;
-    size_t len, cap;
-};
-
 enum xml_status {
     XML_ERROR_INVALID_UTF,
     XML_ERROR_INVALID_CHAR,

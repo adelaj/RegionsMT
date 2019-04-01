@@ -6,6 +6,7 @@
 //
 
 #include "common.h"
+#include "utf8.h"
 
 struct strl {
     char *str;
@@ -18,6 +19,11 @@ struct text_metric {
     const char *path;
     uint64_t byte;
     size_t col, row;
+};
+
+struct buff {
+    char *str;
+    size_t len, cap;
 };
 
 // Functions to be used as 'stable_cmp_callback' and 'cmp_callback' (see sort.h)
