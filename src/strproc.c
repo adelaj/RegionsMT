@@ -1,5 +1,6 @@
 #include "np.h"
 #include "ll.h"
+#include "log.h"
 #include "memory.h"
 #include "strproc.h"
 
@@ -155,4 +156,14 @@ bool str_tbl_handler(const char *str, size_t len, void *p_Off, void *Context)
     memcpy(context->str + context->str_cnt, str, len + 1);
     context->str_cnt += len + 1;
     return 1;
+}
+
+unsigned buff_append(struct buff *buff, const char *str, size_t len, bool term)
+{
+    unsigned res = array_test(&buff->str, &buff->cap, sizeof(*buff->str), 0, 0, len, buff->len, term);
+    if (!res) return 0;
+    strncpy(buff->str + buff->len, str, len);
+    buff->len += len;
+    if (term) buff->str[buff->len] = '\0';
+    return res;
 }

@@ -65,7 +65,8 @@ unsigned lmf_name_finalize(void *Context, struct text_metric metric, struct log 
 
 struct lmf_expr_context {
     unsigned st;
-    struct buff buff;
+    struct buff *buff;
+    struct hash_table tbl;
 };
 
 enum {
@@ -74,7 +75,13 @@ enum {
 
 };
 
-bool lmf_expr_impl(void *Context, struct utf8 utf8, struct text_metric metric, struct log log)
+bool lmf_expr_init(void *Context, struct text_metric metric, struct log log)
+{
+    struct lmf_expr_context *context = Context;
+    if (!hash_table_init(context, 0, sizeof(char *), sizeof(size_t)))
+}
+
+bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric metric, struct log log)
 {
     struct lmf_expr_context *context = Context;
     if (utf8_is_whitespace_len(utf8.val, utf8.len))
@@ -100,7 +107,7 @@ bool lmf_expr_impl(void *Context, struct utf8 utf8, struct text_metric metric, s
     }
 }
 
-bool lmf_expr_finalize(void *Context, struct text_metric metric, struct log log)
+bool lmf_expr_close(void *Context, struct text_metric metric, struct log log)
 {
 
 }

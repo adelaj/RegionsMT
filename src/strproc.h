@@ -21,11 +21,6 @@ struct text_metric {
     size_t col, row;
 };
 
-struct buff {
-    char *str;
-    size_t len, cap;
-};
-
 // Functions to be used as 'stable_cmp_callback' and 'cmp_callback' (see sort.h)
 int char_cmp(const void *, const void *, void *);
 int str_strl_stable_cmp(const void *, const void *, void *);
@@ -84,3 +79,9 @@ struct str_tbl_handler_context {
 
 // Here the second argument should be a definite number 
 bool str_tbl_handler(const char *, size_t, void *, void *);
+
+struct buff {
+    char *str;
+    size_t len, cap;
+};
+

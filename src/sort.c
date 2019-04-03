@@ -402,9 +402,9 @@ bool hash_table_init(struct hash_table *tbl, size_t cnt, size_t szk, size_t szv)
     }
     if (lcnt < 2) lcnt = 2;
     cnt = (size_t) 1 << lcnt;
-    if (array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC))
+    if (array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT))
     {
-        if (array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC))
+        if (array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT))
         {
             if (array_init(&tbl->flags, NULL, NIBBLE_CNT(cnt), sizeof(*tbl->flags), 0, ARRAY_CLEAR | ARRAY_STRICT))
             {
