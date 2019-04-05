@@ -434,7 +434,7 @@ static bool hash_table_search_impl(struct hash_table *tbl, size_t *p_h, void *ke
     {
         uint8_t flags = uint8_bit_fetch_burst2(tbl->flags, h);
         if (!(flags & FLAG_NOT_EMPTY)) return 0;
-        if (!(flags & FLAG_REMOVED) && !eq((char *) tbl->key + h * szk, key, context)) break;
+        if (!(flags & FLAG_REMOVED) && eq((char *) tbl->key + h * szk, key, context)) break;
         h = (h + ++i) & msk;
         if (h == j) return 0;
     }
@@ -451,12 +451,22 @@ bool hash_table_remove(struct hash_table *tbl, void *key, size_t szk, hash_callb
     return 1;
 }
 
-bool hash_table_search(struct hash_table *tbl, void *key, size_t szk, void *p_val, size_t szv, hash_callback hash, cmp_callback eq, void *context)
+bool hash_table_search(struct hash_table *tbl, size_t *p_h, void *key, size_t szk, hash_callback hash, cmp_callback eq, void *context)
 {
     size_t h;
     if (!hash_table_search_impl(tbl, &h, key, szk, hash, eq, context)) return 0;
-    *(void **) p_val = (char *) tbl->val + h * szv;
+    *p_h = h;
     return 1;
+}
+
+void *hash_table_fetch_key(struct hash_table *tbl, size_t h, size_t szk)
+{
+    return (char *) tbl->key + h * szk;
+}
+
+void *hash_table_fetch_val(struct hash_table *tbl, size_t h, size_t szv)
+{
+    return (char *) tbl->val + h * szv;
 }
 
 static bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context)
@@ -534,7 +544,7 @@ unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *
         uint8_t flags = uint8_bit_fetch_burst2(tbl->flags, h);
         if (!(flags & FLAG_NOT_EMPTY)) break;
         if (flags & FLAG_REMOVED) tmp = h;
-        else if (!eq((char *) tbl->key + h * szk, key, context)) return res | HASH_PRESENT;
+        else if (eq((char *) tbl->key + h * szk, key, context)) return res | HASH_PRESENT;
         h = (h + ++i) & msk;
         if (h != j) continue;
         pos = tmp;

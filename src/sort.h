@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "memory.h"
 
 typedef bool (*cmp_callback)(const void *, const void *, void *); // Functional type for compare callbacks
 typedef int (*stable_cmp_callback)(const void *, const void *, void *); // Functional type for stable compare callbacks
@@ -43,9 +44,9 @@ struct hash_table {
 typedef size_t (*hash_callback)(const void *, void *);
 
 enum {
-    HASH_FAILURE = 0,
-    HASH_SUCCESS = 1,
-    HASH_UNTOUCHED = 2,
+    HASH_FAILURE = ARRAY_FAILURE,
+    HASH_SUCCESS = ARRAY_SUCCESS,
+    HASH_UNTOUCHED = ARRAY_UNTOUCHED,
     HASH_PRESENT = 4,
 };
 
@@ -53,7 +54,9 @@ enum {
 bool hash_table_init(struct hash_table *, size_t, size_t, size_t);
 void hash_table_close(struct hash_table *);
 bool hash_table_remove(struct hash_table *, void *, size_t, hash_callback, cmp_callback, void *);
-bool hash_table_search(struct hash_table *, void *, size_t, void *, size_t, hash_callback, cmp_callback, void *);
+bool hash_table_search(struct hash_table *, size_t *, void *, size_t, hash_callback, cmp_callback, void *);
+void *hash_table_fetch_key(struct hash_table *, size_t, size_t);
+void *hash_table_fetch_val(struct hash_table *, size_t, size_t);
 unsigned hash_table_test(struct hash_table *, size_t, size_t, size_t, hash_callback, void *);
 unsigned hash_table_insert(struct hash_table *, void *, size_t, void *, size_t, hash_callback, cmp_callback, void *);
 

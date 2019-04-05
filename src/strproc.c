@@ -22,6 +22,22 @@ int str_strl_stable_cmp(const void *Str, const void *Entry, void *p_Len)
     return res ? res : len < entry->len ? INT_MIN : 0;
 }
 
+bool str_eq(const void *A, const void *B, void *context)
+{
+    (void) context;
+    return !strcmp((char *) A, (char *) B);
+}
+
+bool str_off_str_eq(const void *A, const void *B, void *Str)
+{
+    return str_eq((char *) Str + *(size_t *) A, B, NULL);
+}
+
+bool str_off_eq(const void *A, const void *B, void *Str)
+{
+    return str_eq((char *) Str + *(size_t *) A, (char *) Str + *(size_t *) B, NULL);
+}
+
 int str_off_stable_cmp(const void *A, const void *B, void *Str)
 {
     return strcmp((char *) Str + *(size_t *) A, (char *) Str + *(size_t *) B);
@@ -178,21 +194,45 @@ unsigned buff_append(struct buff *buff, const char *str, size_t len, enum buff_f
 struct str_pool {
     struct buff buff;
     struct hash_table tbl;
-    size_t cnt, *off;
+    struct { size_t off, len } *data;
+    size_t cnt, cap;
 };
-
-size_t str_pool_strlen(struct str_pool *pool, size_t ind)
-{
-    return ((ind < pool->cnt ? pool->off[ind + 1] - 1 : pool->buff.len) - pool->off[ind]) * sizeof(char);
-}
 
 unsigned str_pool_init()
 {
 
 }
 
-unsigned str_pool_add(const char *str, size_t len)
-{
+//size_t str_off_x33_hash(const void *Off, void *Str)
+//{
+//    return str_x33_hash((char *) Str + *(size_t *) Off, NULL);
+//}
 
+enum {
+    STR_POOL_FAILURE = HASH_FAILURE,
+    STR_POOL_SUCCESS = HASH_SUCCESS,
+    STR_POOL_UNTOUCHED = HASH_UNTOUCHED,
+    STR_POOL_PRESENT = HASH_PRESENT,
+};
+
+unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, size_t *p_off)
+{
+    if (!len) 
+    {
+        *p_off = 0;
+        return 1 | STR_POOL_PRESENT | STR_POOL_UNTOUCHED;
+    }
+    size_t h;
+    unsigned res = hash_table_insert(&pool->tbl, str, sizeof(size_t), NULL, 0, str_x33_hash, str_off_str_eq, pool->buff.str);
+    if (res & HASH_PRESENT)
+    {
+        *p_off = *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t));
+        return res;
+    }
+    size_t off = pool->buff.len + 1;
+    unsigned res = buff_append(&pool->buff, str, len, BUFFER_INIT | BUFFER_TERM);
+    if (!res) return 0;
+    *p_off = off;
+    return res | res2;
 }
 

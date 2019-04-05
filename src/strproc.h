@@ -21,6 +21,10 @@ struct text_metric {
     size_t col, row;
 };
 
+bool str_eq(const void *, const void *, void *);
+bool str_off_str_eq(const void *, const void *, void *);
+bool str_off_eq(const void *, const void *, void *);
+
 // Functions to be used as 'stable_cmp_callback' and 'cmp_callback' (see sort.h)
 int char_cmp(const void *, const void *, void *);
 int str_strl_stable_cmp(const void *, const void *, void *);
