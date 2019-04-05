@@ -2,6 +2,7 @@
 #include "ll.h"
 #include "log.h"
 #include "memory.h"
+#include "sort.h"
 #include "strproc.h"
 
 #include <string.h>
@@ -153,17 +154,45 @@ bool str_tbl_handler(const char *str, size_t len, void *p_Off, void *Context)
     }
     if (!array_test(&context->str, &context->str_cap, sizeof(*context->str), 0, 0, context->str_cnt, len, 1)) return 0;
     *p_off = context->str_cnt;
-    memcpy(context->str + context->str_cnt, str, len + 1);
+    memcpy(context->str + context->str_cnt, str, (len + 1) * sizeof(*context->str));
     context->str_cnt += len + 1;
     return 1;
 }
 
-unsigned buff_append(struct buff *buff, const char *str, size_t len, bool term)
+enum buff_flags {
+    BUFFER_INIT = 1,
+    BUFFER_TERM = 2
+};
+
+unsigned buff_append(struct buff *buff, const char *str, size_t len, enum buff_flags flags)
 {
-    unsigned res = array_test(&buff->str, &buff->cap, sizeof(*buff->str), 0, 0, len, buff->len, term);
+    bool init = flags & BUFFER_INIT, term = flags & BUFFER_TERM;
+    unsigned res = array_test(&buff->str, &buff->cap, sizeof(*buff->str), 0, 0, len, buff->len, init, term);
     if (!res) return 0;
-    strncpy(buff->str + buff->len, str, len);
-    buff->len += len;
+    memcpy(buff->str + buff->len + init, str, len * sizeof(*buff->str));
+    buff->len += len + init;
     if (term) buff->str[buff->len] = '\0';
     return res;
 }
+
+struct str_pool {
+    struct buff buff;
+    struct hash_table tbl;
+    size_t cnt, *off;
+};
+
+size_t str_pool_strlen(struct str_pool *pool, size_t ind)
+{
+    return ((ind < pool->cnt ? pool->off[ind + 1] - 1 : pool->buff.len) - pool->off[ind]) * sizeof(char);
+}
+
+unsigned str_pool_init()
+{
+
+}
+
+unsigned str_pool_add(const char *str, size_t len)
+{
+
+}
+

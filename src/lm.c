@@ -78,7 +78,7 @@ enum {
 bool lmf_expr_init(void *Context, struct text_metric metric, struct log log)
 {
     struct lmf_expr_context *context = Context;
-    if (!hash_table_init(context, 0, sizeof(char *), sizeof(size_t)))
+    //if (!hash_table_init(context, 0, sizeof(char *), sizeof(size_t)))
 }
 
 bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric metric, struct log log)

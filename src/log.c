@@ -14,7 +14,7 @@ static void print_unterminated(char *buff, size_t *p_cnt, const char *str, size_
     size_t cnt = *p_cnt;
     *p_cnt = len;
     if (cnt < len) return;
-    memcpy(buff, str, len);
+    memcpy(buff, str, len * sizeof(*buff));
 }
 
 void print(char *buff, size_t *p_cnt, const char *str, size_t len)
@@ -22,7 +22,7 @@ void print(char *buff, size_t *p_cnt, const char *str, size_t len)
     size_t cnt = *p_cnt;
     *p_cnt = len;
     if (!cnt || cnt - 1 < len) return;
-    memcpy(buff, str, len);
+    memcpy(buff, str, len * sizeof(*buff));
     buff[len] = '\0';
 }
 
@@ -537,7 +537,7 @@ static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_exec
         if (res.flags & FMT_LEFT_JUSTIFY)
         {
             size_t diff = cnt - off, disp = size_sub_sat(off, diff);
-            memmove(buff + disp, buff + off, diff);
+            memmove(buff + disp, buff + off, diff * sizeof(*buff));
             cnt = res.flags & FMT_OVERPRINT ? disp : disp + diff;
             tmp = len = *p_cnt - cnt;
         }
@@ -635,7 +635,7 @@ bool log_init(struct log *restrict log, char *restrict path, size_t lim, enum lo
         if (!array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)) log_message_crt(log_error, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
-            if (bom) memcpy(log->buff, UTF8_BOM, log->cnt = lengthof(UTF8_BOM));
+            if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
             else log->cnt = 0;
             log->style = tty ? style : (struct style) { .num = { 0 } };
             log->lim = lim;
