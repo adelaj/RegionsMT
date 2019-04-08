@@ -426,10 +426,10 @@ void hash_table_close(struct hash_table *tbl)
     free(tbl->key);
 }
 
-static bool hash_table_search_impl(struct hash_table *tbl, size_t *p_h, void *key, size_t szk, hash_callback hash, cmp_callback eq, void *context)
+bool hash_table_search(struct hash_table *tbl, size_t *p_h, void *key, size_t szk, cmp_callback eq, void *context)
 {
     if (!tbl->cnt) return 0;
-    size_t msk = ((size_t) 1 << tbl->lcap) - 1, h = hash(key, context) & msk;
+    size_t msk = ((size_t) 1 << tbl->lcap) - 1, h = *p_h & msk;
     for (size_t i = 0, j = h;;)
     {
         uint8_t flags = uint8_bit_fetch_burst2(tbl->flags, h);
@@ -442,20 +442,11 @@ static bool hash_table_search_impl(struct hash_table *tbl, size_t *p_h, void *ke
     return 1;
 }
 
-bool hash_table_remove(struct hash_table *tbl, void *key, size_t szk, hash_callback hash, cmp_callback eq, void *context)
+bool hash_table_remove(struct hash_table *tbl, size_t h, void *key, size_t szk, cmp_callback eq, void *context)
 {
-    size_t h;
-    if (!(hash_table_search_impl(tbl, &h, key, szk, hash, eq, context))) return 0;
+    if (!(hash_table_search(tbl, &h, key, szk, eq, context))) return 0;
     uint8_bit_set_burst2(tbl->flags, h, FLAG_REMOVED);
     tbl->cnt--;
-    return 1;
-}
-
-bool hash_table_search(struct hash_table *tbl, size_t *p_h, void *key, size_t szk, hash_callback hash, cmp_callback eq, void *context)
-{
-    size_t h;
-    if (!hash_table_search_impl(tbl, &h, key, szk, hash, eq, context)) return 0;
-    *p_h = h;
     return 1;
 }
 
@@ -502,22 +493,9 @@ static bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, s
     return 1;
 }
 
-unsigned hash_table_test(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context)
+unsigned hash_table_insert(struct hash_table *tbl, size_t *p_h, void *key, size_t szk, void *val, size_t szv, hash_callback hash, cmp_callback eq, void *context)
 {
-    size_t cnt = (size_t) 1 << lcnt, cap = (size_t) 1 << tbl->lcap;
-    if (tbl->cnt >= (size_t) ((double) cnt * .77 + .5) || cap == cnt) return 1 | HASH_UNTOUCHED;
-    return cap < cnt ?
-        array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
-        array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
-        hash_table_rehash(tbl, lcnt, szk, szv, hash, context) :
-        hash_table_rehash(tbl, lcnt, szk, szv, hash, context) &&
-        array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
-        array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC);
-}
-
-unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *val, size_t szv, hash_callback hash, cmp_callback eq, void *context)
-{
-    unsigned res;
+    unsigned res = 1;
     size_t cap = (size_t) 1 << tbl->lcap;
     if (tbl->tot >= tbl->lim)
     {
@@ -533,18 +511,32 @@ unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *
         }
         else lcnt = size_log2(cap - 1, 1);
         if (lcnt < 2) lcnt = 2;
-        res = hash_table_test(tbl, lcnt, szk, szv, hash, context);
-        if (!(res & HASH_UNTOUCHED)) cap = (size_t) 1 << lcnt;
-        if (!res) return 0;
+        size_t cnt = (size_t) 1 << lcnt;
+        if (tbl->cnt >= (size_t) ((double) cnt * .77 + .5) || cap == cnt) res |= HASH_UNTOUCHED;
+        else
+        {
+            if (!(cap < cnt ?
+                array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
+                array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
+                hash_table_rehash(tbl, lcnt, szk, szv, hash, context) :
+                hash_table_rehash(tbl, lcnt, szk, szv, hash, context) &&
+                array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
+                array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC))) return 0;
+            cap = (size_t) 1 << tbl->lcap; // Update capacity after rehash
+        }
     }
-    else res = 1 | HASH_UNTOUCHED;
-    size_t msk = cap - 1, h = hash(key, context) & msk, pos = cap, tmp = cap;
+    else res |= HASH_UNTOUCHED;
+    size_t msk = cap - 1, h = *p_h & msk, pos = cap, tmp = cap;
     for (size_t i = 0, j = h;;)
     {
         uint8_t flags = uint8_bit_fetch_burst2(tbl->flags, h);
         if (!(flags & FLAG_NOT_EMPTY)) break;
         if (flags & FLAG_REMOVED) tmp = h;
-        else if (eq((char *) tbl->key + h * szk, key, context)) return res | HASH_PRESENT;
+        else if (eq((char *) tbl->key + h * szk, key, context))
+        {
+            *p_h = h;
+            return res | HASH_PRESENT;
+        }
         h = (h + ++i) & msk;
         if (h != j) continue;
         pos = tmp;
@@ -556,13 +548,14 @@ unsigned hash_table_insert(struct hash_table *tbl, void *key, size_t szk, void *
     memcpy((char *) tbl->key + h * szk, key, szk);
     memcpy((char *) tbl->val + h * szv, val, szv);
     tbl->cnt++;
+    *p_h = h;
     return res;
 }
 
-size_t str_x33_hash(void *Key, void *context)
+size_t str_x33_hash(const void *Key, void *context)
 {
     (void) context;
-    char *key = Key;
+    const char *key = Key;
     size_t hash = 5381;
     for (char ch = *key++; ch; ch = *key++) hash = (hash << 5) + hash + ch;
     return hash;

@@ -194,7 +194,6 @@ unsigned buff_append(struct buff *buff, const char *str, size_t len, enum buff_f
 struct str_pool {
     struct buff buff;
     struct hash_table tbl;
-    struct { size_t off, len } *data;
     size_t cnt, cap;
 };
 
@@ -203,10 +202,10 @@ unsigned str_pool_init()
 
 }
 
-//size_t str_off_x33_hash(const void *Off, void *Str)
-//{
-//    return str_x33_hash((char *) Str + *(size_t *) Off, NULL);
-//}
+size_t str_off_x33_hash(const void *Off, void *Str)
+{
+    return str_x33_hash((char *) Str + *(size_t *) Off, NULL);
+}
 
 enum {
     STR_POOL_FAILURE = HASH_FAILURE,
@@ -222,17 +221,18 @@ unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, siz
         *p_off = 0;
         return 1 | STR_POOL_PRESENT | STR_POOL_UNTOUCHED;
     }
-    size_t h;
-    unsigned res = hash_table_insert(&pool->tbl, str, sizeof(size_t), NULL, 0, str_x33_hash, str_off_str_eq, pool->buff.str);
+    size_t h = str_x33_hash(str, NULL);
+    unsigned res = hash_table_insert(&pool->tbl, &h, str, sizeof(size_t), NULL, 0, str_off_x33_hash, str_off_str_eq, pool->buff.str);
+    if (!res) return 0;
     if (res & HASH_PRESENT)
     {
         *p_off = *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t));
         return res;
     }
     size_t off = pool->buff.len + 1;
-    unsigned res = buff_append(&pool->buff, str, len, BUFFER_INIT | BUFFER_TERM);
-    if (!res) return 0;
+    unsigned res2 = buff_append(&pool->buff, str, len, BUFFER_INIT | BUFFER_TERM);
+    if (!res2) return 0;
     *p_off = off;
-    return res | res2;
+    return res & res2;
 }
 

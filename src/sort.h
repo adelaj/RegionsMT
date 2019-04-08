@@ -53,11 +53,10 @@ enum {
 // Heavily based on the 'khash.h'
 bool hash_table_init(struct hash_table *, size_t, size_t, size_t);
 void hash_table_close(struct hash_table *);
-bool hash_table_remove(struct hash_table *, void *, size_t, hash_callback, cmp_callback, void *);
-bool hash_table_search(struct hash_table *, size_t *, void *, size_t, hash_callback, cmp_callback, void *);
+bool hash_table_search(struct hash_table *, size_t *, void *, size_t, cmp_callback, void *);
+bool hash_table_remove(struct hash_table *, size_t, void *, size_t, cmp_callback, void *);
 void *hash_table_fetch_key(struct hash_table *, size_t, size_t);
 void *hash_table_fetch_val(struct hash_table *, size_t, size_t);
-unsigned hash_table_test(struct hash_table *, size_t, size_t, size_t, hash_callback, void *);
-unsigned hash_table_insert(struct hash_table *, void *, size_t, void *, size_t, hash_callback, cmp_callback, void *);
+unsigned hash_table_insert(struct hash_table *, size_t *, void *, size_t, void *, size_t, hash_callback, cmp_callback, void *);
 
-size_t str_x33_hash(void *Key, void *context);
+size_t str_x33_hash(const void *Key, void *context);
