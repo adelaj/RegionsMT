@@ -135,8 +135,6 @@ void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, size_t c
     queue->cnt += cnt;
 }
 
-typedef void (*generator_callback)(void *, size_t, void *);
-
 void queue_enqueue_yield_lo(struct queue *restrict queue, generator_callback genetator, void *context, size_t cnt, size_t sz)
 {
     size_t bor, left = size_sub(&bor, queue->begin, queue->cap - queue->cnt);

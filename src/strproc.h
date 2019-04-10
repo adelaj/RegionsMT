@@ -89,3 +89,4 @@ struct buff {
     size_t len, cap;
 };
 
+size_t str_off_x33_hash(const void *, void *);

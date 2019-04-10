@@ -7,27 +7,24 @@
 
 #include <string.h>
 
-size_t str_off_x33_hash(const void *Off, void *Str)
-{
-    return str_x33_hash((char *) Str + *(size_t *) Off, NULL);
-}
-
 void lm_test()
 {
     char str[] = "ABC\0EFD\0ABCD";
     size_t off[] = { 0, 4, 8 };
     int val[] = { 1, 2, 3 };
-    size_t tmp;
     struct hash_table tbl = { .cnt = 0 };
     unsigned res;
     hash_table_init(&tbl, 0, sizeof(*off), sizeof(*val));
-    res = hash_table_insert(&tbl, off + 0, sizeof(*off), val + 0, sizeof(*val), str_off_x33_hash, str_off_eq, str);
-    res = hash_table_insert(&tbl, off + 0, sizeof(*off), val + 0, sizeof(*val), str_off_x33_hash, str_off_eq, str);
-    res = hash_table_insert(&tbl, off + 1, sizeof(*off), val + 1, sizeof(*val), str_off_x33_hash, str_off_eq, str);
+    size_t h = str_x33_hash("ABC", NULL);
+    res = hash_table_insert(&tbl, &h, "ABC", sizeof(*off), val + 0, sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
+    res = hash_table_insert(&tbl, &h, "ABC", sizeof(*off), val + 0, sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
+    h = str_x33_hash("EFD", NULL);
+    res = hash_table_insert(&tbl, &h, "EFD", sizeof(*off), val + 1, sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
     //hash_table_remove(&tbl, )
-    res = hash_table_insert(&tbl, off + 1, sizeof(*off), val + 1, sizeof(*val), str_off_x33_hash, str_off_eq, str);
-    res = hash_table_search(&tbl, &tmp, off + 1, sizeof(*off), str_off_x33_hash, str_off_eq, str);
-    res = hash_table_search(&tbl, &tmp, off + 2, sizeof(*off), str_off_x33_hash, str_off_eq, str);
+    res = hash_table_insert(&tbl, &h, "EFD", sizeof(*off), val + 1, sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
+    res = hash_table_search(&tbl, &h, "EFD", sizeof(*off), str_off_str_eq, str);
+    h = str_x33_hash("ABCD", NULL);
+    res = hash_table_search(&tbl, &h, "ABCD", sizeof(*off), str_off_str_eq, str);
 }
 
 

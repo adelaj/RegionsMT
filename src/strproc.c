@@ -176,14 +176,14 @@ bool str_tbl_handler(const char *str, size_t len, void *p_Off, void *Context)
 }
 
 enum buff_flags {
-    BUFFER_INIT = 1,
-    BUFFER_TERM = 2
+    BUFFER_INIT = 1, // Zero characharacter at the beginning
+    BUFFER_TERM = 2 // Zero character at the ending
 };
 
 unsigned buff_append(struct buff *buff, const char *str, size_t len, enum buff_flags flags)
 {
     bool init = flags & BUFFER_INIT, term = flags & BUFFER_TERM;
-    unsigned res = array_test(&buff->str, &buff->cap, sizeof(*buff->str), 0, 0, len, buff->len, init, term);
+    unsigned res = array_test(&buff->str, &buff->cap, sizeof(*buff->str), 0, 0, len, buff->len, init + term);
     if (!res) return 0;
     memcpy(buff->str + buff->len + init, str, len * sizeof(*buff->str));
     buff->len += len + init;
@@ -194,12 +194,18 @@ unsigned buff_append(struct buff *buff, const char *str, size_t len, enum buff_f
 struct str_pool {
     struct buff buff;
     struct hash_table tbl;
-    size_t cnt, cap;
 };
 
-unsigned str_pool_init()
+bool str_pool_init(struct str_pool *pool, size_t cnt, size_t len)
 {
-
+    if (array_init(&pool->buff.str, &pool->buff.cap, size_add_sat(len, 1), sizeof(*pool->buff.str), 0, 0))
+    {
+        pool->buff.str[0] = '\0'; // Addind empty srting
+        pool->buff.len = 0;
+        if (hash_table_init(&pool->tbl, cnt, sizeof(size_t), 0)) return 1;
+        free(pool->buff.str);
+    }
+    return 0;
 }
 
 size_t str_off_x33_hash(const void *Off, void *Str)
@@ -216,7 +222,7 @@ enum {
 
 unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, size_t *p_off)
 {
-    if (!len) 
+    if (!len) // Empty strings handled separately
     {
         *p_off = 0;
         return 1 | STR_POOL_PRESENT | STR_POOL_UNTOUCHED;
@@ -235,4 +241,3 @@ unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, siz
     *p_off = off;
     return res & res2;
 }
-

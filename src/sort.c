@@ -394,13 +394,12 @@ enum {
 
 bool hash_table_init(struct hash_table *tbl, size_t cnt, size_t szk, size_t szv)
 {
-    size_t lcnt = size_log2(size_add_sat(cnt, 1), 1);
+    size_t lcnt = size_log2(size_add_sat(cnt, 3), 1);
     if (lcnt == SIZE_BIT)
     {
         errno = ERANGE;
         return 0;
     }
-    if (lcnt < 2) lcnt = 2;
     cnt = (size_t) 1 << lcnt;
     if (array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT))
     {
@@ -426,7 +425,7 @@ void hash_table_close(struct hash_table *tbl)
     free(tbl->key);
 }
 
-bool hash_table_search(struct hash_table *tbl, size_t *p_h, void *key, size_t szk, cmp_callback eq, void *context)
+bool hash_table_search(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, cmp_callback eq, void *context)
 {
     if (!tbl->cnt) return 0;
     size_t msk = ((size_t) 1 << tbl->lcap) - 1, h = *p_h & msk;
@@ -442,7 +441,7 @@ bool hash_table_search(struct hash_table *tbl, size_t *p_h, void *key, size_t sz
     return 1;
 }
 
-bool hash_table_remove(struct hash_table *tbl, size_t h, void *key, size_t szk, cmp_callback eq, void *context)
+bool hash_table_remove(struct hash_table *tbl, size_t h, const void *key, size_t szk, cmp_callback eq, void *context)
 {
     if (!(hash_table_search(tbl, &h, key, szk, eq, context))) return 0;
     uint8_bit_set_burst2(tbl->flags, h, FLAG_REMOVED);
@@ -493,7 +492,7 @@ static bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, s
     return 1;
 }
 
-unsigned hash_table_insert(struct hash_table *tbl, size_t *p_h, void *key, size_t szk, void *val, size_t szv, hash_callback hash, cmp_callback eq, void *context)
+unsigned hash_table_insert(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, void *val, size_t szv, hash_callback hash, cmp_callback eq, void *context)
 {
     unsigned res = 1;
     size_t cap = (size_t) 1 << tbl->lcap;
@@ -509,8 +508,7 @@ unsigned hash_table_insert(struct hash_table *tbl, size_t *p_h, void *key, size_
                 return 0;
             }
         }
-        else lcnt = size_log2(cap - 1, 1);
-        if (lcnt < 2) lcnt = 2;
+        else lcnt = size_log2(MAX(cap, 4) - 1, 1);
         size_t cnt = (size_t) 1 << lcnt;
         if (tbl->cnt >= (size_t) ((double) cnt * .77 + .5) || cap == cnt) res |= HASH_UNTOUCHED;
         else

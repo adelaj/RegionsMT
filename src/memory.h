@@ -33,11 +33,14 @@ struct queue {
     size_t cap, begin, cnt;
 };
 
+typedef void (*generator_callback)(void *, size_t, void *);
+
 void queue_close(struct queue *);
 bool queue_init(struct queue *, size_t, size_t);
 unsigned queue_test(struct queue *, size_t, size_t);
 void *queue_fetch(struct queue *, size_t, size_t);
 unsigned queue_enqueue(struct queue *restrict, bool, void *restrict, size_t, size_t);
+unsigned queue_enqueue_yield(struct queue *restrict, bool, generator_callback, void *, size_t, size_t);
 void queue_dequeue(struct queue *, size_t, size_t);
 
 struct persistent_array {
