@@ -235,7 +235,7 @@ unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, siz
         *p_off = *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t));
         return res;
     }
-    size_t off = pool->buff.len + 1;
+    size_t off = pool->buff.len + 1; // Position should be 
     unsigned res2 = buff_append(&pool->buff, str, len, BUFFER_INIT | BUFFER_TERM);
     if (!res2) 
     {
@@ -244,4 +244,9 @@ unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, siz
     }
     *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t)) = *p_off = off;
     return res & res2;
+}
+
+char *str_pool_fetch(struct str_pool *pool, size_t ind)
+{
+    
 }

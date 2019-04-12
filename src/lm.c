@@ -61,6 +61,9 @@ unsigned lmf_name_finalize(void *Context, struct text_metric metric, struct log 
 
 }
 
+struct lmf_expr_res {
+    unsigned st;
+};
 
 struct lmf_expr_context {
     unsigned st;
