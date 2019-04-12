@@ -16,15 +16,21 @@ void lm_test()
     unsigned res;
     hash_table_init(&tbl, 0, sizeof(*off), sizeof(*val));
     size_t h = str_x33_hash("ABC", NULL);
-    res = hash_table_insert(&tbl, &h, "ABC", sizeof(*off), val + 0, sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
-    res = hash_table_insert(&tbl, &h, "ABC", sizeof(*off), val + 0, sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
+    res = hash_table_alloc(&tbl, &h, "ABC", sizeof(*off), sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
+    *(size_t *) hash_table_fetch_key(&tbl, h, sizeof(*off)) = off[0];
+    *(int *) hash_table_fetch_val(&tbl, h, sizeof(*val)) = val[0];
+    h = str_x33_hash("ABC", NULL);
+    res = hash_table_alloc(&tbl, &h, "ABC", sizeof(*off), sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
     h = str_x33_hash("EFD", NULL);
-    res = hash_table_insert(&tbl, &h, "EFD", sizeof(*off), val + 1, sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
+    res = hash_table_alloc(&tbl, &h, "EFD", sizeof(*off), sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
+    *(size_t *) hash_table_fetch_key(&tbl, h, sizeof(*off)) = off[1];
+    *(int *) hash_table_fetch_val(&tbl, h, sizeof(*val)) = val[1];
     //hash_table_remove(&tbl, )
-    res = hash_table_insert(&tbl, &h, "EFD", sizeof(*off), val + 1, sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
+    h = str_x33_hash("EFD", NULL);
+    res = hash_table_alloc(&tbl, &h, "EFD", sizeof(*off), sizeof(*val), str_off_x33_hash, str_off_str_eq, str);
     res = hash_table_search(&tbl, &h, "EFD", sizeof(*off), str_off_str_eq, str);
     h = str_x33_hash("ABCD", NULL);
-    res = hash_table_search(&tbl, &h, "ABCD", sizeof(*off), str_off_str_eq, str);
+    res = hash_table_search(&tbl, &h, "ABCD",  sizeof(*off), str_off_str_eq, str);
 }
 
 

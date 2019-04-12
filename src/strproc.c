@@ -25,22 +25,22 @@ int str_strl_stable_cmp(const void *Str, const void *Entry, void *p_Len)
 bool str_eq(const void *A, const void *B, void *context)
 {
     (void) context;
-    return !strcmp((char *) A, (char *) B);
+    return !strcmp((const char *) A, (const char *) B);
 }
 
 bool str_off_str_eq(const void *A, const void *B, void *Str)
 {
-    return str_eq((char *) Str + *(size_t *) A, B, NULL);
+    return str_eq((const char *) Str + *(size_t *) A, B, NULL);
 }
 
 bool str_off_eq(const void *A, const void *B, void *Str)
 {
-    return str_eq((char *) Str + *(size_t *) A, (char *) Str + *(size_t *) B, NULL);
+    return str_eq((const char *) Str + *(size_t *) A, (const char *) Str + *(size_t *) B, NULL);
 }
 
 int str_off_stable_cmp(const void *A, const void *B, void *Str)
 {
-    return strcmp((char *) Str + *(size_t *) A, (char *) Str + *(size_t *) B);
+    return strcmp((const char *) Str + *(size_t *) A, (const char *) Str + *(size_t *) B);
 }
 
 bool str_off_cmp(const void *A, const void *B, void *Str)
@@ -228,7 +228,7 @@ unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, siz
         return 1 | STR_POOL_PRESENT | STR_POOL_UNTOUCHED;
     }
     size_t h = str_x33_hash(str, NULL);
-    unsigned res = hash_table_insert(&pool->tbl, &h, str, sizeof(size_t), NULL, 0, str_off_x33_hash, str_off_str_eq, pool->buff.str);
+    unsigned res = hash_table_alloc(&pool->tbl, &h, str, sizeof(size_t), 0, str_off_x33_hash, str_off_str_eq, pool->buff.str);
     if (!res) return 0;
     if (res & HASH_PRESENT)
     {
@@ -237,7 +237,11 @@ unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, siz
     }
     size_t off = pool->buff.len + 1;
     unsigned res2 = buff_append(&pool->buff, str, len, BUFFER_INIT | BUFFER_TERM);
-    if (!res2) return 0;
-    *p_off = off;
+    if (!res2) 
+    {
+        hash_table_dealloc(&pool->tbl, h);
+        return 0;
+    }
+    *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t)) = *p_off = off;
     return res & res2;
 }

@@ -57,6 +57,7 @@ bool hash_table_search(struct hash_table *, size_t *, const void *, size_t, cmp_
 bool hash_table_remove(struct hash_table *, size_t, const void *, size_t, cmp_callback, void *);
 void *hash_table_fetch_key(struct hash_table *, size_t, size_t);
 void *hash_table_fetch_val(struct hash_table *, size_t, size_t);
-unsigned hash_table_insert(struct hash_table *, size_t *, const void *, size_t, void *, size_t, hash_callback, cmp_callback, void *);
+unsigned hash_table_alloc(struct hash_table *, size_t *, const void *, size_t, size_t, hash_callback, cmp_callback, void *);
+void hash_table_dealloc(struct hash_table *, size_t);
 
 size_t str_x33_hash(const void *Key, void *context);

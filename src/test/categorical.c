@@ -43,19 +43,10 @@ bool test_categorical_a(void *In, struct log *log)
         !array_init(&ymar, NULL, in->dimy, sizeof(*ymar), 0, ARRAY_STRICT | ARRAY_CLEAR)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
     else
     {
-        double nlpv, qas;
+        double nlpv; // qas;
         size_t mar = 0;
         mar_init(in->tbl, xmar, ymar, &mar, in->dimx, in->dimy);
-        if (outer_combined_init(outer, xmar, ymar, mar, in->dimx, in->dimy))
-        {
-            nlpv = stat_chisq(in->tbl, outer, mar, in->dimx, in->dimy);
-            //qas = qas_fisher(in->tbl, xmar, ymar, mar, in->dimx, in->dimy);
-        }
-        else
-        {
-            nlpv = stat_exact(in->tbl, xmar, ymar);
-            //qas = qas_lor(in->tbl);
-        }
+        nlpv = outer_combined_init(outer, xmar, ymar, mar, in->dimx, in->dimy) ? stat_chisq(in->tbl, outer, mar, in->dimx, in->dimy) : stat_exact(in->tbl, xmar, ymar);
         if (fabs(nlpv - in->nlpv) >= nlpv * REL_ERROR) log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Relative error is too large!\n");
         else succ = 1;
     }    

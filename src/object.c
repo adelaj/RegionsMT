@@ -683,7 +683,7 @@ static bool *xml_decl_read(const char *str, size_t len, void *ptr, void *Context
 static bool *xml_decl_val_selector(struct xml_val *restrict val, const char *restrict str, size_t len, void *restrict res, void *Context, size_t *restrict p_ind)
 {
     (void) res;
-    const struct strl decl_name[] = { STRI("version"), STRI("encoding"), STRI("standalone") };
+    static const struct strl decl_name[] = { STRI("version"), STRI("encoding"), STRI("standalone") };
     size_t *p_pos = Context, pos = *p_pos;
     for (size_t i = pos; i < countof(decl_name); i++)
     {
