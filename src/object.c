@@ -1055,8 +1055,8 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
     struct xml_ctrl_context xml_ctrl_context = { 0 };
     
     size_t dep = 0;
-    char buff[MAX(BLOCK_READ, countof(UTF8_BOM))] = { '\0' }, *text = NULL;
-    struct text_metric metric = { 0 }; // Text metrics        
+    char buff[MAX(BLOCK_READ, countof(UTF8_BOM))] = { '\0' }, *buff0 = NULL;
+    struct text_metric metric = { .path = path, 0 }; // Text metrics        
     struct xml_att xml_val = { 0 };
     struct xml_node xml_node = { 0 };
     
@@ -1064,44 +1064,14 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
     if (rd >= lengthof(UTF8_BOM) && !strncmp(buff, UTF8_BOM, lengthof(UTF8_BOM))) pos += lengthof(UTF8_BOM), metric.byte += lengthof(UTF8_BOM);
         
     enum {
-        ST_DECL = 0,
-        ST_WHITESPACE_K,
-        ST_ANGLE_LEFT_A,
-        ST_TAG_BEGINNING_A,
-        ST_NAME_A, 
-        ST_TAG_ROOT_A,
-        ST_WHITESPACE_L,
-        ST_TAG_ENDING_A,       
-        ST_TAG_ENDING_B,        
-        ST_NAME_B, 
-        ST_ATTRIBUTE_A, 
-        ST_WHITESPACE_M, 
-        ST_EQUALS_D, 
-        ST_WHITESPACE_N, 
-        ST_QUOTE_OPENING_D, 
-        ST_QUOTE_CLOSING_D, 
-        ST_ATTRIBUTE_HANDLING_A,       
-        ST_TEXT_A,
-        ST_TAG_BEGINNING_B, 
-        ST_NAME_C, 
-        ST_TAG_A, 
-        ST_NAME_D, 
-        ST_CLOSING_TAG_A, 
-        ST_TAG_ENDING_C,        
-        ST_WHITESPACE_O, 
-        ST_ANGLE_LEFT_B,
-        ST_TAG_BEGINNING_C,     
-        ST_SPECIAL_A,
-        ST_SPECIAL_B,
-        ST_COMMENT_A,
-        ST_COMMENT_B,
-        ST_COMMENT_C,
+        ST_XML_DECL = 0,
+        ST_XML_PROLOG,
+        ST_XML_TREE,
     };
     
     struct utf8 utf8;
-
-    bool halt = 0, skip = 0;
-    uint32_t st = 0;
+    bool halt = 0, cr = 0;
+    unsigned st = 0;
 
     for (; !halt && rd; rd = fread(buff, 1, sizeof buff, f), pos = 0) for (halt = 1; pos < rd; halt = 1)
     {
@@ -1109,7 +1079,8 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
         if (!utf8_decode(buff[pos], &utf8.val, utf8.byte, &utf8.len, &utf8.context)) log_message_error_xml(log, CODE_METRIC, metric, path, XML_ERROR_INVALID_UTF);
         else
         {
-            pos++, metric.byte++;
+            pos++;
+            metric.byte++;
             if (utf8.context) continue;
             if (!utf8_is_valid(utf8.val, utf8.len)) log_message_error_xml(log, CODE_METRIC, metric, path, XML_ERROR_INVALID_UTF);
             else
@@ -1117,18 +1088,24 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
                 switch (utf8.val)
                 {
                 case '\n':
-                    if (!skip) // '\n' which appears after '\r' is always skipped
+                    if (!cr) // '\n' which appears after '\r' is always skipped
                     {
-                        metric.row++, metric.col = 0, skip = 0;
+                        metric.row++; 
+                        metric.col = 0;
+                        cr = 0;
                         break;
                     }
-                    skip = 0;
+                    cr = 0;
                     continue;
                 case '\r': // '\r' is replaced by '\n'
-                    metric.row++, metric.col = 0, skip = 1, utf8 = (struct utf8) { .byte = { '\n' }, .len = 1, .val = '\n' };
+                    metric.row++;
+                    metric.col = 0;
+                    cr = 1;
+                    utf8 = (struct utf8) { .byte = { '\n' }, .len = 1, .val = '\n' };
                     break;
                 default:
-                    metric.col++, skip = 0;
+                    metric.col++; 
+                    cr = 0;
                     if (!utf8_is_xml_char_len(utf8.val, utf8.len)) log_message_error_xml(log, CODE_METRIC, metric, path, XML_ERROR_INVALID_CHAR);
                     else halt = 0;
                 }
@@ -1136,6 +1113,13 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
         }
         
         if (halt) break;
+
+        switch (st)
+        {
+        case ST_XML_DECL:
+            if (utf8.)
+
+        }
 
         for (;;)
         {
