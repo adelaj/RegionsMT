@@ -6,6 +6,8 @@
 
 #include <stdbool.h>
 
+#define XML_DECL "<?xml"
+
 typedef bool (*prologue_callback)(void *, void **, void *);
 typedef bool (*epilogue_callback)(void *, void *, void *);
 typedef void (*disposer_callback)(void *);

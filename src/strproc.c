@@ -175,11 +175,6 @@ bool str_tbl_handler(const char *str, size_t len, void *p_Off, void *Context)
     return 1;
 }
 
-enum buff_flags {
-    BUFFER_INIT = 1, // Zero characharacter at the beginning
-    BUFFER_TERM = 2 // Zero character at the ending
-};
-
 unsigned buff_append(struct buff *buff, const char *str, size_t len, enum buff_flags flags)
 {
     bool init = flags & BUFFER_INIT, term = flags & BUFFER_TERM;
@@ -191,10 +186,7 @@ unsigned buff_append(struct buff *buff, const char *str, size_t len, enum buff_f
     return res;
 }
 
-struct str_pool {
-    struct buff buff;
-    struct hash_table tbl;
-};
+
 
 bool str_pool_init(struct str_pool *pool, size_t cnt, size_t len)
 {
@@ -235,18 +227,13 @@ unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, siz
         *p_off = *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t));
         return res;
     }
-    size_t off = pool->buff.len + 1; // Position should be 
-    unsigned res2 = buff_append(&pool->buff, str, len, BUFFER_INIT | BUFFER_TERM);
-    if (!res2) 
+    size_t off = pool->buff.len + 1; // Position should be saved before the buffer update
+    res &= buff_append(&pool->buff, str, len, BUFFER_INIT | BUFFER_TERM);
+    if (!res)
     {
         hash_table_dealloc(&pool->tbl, h);
         return 0;
     }
     *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t)) = *p_off = off;
-    return res & res2;
-}
-
-char *str_pool_fetch(struct str_pool *pool, size_t ind)
-{
-    
+    return res;
 }

@@ -61,20 +61,29 @@ unsigned lmf_name_finalize(void *Context, struct text_metric metric, struct log 
 
 }
 
-struct lmf_expr_res {
-    unsigned st;
+struct lmf_entry {
+    size_t off, deg;
 };
 
-struct lmf_expr_context {
-    unsigned st;
+struct lmf_expr_arg {
+    struct lmf_entry *ent;
+    size_t *ent_len, cnt;
+};
+
+struct base_context {
     struct buff *buff;
     struct hash_table tbl;
+    unsigned st;
+    size_t len;
+    void *context;
 };
 
 enum {
-    LMF_EXPR_BEGIN = 0,
-    LMF_EXPR_NAME,
+    LMF_EXPR_ST_INIT = 0,
 
+    LMF_EXPR_ST_VAR,
+    LMF_EXPR_ST_MID,
+    LMF_EXPR_ST_NUM,
 };
 
 bool lmf_expr_init(void *Context, struct text_metric metric, struct log log)
@@ -85,34 +94,44 @@ bool lmf_expr_init(void *Context, struct text_metric metric, struct log log)
 
 bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric metric, struct log log)
 {
-    struct lmf_expr_context *context = Context;
-    if (utf8_is_whitespace_len(utf8.val, utf8.len))
+    struct lmf_expr_arg *arg = arg;
+    struct base_context *context = Context;
+
+    for (;;) switch (context->st)
     {
+    case LMF_EXPR_ST_INIT:
+        if (!utf8.val) return 1;
+        // Removing leading whitespaces
+        if (utf8_is_whitespace_len(utf8.val, utf8.len)) return 1;
+        context->st = LMF_EXPR_ST_VAR;
+        continue;
+    case LMF_EXPR_ST_VAR:
+        switch (utf8.val)
+        {
+        case '\0':
+            // Add to the list
+            return 1;
+        case '^':
+            context->st = LMF_EXPR_ST_NUM;
+            return 1;
+        case '*':
+            if (array_init())
+                break;
+        case '+':
+            break;
+        default:
+            if (!utf8_is_whitespace_len(utf8.val, utf8.len)) context->len = context->buff->len;
 
-    }
-    switch (utf8.val)
-    {
-    case '^':
+        }
+    case LMF_EXPR_ST_NUM:
+        switch (utf8.val)
+        {
 
-        break;
-
-    case '*':
-        break;
-
-    case '+':
-        break;
-
-    default:
-
-        context->st = LMF_EXPR_NAME;
+        }
 
     }
 }
 
-bool lmf_expr_close(void *Context, struct text_metric metric, struct log log)
-{
-
-}
 
 bool lmf_compile(void *Context, struct utf8 utf8, struct text_metric metric, struct log log)
 {

@@ -729,9 +729,29 @@ enum {
     XML_DECL_ST_DECL_CNT
 };
 
+struct xml_decl_arg {
+    uint8_t bits[UINT8_CNT(3)];
+};
+
 struct xml_decl_context {
+    unsigned state;
+    size_t pos;
     struct text_metric *snapshot;
 };
+
+static unsigned xml_decl_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric metric, struct log log)
+{
+    switch (utf8.val)
+    {
+    case '?':
+
+    default:
+        if (utf8_is_whitespace_len(utf8.val, utf8.len))
+        {
+
+        }
+    }
+}
 
 static bool xml_decl_impl(uint32_t *restrict p_st, struct xml_decl_context context, struct bits *bits, struct utf8 *restrict utf8, struct buff *restrict buff, struct text_metric metric, const char *restrict path, struct log *restrict log)
 {
@@ -1055,23 +1075,30 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
     struct xml_ctrl_context xml_ctrl_context = { 0 };
     
     size_t dep = 0;
-    char buff[MAX(BLOCK_READ, countof(UTF8_BOM))] = { '\0' }, *buff0 = NULL;
+    // Buffer should be able to store UTF_BOM + XML_DECL + whitespace
+    char buff[MAX(BLOCK_READ, lengthof(UTF8_BOM) + countof(XML_DECL))] = { '\0' }, *buff0 = NULL;
     struct text_metric metric = { .path = path, 0 }; // Text metrics        
     struct xml_att xml_val = { 0 };
     struct xml_node xml_node = { 0 };
     
+    bool decl = 0;
     size_t rd = fread(buff, 1, sizeof(buff), f), pos = 0;
+    // Checking for the UTF-8 BOM
     if (rd >= lengthof(UTF8_BOM) && !strncmp(buff, UTF8_BOM, lengthof(UTF8_BOM))) pos += lengthof(UTF8_BOM), metric.byte += lengthof(UTF8_BOM);
-        
+    
     enum {
-        ST_XML_DECL = 0,
-        ST_XML_PROLOG,
+        ST_XML_DECL_BEGIN = 0,
+        ST_XML_PROLOG = XML_DECL_ST_DECL_CNT,
         ST_XML_TREE,
     };
-    
+
+    unsigned st = ST_XML_DECL_BEGIN;
+    // Checking if XML file has declaration
+    if (rd - pos >= countof(XML_DECL) && !strncmp(buff + pos, XML_DECL, lengthof(XML_DECL)) && utf8_is_whitespace(buff + pos + lengthof(XML_DECL))) pos += countof(XML_DECL), metric.byte += lengthof(XML_DECL);
+    else st = ST_XML_PROLOG;
+        
     struct utf8 utf8;
     bool halt = 0, cr = 0;
-    unsigned st = 0;
 
     for (; !halt && rd; rd = fread(buff, 1, sizeof buff, f), pos = 0) for (halt = 1; pos < rd; halt = 1)
     {
@@ -1114,11 +1141,9 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
         
         if (halt) break;
 
-        switch (st)
+        if (st < ST_XML_PROLOG)
         {
-        case ST_XML_DECL:
-            if (utf8.)
-
+            if (xml_decl_impl());
         }
 
         for (;;)

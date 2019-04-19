@@ -6,6 +6,7 @@
 //
 
 #include "common.h"
+#include "sort.h"
 #include "utf8.h"
 
 struct strl {
@@ -88,5 +89,20 @@ struct buff {
     char *str;
     size_t len, cap;
 };
+
+enum buff_flags {
+    BUFFER_INIT = 1, // Zero characharacter at the beginning
+    BUFFER_TERM = 2 // Zero character at the ending
+};
+
+unsigned buff_append(struct buff *, const char *, size_t, enum buff_flags);
+
+struct str_pool {
+    struct buff buff;
+    struct hash_table tbl;
+};
+
+bool str_pool_init(struct str_pool *, size_t, size_t);
+unsigned str_pool_insert(struct str_pool *, const char *, size_t, size_t *);
 
 size_t str_off_x33_hash(const void *, void *);
