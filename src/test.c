@@ -55,6 +55,6 @@ bool perf(struct log *log)
 
     // Performance tests here
 
-    log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Performance tests execution took %D.\n", log->style.tmd, start, get_time());
+    log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Performance tests execution took %<>T.\n", log->style.tmd, start, get_time());
     return 1;
 }

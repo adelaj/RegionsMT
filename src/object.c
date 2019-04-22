@@ -126,95 +126,69 @@ struct message_xml_context {
     enum xml_status status;
 };
 
-static bool message_xml(char *buff, size_t *p_buff_cnt, void *Context)
-{
-    struct message_xml_context *restrict context = Context;
-    const char *str[] = {
-        "Invalid UTF-8 byte sequence",
-        "Invalid character",
-        "Invalid XML declaration",
-        "No root element found",
-        "Compiler malfunction",
-        "Unexpected end of file",
-        "Unexpected character",
-        "Unexpected tag",
-        "Unexpected attribute",
-        "Unexpected closing tag",
-        "Duplicated attribute",
-        "Unable to handle value",
-        "Invalid control sequence",
-        "Invalid processing instruction",
-        "is out of range",
-        "referencing to invalid character"
-    };
-    size_t cnt = 0, len = *p_buff_cnt;
-    for (unsigned i = 0;; i++)
-    {
-        size_t tmp = len;
-        switch (i)
-        {
-        case 0:
-            switch (context->status)
-            {
-            case XML_ERROR_INVALID_UTF:
-            case XML_ERROR_INVALID_CHAR:
-            case XML_ERROR_DECL:
-            case XML_ERROR_ROOT:
-            case XML_ERROR_COMPILER:
-                if (!print_fmt(buff + cnt, &tmp, "%s", str[context->status])) return 0;
-                break;
-            case XML_ERROR_CHAR_UNEXPECTED_EOF:
-            case XML_ERROR_CHAR_UNEXPECTED_CHAR:
-                if (!print_fmt(buff + cnt, &tmp, "%s \'%.*s\'", str[context->status], (int) context->utf8_len, context->utf8_byte)) return 0;
-                break;
-            case XML_ERROR_STR_UNEXPECTED_TAG:
-            case XML_ERROR_STR_UNEXPECTED_ATTRIBUTE:
-            case XML_ERROR_STR_DUPLICATED_ATTRIBUTE:
-            case XML_ERROR_STR_ENDING:
-            case XML_ERROR_STR_UNHANDLED_VALUE:
-            case XML_ERROR_STR_CONTROL:
-                if (!print_fmt(buff + cnt, &tmp, "%s \"%.*s\"", str[context->status], (context->len), context->str)) return 0;
-                break;
-            case XML_ERROR_VAL_RANGE:
-            case XML_ERROR_VAL_REFERENCE:
-                if (!print_fmt(buff + cnt, &tmp, "Numeric value %" PRIu32 " %s", context->val, str[context->status])) return 0;
-                break;
-            }
-        case 1:
-            if (!print_fmt(buff + cnt, len, " (file: \"%s\"; line: %zu; character: %zu; byte: %" PRIu64 ")!\n",
-                context->path,
-                context->metric.row + 1,
-                context->metric.col + 1,
-                context->metric.byte + 1
-            )) return 0;
-        }
-        if (tmp < 0) return 0;
-        cnt = size_add_sat(cnt, tmp);
-        if (i == 1) break;
-        len = size_sub_sat(len, tmp);
-    }
-    *p_buff_cnt = cnt;
-    return 1;
-}
+static const char xml_pos_fmt[] = " (file: %<>s; line: %<>uz; character: %<>uz; byte: %<>uq)!\n";
+#define XML_POS_SUBS xml_pos_fmt, log->style.pth, STRL(metric.path), log->style.num, metric.row + 1, log->style.num, metric.col + 1, log->style.num, metric.byte + 1
 
 static bool log_message_error_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *path, enum xml_status status)
 {
-    return log_message(log, code_metric, MESSAGE_ERROR, message_xml, &(struct message_xml_context) { .metric = metric, .path = path, .status = status });
+    switch (status)
+    {
+    case XML_ERROR_INVALID_UTF:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid UTF-8 byte sequence%$", XML_POS_SUBS);
+    case XML_ERROR_INVALID_CHAR:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid character%$", XML_POS_SUBS);
+    case XML_ERROR_DECL:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid XML declaration%$", XML_POS_SUBS);
+    case XML_ERROR_ROOT:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "No root element found%$", XML_POS_SUBS);
+    case XML_ERROR_COMPILER:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Compiler malfunction%$", XML_POS_SUBS);
+    default:
+        break;
+    }
+    return 0;
 }
 
 static bool log_message_error_str_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *path, char *str, size_t len, enum xml_status status)
 {
-    return log_message(log, code_metric, MESSAGE_ERROR, message_xml, &(struct message_xml_context) { .metric = metric, .path = path, .str = str, .len = len, .status = status });
-}
-
-static bool log_message_error_char_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *path, uint8_t *utf8_byte, size_t utf8_len, enum xml_status status)
-{
-    return log_message(log, code_metric, MESSAGE_ERROR, message_xml, &(struct message_xml_context) { .metric = metric, .path = path, .utf8_byte = utf8_byte, .utf8_len = utf8_len, .status = status });
+    switch (status)
+    {
+    case XML_ERROR_CHAR_UNEXPECTED_EOF:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected end of file %<>s*%$", log->style.chr, str, len, XML_POS_SUBS);
+    case XML_ERROR_CHAR_UNEXPECTED_CHAR:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected character %<>s*%$", log->style.chr, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_UNEXPECTED_TAG:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected tag %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_UNEXPECTED_ATTRIBUTE:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected attribute %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_ENDING:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected closing tag %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_DUPLICATED_ATTRIBUTE:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Duplicated attribute %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_UNHANDLED_VALUE:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to handle value %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_CONTROL:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid control sequence %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_INVALID_PI:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid processing instruction %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    default:
+        break;
+    }
+    return 0;
 }
 
 static bool log_message_error_val_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *path, uint32_t val, enum xml_status status)
 {
-    return log_message(log, code_metric, MESSAGE_ERROR, message_xml, &(struct message_xml_context) { .metric = metric, .path = path, .val = val, .status = status });
+    switch (status)
+    {
+    case XML_ERROR_VAL_RANGE:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Numeric value %<>ud is out of range%$", log->style.num, val, XML_POS_SUBS);
+    case XML_ERROR_VAL_REFERENCE:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Numeric value %<>ud referencing to invalid character%$", log->style.num, val, XML_POS_SUBS);
+    default:
+        break;
+    }
+    return 0;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -1143,7 +1117,7 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
 
         if (st < ST_XML_PROLOG)
         {
-            if (xml_decl_impl());
+            //if (xml_decl_impl());
         }
 
         for (;;)
