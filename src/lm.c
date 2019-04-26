@@ -35,6 +35,28 @@ void lm_test()
     res = hash_table_search(&tbl, &h, "ABCD",  sizeof(*off), str_off_str_eq, str);
 }
 
+struct lmf_reg_context {
+    size_t deg_cnt, bit_cnt;
+};
+
+struct lmf_reg_entry {
+    size_t *deg;
+    uint8_t *bit;
+};
+
+bool lmf_reg_entry_cmp(const void *A, const void *B, void *Context)
+{
+    struct lmf_reg_context *context = Context;
+    struct lmf_reg_entry *a = A, *b = B;
+
+    size_t i = 0, j;
+    for (; i < context->deg_cnt && a->deg[i] > b->deg[i]; i++);
+    for (j = i; j < context->deg_cnt && a->deg[i] >= b->deg[i]; j++);
+
+
+}
+
+
 struct lmf_name_context {
     char *buff;
     size_t cnt, cap;

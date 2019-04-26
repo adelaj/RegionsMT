@@ -190,19 +190,6 @@ size_t size_sub(size_t *p_bor, size_t x, size_t y)
     return (size_t) res;
 }
 
-size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
-{
-    if (!args_cnt)
-    {
-        *p_hi = 0;
-        return 0;
-    }
-    unsigned __int64 lo = args[0], hi = 0;
-    for (size_t i = 1; i < args_cnt; _addcarry_u64(_addcarry_u64(0, lo, args[i++], &lo), hi, 0, &hi));
-    *p_hi = (size_t) hi;
-    return (size_t) lo;
-}
-
 size_t size_bit_scan_reverse(size_t x)
 {
     unsigned long res;
@@ -264,6 +251,8 @@ size_t size_sub(size_t *p_bor, size_t x, size_t y)
     return (size_t) val;
 }
 
+#endif
+
 size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
 {
     if (!args_cnt)
@@ -271,13 +260,11 @@ size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
         *p_hi = 0;
         return 0;
     }
-    Dsize_t val = args[0];
-    for (size_t i = 1; i < args_cnt; val += args[i++]);
-    *p_hi = (size_t) (val >> SIZE_BIT);
-    return (size_t) val;
+    size_t lo = args[0], hi = 0, car;
+    for (size_t i = 1; i < args_cnt; lo = size_add(&car, lo, args[i++]), hi += car);
+    *p_hi = hi;
+    return lo;
 }
-
-#endif
 
 #define DECLARE_UINT_LOG10(TYPE, PREFIX, MAX, ...) \
     TYPE PREFIX ## _log10(TYPE x, bool ceil) \
