@@ -102,6 +102,7 @@ int flt64_stable_cmp_asc_nan(const void *, const void *, void *);
 int flt64_sign(double x);
 
 uint32_t uint32_fused_mul_add(uint32_t *, uint32_t, uint32_t);
+size_t size_fused_mul_add(size_t *, size_t, size_t);
 
 bool uint8_bit_test(uint8_t *, size_t);
 bool uint8_bit_test_set(uint8_t *, size_t);

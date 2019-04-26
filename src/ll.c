@@ -529,6 +529,13 @@ uint32_t uint32_fused_mul_add(uint32_t *p_res, uint32_t m, uint32_t a)
     return (uint32_t) (val >> UINT32_BIT);
 }
 
+size_t size_fused_mul_add(size_t *p_res, size_t m, size_t a)
+{
+    size_t hi, lo = size_mul(&hi, *p_res, m), car;
+    *p_res = size_add(&car, lo, a);
+    return hi + car;
+}
+
 #define DECLARE_BIT_TEST(TYPE, PREFIX) \
     bool PREFIX ## _bit_test(TYPE *arr, size_t bit) \
     { \

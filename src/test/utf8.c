@@ -20,7 +20,7 @@ enum utf8_test_obituary {
 
 static bool log_message_error_utf8_test(struct log *restrict log, struct code_metric code_metric, enum utf8_test_obituary obituary)
 {
-    const struct strl str[] = { 
+    static const struct strl str[] = { 
         STRI("Incorrect length of the UTF-8 byte sequence"),
         STRI("Incorrect UTF-8 byte sequence"),
         STRI("Incorrect Unicode value of the UTF-8 byte sequence"),

@@ -90,25 +90,6 @@ bool xml_object_execute(struct xml_object *obj, void *in)
 
 ///////////////////////////////////////////////////////////////////////////////
 
-enum xml_status {
-    XML_ERROR_INVALID_UTF,
-    XML_ERROR_INVALID_CHAR,
-    XML_ERROR_DECL,
-    XML_ERROR_ROOT,
-    XML_ERROR_COMPILER,
-    XML_ERROR_CHAR_UNEXPECTED_EOF,
-    XML_ERROR_CHAR_UNEXPECTED_CHAR,
-    XML_ERROR_STR_UNEXPECTED_TAG,
-    XML_ERROR_STR_UNEXPECTED_ATTRIBUTE,
-    XML_ERROR_STR_ENDING,
-    XML_ERROR_STR_DUPLICATED_ATTRIBUTE,
-    XML_ERROR_STR_UNHANDLED_VALUE,
-    XML_ERROR_STR_CONTROL,
-    XML_ERROR_STR_INVALID_PI,
-    XML_ERROR_VAL_RANGE,
-    XML_ERROR_VAL_REFERENCE
-};
-
 struct message_xml_context {
     char *path;
     struct text_metric metric;
@@ -129,7 +110,7 @@ struct message_xml_context {
 static const char xml_pos_fmt[] = " (file: %<>s; line: %<>uz; character: %<>uz; byte: %<>uq)!\n";
 #define XML_POS_SUBS xml_pos_fmt, log->style.pth, STRL(metric.path), log->style.num, metric.row + 1, log->style.num, metric.col + 1, log->style.num, metric.byte + 1
 
-static bool log_message_error_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *path, enum xml_status status)
+bool log_message_error_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status)
 {
     switch (status)
     {
@@ -149,7 +130,7 @@ static bool log_message_error_xml(struct log *restrict log, struct code_metric c
     return 0;
 }
 
-static bool log_message_error_str_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *path, char *str, size_t len, enum xml_status status)
+bool log_message_error_str_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, char *str, size_t len, enum xml_status status)
 {
     switch (status)
     {
@@ -177,7 +158,7 @@ static bool log_message_error_str_xml(struct log *restrict log, struct code_metr
     return 0;
 }
 
-static bool log_message_error_val_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *path, uint32_t val, enum xml_status status)
+bool log_message_error_val_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, uint32_t val, enum xml_status status)
 {
     switch (status)
     {

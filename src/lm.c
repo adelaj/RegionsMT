@@ -1,6 +1,8 @@
+#include "ll.h"
 #include "lm.h"
 #include "log.h"
 #include "memory.h"
+#include "object.h"
 #include "sort.h"
 #include "strproc.h"
 #include "utf8.h"
@@ -33,19 +35,6 @@ void lm_test()
     res = hash_table_search(&tbl, &h, "ABCD",  sizeof(*off), str_off_str_eq, str);
 }
 
-
-
-struct entry {
-    size_t *deg;
-    uint8_t *bits;
-};
-
-enum {
-    STATUS_FAILURE = 0,
-    STATUS_SUCCESS,
-    STATUS_REPEAT,
-};
-
 struct lmf_name_context {
     char *buff;
     size_t cnt, cap;
@@ -67,32 +56,37 @@ struct lmf_entry {
 
 struct lmf_expr_arg {
     struct lmf_entry *ent;
-    size_t *ent_len, cnt;
+    size_t *len, ent_cnt, ent_cap, len_cnt, len_cap;
 };
 
 struct base_context {
     struct buff *buff;
-    struct hash_table tbl;
+    struct hash_table *tbl;
+    struct text_metric metric;
     unsigned st;
-    size_t len;
+    size_t reg;
     void *context;
 };
 
 enum {
     LMF_EXPR_ST_INIT = 0,
-
+    LMF_EXPR_ST_VAR_INIT,
+    LMF_EXPR_ST_WHITESPACE_VAR,
+    
     LMF_EXPR_ST_VAR,
-    LMF_EXPR_ST_MID,
+    LMF_EXPR_ST_OP,
+    LMF_EXPR_ST_WHITESPACE_NUM,
     LMF_EXPR_ST_NUM,
 };
 
-bool lmf_expr_init(void *Context, struct text_metric metric, struct log log)
+void lmf_expr_arg_close(void *Arg)
 {
-    struct lmf_expr_context *context = Context;
-    //if (!hash_table_init(context, 0, sizeof(char *), sizeof(size_t)))
+    struct lmf_expr_arg *arg = arg;
+    free(arg->len);
+    free(arg->ent);
 }
 
-bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric metric, struct log log)
+bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric metric, struct log *log)
 {
     struct lmf_expr_arg *arg = arg;
     struct base_context *context = Context;
@@ -100,32 +94,90 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
     for (;;) switch (context->st)
     {
     case LMF_EXPR_ST_INIT:
+        if (!utf8_is_whitespace_len(utf8.val, utf8.len)) return 1; // Removing leading whitespaces        
         if (!utf8.val) return 1;
-        // Removing leading whitespaces
-        if (utf8_is_whitespace_len(utf8.val, utf8.len)) return 1;
-        context->st = LMF_EXPR_ST_VAR;
-        continue;
+        context->st++;
+        if (!array_init(&arg->len, &arg->len_cap, sizeof(*arg->len), 0, ARRAY_CLEAR, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else
+        {
+            arg->len[arg->len_cnt++]++;
+            continue;
+        }
+        return 0;
+    case LMF_EXPR_ST_VAR_INIT:
+        if (utf8.val == '^' || utf8.val == '*' || utf8.val == '+') log_message_error_str_xml(log, CODE_METRIC, metric, utf8.byte, utf8.len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+        else if (!buff_append(context->buff, utf8.byte, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else
+        {
+            context->reg = utf8.len;
+            context->st++;
+            return 1;
+        }
+        lmf_expr_arg_close(arg);
+        return 0;
     case LMF_EXPR_ST_VAR:
         switch (utf8.val)
         {
         case '\0':
-            // Add to the list
-            return 1;
-        case '^':
-            context->st = LMF_EXPR_ST_NUM;
-            return 1;
-        case '*':
-            if (array_init())
-                break;
-        case '+':
             break;
+        case '^':
+            context->st = LMF_EXPR_ST_WHITESPACE_NUM;
+            break;
+        case '*':
+            context->st = LMF_EXPR_ST_WHITESPACE_VAR;
+            arg->len[arg->len_cnt - 1]++;
+            break;
+        case '+':
+            if (!array_test(&arg->len, &arg->len_cap, sizeof(*arg->len), 0, ARRAY_CLEAR, arg->len_cnt, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            else
+            {
+                arg->len[arg->len_cnt++]++;
+                break;
+            }
+            lmf_expr_arg_close(arg);
+            return 0;
         default:
-            if (!utf8_is_whitespace_len(utf8.val, utf8.len)) context->len = context->buff->len;
-
+            if (!buff_append(context->buff, utf8.byte, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            else
+            {
+                if (!utf8_is_whitespace_len(utf8.val, utf8.len)) context->reg = context->buff->len;
+                return 1;
+            }
+            lmf_expr_arg_close(arg);
+            return 0;
         }
+        if (!array_test(&arg->ent, &arg->ent_cap, sizeof(*arg->ent), 0, 0, arg->ent_cnt, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else
+        {
+            if (!str_pool_insert(context->tbl, context->buff, context->reg, &arg->ent[arg->ent_cnt++].off)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            else return 1;
+        }
+        lmf_expr_arg_close(arg);
+        return 0;
+    case LMF_EXPR_ST_WHITESPACE_VAR:
+        if (!utf8_is_whitespace_len(utf8.val, utf8.len)) return 1;
+        if (utf8.val)
+        {
+            context->st++;
+            continue;
+        }
+        lmf_expr_arg_close(arg);
+        return 0; // Termination error
+    case LMF_EXPR_ST_WHITESPACE_NUM:
+        if (!utf8_is_whitespace_len(utf8.val, utf8.len)) return 1;
+        if (utf8.val < '0' && utf8.val > '9') log_message_error_str_xml(log, CODE_METRIC, metric, utf8.byte, utf8.len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+        context->reg = utf8.val - '0';
+        return 1;
     case LMF_EXPR_ST_NUM:
         switch (utf8.val)
         {
+        case '\0':
+            break;
+        case '*':
+        case '+':
+        default:
+            if (utf8.val < '0' && utf8.val > '9') log_message_error_str_xml(log, CODE_METRIC, metric, utf8.byte, utf8.len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+            else if (size_fused_mul_add(&context->reg,  utf8.val - '0', 10)) log_message_error_val_xml(log, CODE_METRIC, metric, utf8.val, XML_ERROR_VAL_RANGE);
 
         }
 
@@ -133,7 +185,15 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
 }
 
 
-bool lmf_compile(void *Context, struct utf8 utf8, struct text_metric metric, struct log log)
-{
+struct entry {
+    size_t *deg;
+    uint8_t *bits;
+};
 
+bool lmf_matrix(struct lmf_expr_arg *arg)
+{
+    for (size_t i = 0; i < arg->len_cnt; i++)
+    {
+
+    }
 }
