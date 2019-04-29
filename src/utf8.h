@@ -17,7 +17,7 @@ bool utf8_is_overlong(uint32_t, uint8_t);
 bool utf8_is_valid(uint32_t, uint8_t);
 
 // Before proceeding with these functions, 'utf8_is_valid' should be ensured to return 'true'.
-// In many cases length is known explicitly, so it is provided a possibility to pass it directly.
+// In many cases length is known explicitly, so the possibility is provided to pass it directly.
 bool utf8_is_whitespace(uint32_t);
 bool utf8_is_whitespace_len(uint32_t, uint8_t);
 bool utf8_is_xml_char(uint32_t);

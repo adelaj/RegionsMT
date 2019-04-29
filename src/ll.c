@@ -179,14 +179,14 @@ size_t size_mul(size_t *p_hi, size_t a, size_t b)
 size_t size_add(size_t *p_car, size_t x, size_t y)
 {
     unsigned __int64 res;
-    *p_car = _addcarry_u64(0, x, y, &res);
+    *p_car = _addcarry_u64(0, (unsigned __int64) x, (unsigned __int64) y, &res);
     return (size_t) res;
 }
 
 size_t size_sub(size_t *p_bor, size_t x, size_t y)
 {
     unsigned __int64 res;
-    *p_bor = _subborrow_u64(0, x, y, &res);
+    *p_bor = _subborrow_u64(0, (unsigned __int64) x, (unsigned __int64) y, &res);
     return (size_t) res;
 }
 

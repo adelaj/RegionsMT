@@ -35,8 +35,7 @@ bool utf8_is_whitespace(uint32_t utf8_val)
 
 bool utf8_is_whitespace_len(uint32_t utf8_val, uint8_t utf8_len)
 {
-    if (utf8_len == 1) utf8_is_whitespace(utf8_val);
-    return 0;
+    return utf8_len == 1 && utf8_is_whitespace(utf8_val);
 }
 
 bool utf8_is_xml_char(uint32_t utf8_val)

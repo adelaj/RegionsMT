@@ -36,7 +36,7 @@ void lm_test()
 }
 
 struct lmf_reg_context {
-    size_t deg_cnt, bit_cnt;
+    size_t deg_cnt;
 };
 
 struct lmf_reg_entry {
@@ -117,11 +117,11 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
     case LMF_EXPR_ST_INIT:
         if (!utf8_is_whitespace_len(utf8.val, utf8.len)) return 1; // Removing leading whitespaces        
         if (!utf8.val) return 1;
-        context->st++;
         if (!array_init(&arg->len, &arg->len_cap, sizeof(*arg->len), 0, ARRAY_CLEAR, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
             arg->len[arg->len_cnt++]++;
+            context->st++;
             continue;
         }
         return 0;
