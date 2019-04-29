@@ -41,19 +41,18 @@ struct lmf_reg_context {
 
 struct lmf_reg_entry {
     size_t *deg;
-    uint8_t *bit;
+    bool mark;
 };
 
 bool lmf_reg_entry_cmp(const void *A, const void *B, void *Context)
 {
     struct lmf_reg_context *context = Context;
     struct lmf_reg_entry *a = A, *b = B;
-
     size_t i = 0, j;
     for (; i < context->deg_cnt && a->deg[i] > b->deg[i]; i++);
     for (j = i; j < context->deg_cnt && a->deg[i] >= b->deg[i]; j++);
-
-
+    if (j == context->deg_cnt) b->mark = 1;
+    return i > 0;
 }
 
 
