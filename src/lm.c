@@ -55,7 +55,6 @@ bool lmf_reg_entry_cmp(const void *A, const void *B, void *Context)
     return i > 0;
 }
 
-
 struct lmf_name_context {
     char *buff;
     size_t cnt, cap;
@@ -168,11 +167,8 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
             return 0;
         }
         if (!array_test(&arg->ent, &arg->ent_cap, sizeof(*arg->ent), 0, 0, arg->ent_cnt, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-        else
-        {
-            if (!str_pool_insert(context->tbl, context->buff, context->reg, &arg->ent[arg->ent_cnt++].off)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-            else return 1;
-        }
+        else if (!str_pool_insert(context->tbl, context->buff, context->reg, &arg->ent[arg->ent_cnt++].off)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else return 1;
         lmf_expr_arg_close(arg);
         return 0;
     case LMF_EXPR_ST_WHITESPACE_VAR:
@@ -187,21 +183,31 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
     case LMF_EXPR_ST_WHITESPACE_NUM:
         if (!utf8_is_whitespace_len(utf8.val, utf8.len)) return 1;
         if (utf8.val < '0' && utf8.val > '9') log_message_error_str_xml(log, CODE_METRIC, metric, utf8.byte, utf8.len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
-        context->reg = utf8.val - '0';
-        return 1;
+        else
+        {
+            context->reg = utf8.val - '0';
+            context->st++;
+            return 1;
+        }
+        lmf_expr_arg_close(arg);
+        return 0;
     case LMF_EXPR_ST_NUM:
         switch (utf8.val)
         {
         case '\0':
             break;
         case '*':
+            break;
         case '+':
+            break;
         default:
             if (utf8.val < '0' && utf8.val > '9') log_message_error_str_xml(log, CODE_METRIC, metric, utf8.byte, utf8.len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
-            else if (size_fused_mul_add(&context->reg,  utf8.val - '0', 10)) log_message_error_val_xml(log, CODE_METRIC, metric, utf8.val, XML_ERROR_VAL_RANGE);
+            else if (size_fused_mul_add(&context->reg,  utf8.val - '0', 10)) log_message_error_val_xml(log, CODE_METRIC, metric, context->reg, XML_ERROR_VAL_RANGE);
+            else return 1;
 
         }
-
+        arg->ent[arg->ent_cnt - 1].deg = context->reg;
+        return 1;
     }
 }
 

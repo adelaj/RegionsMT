@@ -9,6 +9,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#define ARG_FETCH(FLAG, ARG, TYPE, TYPE_DOM) \
+    ((FLAG) ? *(TYPE *) *(*(void ***) (ARG))++ : Va_arg(*(Va_list *) (ARG), TYPE_DOM))
+
 static void print_unterminated(char *buff, size_t *p_cnt, const char *str, size_t len)
 {
     size_t cnt = *p_cnt;
@@ -41,9 +44,9 @@ void print_time_stamp(char *buff, size_t *p_cnt)
     else *p_cnt = 1;
 }
 
-static bool fmt_execute_time_diff_sec(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
+static bool fmt_execute_time_diff_sec(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute_flags flags)
 {
-    uint32_t sdr = Va_arg(*p_arg, Uint32_dom_t);
+    uint32_t sdr = ARG_FETCH(flags & FMT_EXE_FLAG_PTR, p_arg, uint32_t, Uint32_dom_t);
     if (flags & FMT_EXE_FLAG_PHONY) return 1;
     size_t dig = 0;
     for (uint32_t i = sdr; !(i % 10); dig++, i /= 10);
@@ -113,7 +116,8 @@ enum fmt_flags {
     FMT_OVERPRINT =  2,
     FMT_ENV_BEGIN = 4,
     FMT_ENV_END = 8,
-    FMT_LEFT_JUSTIFY = 16
+    FMT_LEFT_JUSTIFY = 16,
+    FMT_PTR = 32
 };
 
 enum fmt_arg_mode {
@@ -274,6 +278,9 @@ static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
         case '-':
             tmp = FMT_LEFT_JUSTIFY;
             break;
+        case '@':
+            tmp = FMT_PTR;
+            break;
         }
         if (!tmp) break;
         if (res->flags >= tmp) return 1;
@@ -343,7 +350,7 @@ static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
 
 static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_flags, char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    bool u = int_flags & INT_FLAG_UNSIGNED;
+    bool u = int_flags & INT_FLAG_UNSIGNED, ptr = flags & FMT_EXE_FLAG_PTR;
     union {
         int i;
         int8_t ib;
@@ -416,16 +423,16 @@ static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_f
         else val.ill = Va_arg(*p_arg, long long);
         */
     case INT_SPEC_DEFAULT:
-        if (u) val.uj = Va_arg(*p_arg, unsigned);
-        else val.ij = Va_arg(*p_arg, int);
+        if (u) val.uj = ARG_FETCH(ptr, p_arg, unsigned, unsigned);
+        else val.ij = ARG_FETCH(ptr, p_arg, int, int);
         break;
     case INT_SPEC_BYTE:
-        if (u) val.uj = Va_arg(*p_arg, Uint8_dom_t);
-        else val.ij = Va_arg(*p_arg, Int8_dom_t);
+        if (u) val.uj = ARG_FETCH(ptr, p_arg, uint8_t, Uint8_dom_t);
+        else val.ij = ARG_FETCH(ptr, p_arg, int8_t, Int8_dom_t);
         break;
     case INT_SPEC_WORD:
-        if (u) val.uj = Va_arg(*p_arg, Uint16_dom_t);
-        else val.ij = Va_arg(*p_arg, Int16_dom_t);
+        if (u) val.uj = ARG_FETCH(ptr, p_arg, uint16_t, Uint16_dom_t);
+        else val.ij = ARG_FETCH(ptr, p_arg, int16_t, Int16_dom_t);
         break;
     case INT_SPEC_DWORD:
         if (u) val.uj = Va_arg(*p_arg, Uint32_dom_t);

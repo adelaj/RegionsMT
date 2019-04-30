@@ -7,10 +7,11 @@
 
 enum fmt_execute_flags {
     FMT_EXE_FLAG_PHONY = 1,
-    FMT_EXE_FLAG_BLANK = 2
+    FMT_EXE_FLAG_BLANK = 2,
+    FMT_EXE_FLAG_PTR = 4
 };
 
-typedef bool (*fmt_callback)(char *, size_t *, Va_list *, enum fmt_execute_flags);
+typedef bool (*fmt_callback)(char *, size_t *, void *, enum fmt_execute_flags);
 
 void print(char *, size_t *, const char *, size_t);
 bool print_fmt(char *, size_t *, ...);

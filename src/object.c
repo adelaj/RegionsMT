@@ -107,11 +107,18 @@ struct message_xml_context {
     enum xml_status status;
 };
 
-static const char xml_pos_fmt[] = " (file: %<>s; line: %<>uz; character: %<>uz; byte: %<>uq)!\n";
 #define XML_POS_SUBS xml_pos_fmt, log->style.pth, STRL(metric.path), log->style.num, metric.row + 1, log->style.num, metric.col + 1, log->style.num, metric.byte + 1
 
-bool log_message_error_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status)
+bool log_message_error_generic_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *str, size_t len, uint32_t val, enum xml_status status)
 {
+    static const char xml_pos_fmt[] = " (file: %<>s; line: %<>uz; character: %<>uz; byte: %<>uq)!\n";
+    void *xml_pos_fmt_arg[] = {
+        &xml_pos_fmt,
+        &log->style.pth, &metric.path.str, &metric.path.len,
+        &log->style.num, &(size_t) { metric.row + 1 },
+        &log->style.num, &(size_t) { metric.col + 1 },
+        &log->style.num, &(size_t) { metric.byte + 1 }
+    };
     switch (status)
     {
     case XML_ERROR_INVALID_UTF:
@@ -124,13 +131,35 @@ bool log_message_error_xml(struct log *restrict log, struct code_metric code_met
         return log_message_fmt(log, code_metric, MESSAGE_ERROR, "No root element found%$", XML_POS_SUBS);
     case XML_ERROR_COMPILER:
         return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Compiler malfunction%$", XML_POS_SUBS);
+    case XML_ERROR_CHAR_UNEXPECTED_EOF:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected end of file %<>s*%$", log->style.chr, str, len, XML_POS_SUBS);
+    case XML_ERROR_CHAR_UNEXPECTED_CHAR:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected character %<>s*%$", log->style.chr, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_UNEXPECTED_TAG:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected tag %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_UNEXPECTED_ATTRIBUTE:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected attribute %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_ENDING:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected closing tag %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_DUPLICATED_ATTRIBUTE:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Duplicated attribute %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_UNHANDLED_VALUE:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to handle value %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_CONTROL:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid control sequence %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_STR_INVALID_PI:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid processing instruction %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+    case XML_ERROR_VAL_RANGE:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Numeric value %<>ud is out of range%$", log->style.num, val, XML_POS_SUBS);
+    case XML_ERROR_VAL_REFERENCE:
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Numeric value %<>ud referencing to invalid character%$", log->style.num, val, XML_POS_SUBS);
     default:
         break;
     }
     return 0;
 }
 
-bool log_message_error_str_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, char *str, size_t len, enum xml_status status)
+bool log_message_error_str_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *str, size_t len, enum xml_status status)
 {
     switch (status)
     {
@@ -170,6 +199,19 @@ bool log_message_error_val_xml(struct log *restrict log, struct code_metric code
         break;
     }
     return 0;
+}
+
+bool log_message_error_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status)
+{
+
+}
+
+bool log_message_error_str_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *str, size_t len, enum xml_status status)
+{
+}
+
+bool log_message_error_val_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, uint32_t val, enum xml_status status)
+{
 }
 
 ///////////////////////////////////////////////////////////////////////////////
