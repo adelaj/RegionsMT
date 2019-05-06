@@ -476,10 +476,10 @@ static void fmt_execute_char(size_t rep, enum fmt_arg_mode mode, char *buff, siz
     *p_cnt = rep;
 }
 
-static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
+static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute_flags flags)
 {
-    void *p_arg_list;
-    bool ptr = flags & FMT_EXE_FLAG_PTR;
+    void *p_arg_list = NULL, **pp_arg = NULL;
+    bool ptr = flags & FMT_EXE_FLAG_PTR, ptr_list = 0;
     const char *fmt = ARG_FETCH(ptr, p_arg, const char *, const char *);
     if (!fmt)
     {
@@ -527,15 +527,19 @@ static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_exec
     case 3:
         if (!fmt_decode(&res, fmt, &pos)) return 0;
         tf = flags;
-        if (res.flags & FMT_PTR)
+        ptr_list = res.flags & FMT_PTR;
+        if (ptr_list)
         {
-            p_arg_list = ARG_FETCH(ptr, *p_arg, void *);
-            tf |= 
+            p_arg_list = ARG_FETCH(ptr, p_arg, void *, void *);
+            pp_arg = &p_arg_list;
+            tf |= FMT_EXE_FLAG_PTR;
+            ptr_list = ptr_list || ptr;
         }
-        if ((res.flags & FMT_CONDITIONAL) && !Va_arg(*p_arg, int)) tf |= FMT_EXE_FLAG_PHONY;
+        else pp_arg = &p_arg;
+        if ((res.flags & FMT_CONDITIONAL) && !ARG_FETCH(ptr_list, *pp_arg, bool, int)) tf |= FMT_EXE_FLAG_PHONY;
         if (res.flags & (FMT_ENV_BEGIN | FMT_ENV_END))
         {
-            env = Va_arg(*p_arg, struct env);
+            env = ARG_FETCH(ptr_list, *pp_arg, struct env, struct env);
             if (!(tf & FMT_EXE_FLAG_PHONY) && (res.flags & FMT_ENV_BEGIN)) print_unterminated(buff + cnt, &len, STRL(env.begin));
             else i++;
         }
@@ -545,31 +549,31 @@ static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_exec
         switch (res.type)
         {
         case TYPE_INT:
-            if (!fmt_execute_int(res.int_arg.spec, res.int_arg.flags, buff + cnt, &len, p_arg, tf)) return 0;
+            if (!fmt_execute_int(res.int_arg.spec, res.int_arg.flags, buff + cnt, &len, *pp_arg, tf)) return 0;
             break;
         case TYPE_STR: 
-            fmt_execute_str(res.str_arg.len, res.str_arg.mode, buff + cnt, &len, p_arg, tf);
+            fmt_execute_str(res.str_arg.len, res.str_arg.mode, buff + cnt, &len, *pp_arg, tf);
             break;
         case TYPE_TIME_DIFF:
-            if (!fmt_execute_time_diff(buff + cnt, &len, p_arg, tf)) return 0;
+            if (!fmt_execute_time_diff(buff + cnt, &len, *pp_arg, tf)) return 0;
             break;
         case TYPE_TIME_STAMP:
             if (!(tf & FMT_EXE_FLAG_PHONY)) print_time_stamp(buff + cnt, &len);
             break;
         case TYPE_CRT:
-            fmt_execute_crt(buff + cnt, &len, p_arg, tf);
+            fmt_execute_crt(buff + cnt, &len, *pp_arg, tf);
             break;
         case TYPE_FMT:
-            if (!fmt_execute(buff + cnt, &len, p_arg, tf)) return 0;
+            if (!fmt_execute(buff + cnt, &len, *pp_arg, tf)) return 0;
             break;
         case TYPE_DEFAULT:
-            fmt_execute_default(res.str_arg.len, res.str_arg.mode, &len, p_arg, tf);
+            fmt_execute_default(res.str_arg.len, res.str_arg.mode, &len, *pp_arg, tf);
             break;
         case TYPE_CALLBACK:
-            if (!Va_arg(*p_arg, fmt_callback)(buff + cnt, &len, p_arg, tf)) return 0;
+            if (!ARG_FETCH(ptr_list, *pp_arg, fmt_callback, fmt_callback)(buff + cnt, &len, *pp_arg, tf)) return 0;
             break;
         case TYPE_CHAR:
-            fmt_execute_char(res.char_arg.rep, res.char_arg.mode, buff + cnt, &len, p_arg, tf);
+            fmt_execute_char(res.char_arg.rep, res.char_arg.mode, buff + cnt, &len, *pp_arg, tf);
             break;
         case TYPE_FLT: // NOT IMPLEMENTED!
         case TYPE_PERC:
