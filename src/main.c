@@ -508,6 +508,69 @@ static int Main(int argc, char **argv)
 #if _WIN32
 #   include <windows.h>
 
+// Translating UTF-16 command-line parameters to UTF-8
+bool argv_from_wargv(char ***p_argv, size_t argc, wchar_t **wargv)
+{
+    char **argv;
+    if (!array_init(&argv, NULL, argc, sizeof(*argv), 0, ARRAY_STRICT)) return 0;
+    size_t base_cnt = 0, i;
+    for (i = 0; i < argc; i++) // Determining total length and performing error checking
+    {
+        wchar_t *word = wargv[i];
+        uint32_t val;
+        uint8_t context = 0;
+        for (; *word; word++)
+        {
+            if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) break;
+            if (!context) base_cnt += utf8_len(val);
+        }
+        if (*word) break;
+        base_cnt++;
+    }
+    if (i == argc)
+    {
+        if (!argc) return 1;
+        char *base;
+        if (array_init(&base, NULL, base_cnt, sizeof(*base), 0, ARRAY_STRICT))
+        {
+            char *byte = base;
+            for (i = 0; i < argc; i++) // Performing translation
+            {
+                argv[i] = byte;
+                wchar_t *word = wargv[i];
+                uint32_t val;
+                uint8_t context = 0;
+                for (; *word; word++)
+                {
+                    if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) break;
+                    if (!context)
+                    {
+                        uint8_t len;
+                        utf8_encode(val, (uint8_t *) byte, &len);
+                        byte += len;
+                    }
+                }
+                if (*word) break;
+                *(byte++) = '\0';
+            }
+            if (i == argc)
+            {
+                *p_argv = argv;
+                return 1;
+            }
+            free(base);
+        }
+    }
+    free(argv);
+    return 0;
+}
+
+void argv_dispose(size_t argc, char **argv)
+{
+    if (argc) free(argv[0]);
+    free(argv);
+}
+
 int wmain(int argc, wchar_t **wargv)
 {
     // Memory leaks will be reported at the program exit
@@ -522,56 +585,11 @@ int wmain(int argc, wchar_t **wargv)
     // Making console output UTF-8 friendly
     if (!SetConsoleOutputCP(CP_UTF8)) return EXIT_FAILURE;
     
-    // Translating UTF-16 command-line parameters to UTF-8
+    // Performing UTF-16LE to UTF-8 translation and executing main routine
     char **argv;
-    int main_res = EXIT_FAILURE;
-    if (array_init(&argv, NULL, argc, sizeof(*argv), 0, ARRAY_STRICT))
-    {
-        size_t base_cnt = 0, i;
-        for (i = 0; i < (size_t) argc; i++) // Determining total length and performing error checking
-        {
-            wchar_t *word = wargv[i];
-            uint32_t val;
-            uint8_t context = 0;
-            for (; *word; word++)
-            {
-                if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) break;
-                if (!context) base_cnt += utf8_len(val);
-            }
-            if (*word) break;
-            else base_cnt++;
-        }
-        if (i == (size_t) argc)
-        {
-            char *base;
-            if (array_init(&base, NULL, base_cnt, sizeof(*base), 0, ARRAY_STRICT))
-            {
-                char *byte = base;
-                for (i = 0; i < (size_t) argc; i++) // Performing translation
-                {
-                    argv[i] = byte;
-                    wchar_t *word = wargv[i];
-                    uint32_t val;
-                    uint8_t context = 0;
-                    for (; *word; word++)
-                    {
-                        if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) break;
-                        if (!context)
-                        {
-                            uint8_t len;
-                            utf8_encode(val, (uint8_t *) byte, &len);
-                            byte += len;
-                        }
-                    }
-                    if (*word) break;
-                    else *(byte++) = '\0';
-                }
-                if (i == (size_t) argc) main_res = Main(argc, argv);
-                free(base);
-            }
-        }
-        free(argv);
-    }
+    if (!argv_from_wargv(&argv, argc, wargv)) return EXIT_FAILURE;
+    int main_res = Main(argc, argv);
+    argv_dispose(argc, argv);
     return main_res;
 }
 

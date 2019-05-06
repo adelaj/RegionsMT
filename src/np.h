@@ -34,6 +34,8 @@ typedef int Errno_t;
 
 #endif
 
+typedef Errno_t Errno_dom_t;
+
 #include "common.h"
 
 #include <stdarg.h>

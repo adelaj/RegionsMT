@@ -377,51 +377,6 @@ static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_f
     } val = { .uj = 0 };
     switch (int_spec)
     {
-    /*
-    case INT_SPEC_DEFAULT:
-        if (u) val.u = Va_arg(*p_arg, unsigned);
-        else val.i = Va_arg(*p_arg, int);
-        break;
-    case INT_SPEC_BYTE:
-        if (u) val.ub = (uint8_t) Va_arg(*p_arg, Uint8_dom_t);
-        else val.ib = (int8_t) Va_arg(*p_arg, Int8_dom_t);
-        break;
-    case INT_SPEC_WORD:
-        if (u) val.uw = (uint16_t) Va_arg(*p_arg, Uint16_dom_t);
-        else val.iw = (int16_t) Va_arg(*p_arg, Int16_dom_t);
-        break;
-    case INT_SPEC_DWORD:
-        if (u) val.ud = (uint32_t) Va_arg(*p_arg, Uint32_dom_t);
-        else val.id = (int32_t) Va_arg(*p_arg, Int32_dom_t);
-        break;
-    case INT_SPEC_QWORD:
-        if (u) val.uq = (uint64_t) Va_arg(*p_arg, Uint64_dom_t);
-        else val.iq = (int64_t) Va_arg(*p_arg, Int64_dom_t);
-        break;
-    case INT_SPEC_SIZE:
-        if (u) val.uz = (size_t) Va_arg(*p_arg, Size_dom_t);
-        else val.iz = (ptrdiff_t) Va_arg(*p_arg, Ptrdiff_dom_t);
-        break;
-    case INT_SPEC_MAX:
-        if (u) val.uj = (uintmax_t) Va_arg(*p_arg, Uintmax_dom_t);
-        else val.ij = (intmax_t) Va_arg(*p_arg, Intmax_dom_t);
-        break;
-    case INT_SPEC_SHRTSHRT:
-        if (u) val.uhh = Va_arg(*p_arg, unsigned);
-        else val.ihh = Va_arg(*p_arg, int);
-        break;
-    case INT_SPEC_SHRT:
-        if (u) val.uh = Va_arg(*p_arg, unsigned);
-        else val.ih = Va_arg(*p_arg, int);
-        break;
-    case INT_SPEC_LONG:
-        if (u) val.ul = Va_arg(*p_arg, unsigned long);
-        else val.il = Va_arg(*p_arg, long);
-        break;
-    case INT_SPEC_LONGLONG:
-        if (u) val.ull = Va_arg(*p_arg, unsigned long long);
-        else val.ill = Va_arg(*p_arg, long long);
-        */
     case INT_SPEC_DEFAULT:
         if (u) val.uj = ARG_FETCH(ptr, p_arg, unsigned, unsigned);
         else val.ij = ARG_FETCH(ptr, p_arg, int, int);
@@ -435,36 +390,36 @@ static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_f
         else val.ij = ARG_FETCH(ptr, p_arg, int16_t, Int16_dom_t);
         break;
     case INT_SPEC_DWORD:
-        if (u) val.uj = Va_arg(*p_arg, Uint32_dom_t);
-        else val.ij = Va_arg(*p_arg, Int32_dom_t);
+        if (u) val.uj = ARG_FETCH(ptr, p_arg, uint32_t, Uint32_dom_t);
+        else val.ij = ARG_FETCH(ptr, p_arg, int32_t, Int32_dom_t);
         break;
     case INT_SPEC_QWORD:
-        if (u) val.uj = Va_arg(*p_arg, Uint64_dom_t);
-        else val.ij = Va_arg(*p_arg, Int64_dom_t);
+        if (u) val.uj = ARG_FETCH(ptr, p_arg, uint64_t, Uint64_dom_t);
+        else val.ij = ARG_FETCH(ptr, p_arg, int64_t, Int64_dom_t);
         break;
     case INT_SPEC_SIZE:
-        if (u) val.uj = Va_arg(*p_arg, Size_dom_t);
-        else val.ij = Va_arg(*p_arg, Ptrdiff_dom_t);
+        if (u) val.uj = ARG_FETCH(ptr, p_arg, size_t, Size_dom_t);
+        else val.ij = ARG_FETCH(ptr, p_arg, ptrdiff_t, Ptrdiff_dom_t);
         break;
     case INT_SPEC_MAX:
-        if (u) val.uj = Va_arg(*p_arg, Uintmax_dom_t);
-        else val.ij = Va_arg(*p_arg, Intmax_dom_t);
+        if (u) val.uj = ARG_FETCH(ptr, p_arg, uintmax_t, Uintmax_dom_t);
+        else val.ij = ARG_FETCH(ptr, p_arg, intmax_t, Intmax_dom_t);
         break;
     case INT_SPEC_SSHRT:
-        if (u) val.uj = Va_arg(*p_arg, unsigned);
-        else val.ij = Va_arg(*p_arg, int);
+        if (u) val.uj = ARG_FETCH(ptr, p_arg, unsigned, unsigned);
+        else val.ij = ARG_FETCH(ptr, p_arg, int, int);
         break;
     case INT_SPEC_SHRT:
-        if (u) val.uj = Va_arg(*p_arg, unsigned);
-        else val.ij = Va_arg(*p_arg, int);
+        if (u) val.uj = ARG_FETCH(ptr, p_arg, unsigned, unsigned);
+        else val.ij = ARG_FETCH(ptr, p_arg, int, int);
         break;
     case INT_SPEC_LONG:
-        if (u) val.uj = Va_arg(*p_arg, unsigned long);
-        else val.ij = Va_arg(*p_arg, long);
+        if (u) val.uj = ARG_FETCH(ptr, p_arg, unsigned long, unsigned long);
+        else val.ij = ARG_FETCH(ptr, p_arg, long, long);
         break;
     case INT_SPEC_LLONG:
-        if (u) val.uj = Va_arg(*p_arg, unsigned long long);
-        else val.ij = Va_arg(*p_arg, long long);
+        if (u) val.uj = ARG_FETCH(ptr, p_arg, unsigned long long, unsigned long long);
+        else val.ij = ARG_FETCH(ptr, p_arg, long long, long long);
     }
     if (flags & FMT_EXE_FLAG_PHONY) *p_cnt = 0;
     else
@@ -484,34 +439,37 @@ static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_f
 
 static void fmt_execute_str(size_t len, enum fmt_arg_mode mode, char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    const char *str = Va_arg(*p_arg, const char *);
-    if (mode == ARG_FETCH) len = Va_arg(*p_arg, Size_dom_t);
+    bool ptr = flags & FMT_EXE_FLAG_PTR;
+    const char *str = ARG_FETCH(ptr, p_arg, const char *, const char *);
+    if (mode == ARG_FETCH) len = ARG_FETCH(ptr, p_arg, size_t, Size_dom_t);
     if (!(flags & FMT_EXE_FLAG_PHONY)) print(buff, p_cnt, str, mode == ARG_DEFAULT ? Strnlen(str, *p_cnt) : len);
 }
 
 static bool fmt_execute_time_diff(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    uint64_t start = Va_arg(*p_arg, Uint64_dom_t), stop = Va_arg(*p_arg, Uint64_dom_t);
+    bool ptr = flags & FMT_EXE_FLAG_PTR;
+    uint64_t start = ARG_FETCH(ptr, p_arg, uint64_t, Uint64_dom_t), stop = ARG_FETCH(ptr, p_arg, uint64_t, Uint64_dom_t);
     if (flags & FMT_EXE_FLAG_PHONY) return 1;
     return print_time_diff(buff, p_cnt, start, stop);
 }
 
 static void fmt_execute_crt(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    Errno_t err = Va_arg(*p_arg, Errno_t);
+    Errno_t err = ARG_FETCH(flags & FMT_EXE_FLAG_PTR, p_arg, Errno_t, Errno_dom_t);
     if (!(flags & FMT_EXE_FLAG_PHONY)) print_crt(buff, p_cnt, err);
 }
 
 static void fmt_execute_default(size_t len, enum fmt_arg_mode mode, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    if (mode == ARG_FETCH) len = Va_arg(*p_arg, Size_dom_t);
+    if (mode == ARG_FETCH) len = ARG_FETCH(flags & FMT_EXE_FLAG_PTR, p_arg, size_t, Size_dom_t);
     if (!(flags & FMT_EXE_FLAG_PHONY)) *p_cnt = len;
 }
 
 static void fmt_execute_char(size_t rep, enum fmt_arg_mode mode, char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    int ch = Va_arg(*p_arg, int);
-    if (mode == ARG_FETCH) rep = Va_arg(*p_arg, Size_dom_t);
+    bool ptr = flags & FMT_EXE_FLAG_PTR;
+    int ch = ARG_FETCH(ptr, p_arg, char, int);
+    if (mode == ARG_FETCH) rep = ARG_FETCH(ptr, p_arg, size_t, Size_dom_t);
     if (flags & FMT_EXE_FLAG_PHONY) return;
     if (mode == ARG_DEFAULT) rep = 1;
     if (rep <= *p_cnt) memset(buff, ch, rep * sizeof(buff));
@@ -520,7 +478,9 @@ static void fmt_execute_char(size_t rep, enum fmt_arg_mode mode, char *buff, siz
 
 static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
-    const char *fmt = Va_arg(*p_arg, const char *);
+    void *p_arg_list;
+    bool ptr = flags & FMT_EXE_FLAG_PTR;
+    const char *fmt = ARG_FETCH(ptr, p_arg, const char *, const char *);
     if (!fmt)
     {
         if (!(flags & FMT_EXE_FLAG_PHONY)) *p_cnt = 0;
@@ -567,6 +527,11 @@ static bool fmt_execute(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_exec
     case 3:
         if (!fmt_decode(&res, fmt, &pos)) return 0;
         tf = flags;
+        if (res.flags & FMT_PTR)
+        {
+            p_arg_list = ARG_FETCH(ptr, *p_arg, void *);
+            tf |= 
+        }
         if ((res.flags & FMT_CONDITIONAL) && !Va_arg(*p_arg, int)) tf |= FMT_EXE_FLAG_PHONY;
         if (res.flags & (FMT_ENV_BEGIN | FMT_ENV_END))
         {
