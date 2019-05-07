@@ -97,16 +97,18 @@ size_t size_pop_cnt(size_t x)
 #elif defined _MSC_BUILD
 #   include <intrin.h>
 
-#   define DECLARE_LOAD_ACQUIRE(TYPE, PREFIX, BACKEND_CAST, BACKEND) \
+// Acquire semantics imposed by volatility. Should be used only with '/volatile:ms' option
+#   define DECLARE_LOAD_ACQUIRE(TYPE, PREFIX) \
         TYPE PREFIX ## _load_acquire(TYPE volatile *src) \
         { \
-            return (TYPE) BACKEND((BACKEND_CAST volatile *) src, 0); \
+            return *src; \
         }
 
-#   define DECLARE_STORE_RELEASE(TYPE, PREFIX, BACKEND_CAST, BACKEND) \
+// Release semantics imposed by volatility. Should be used only with '/volatile:ms' option
+#   define DECLARE_STORE_RELEASE(TYPE, PREFIX) \
         void PREFIX ## _store_release(TYPE volatile *dst, TYPE val) \
         { \
-            BACKEND((BACKEND_CAST volatile *) dst, val); \
+            *dst = val; \
         }
 
 #   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX, BACKEND_CAST, BACKEND) \
@@ -121,15 +123,15 @@ size_t size_pop_cnt(size_t x)
             return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, msk); \
         }
 
-static DECLARE_LOAD_ACQUIRE(long, spinlock, long, _InterlockedOr)
-static DECLARE_STORE_RELEASE(long, spinlock, long, _InterlockedExchange)
+static DECLARE_LOAD_ACQUIRE(long, spinlock)
+static DECLARE_STORE_RELEASE(long, spinlock)
 static DECLARE_INTERLOCKED_COMPARE_EXCHANGE(long, spinlock, long, _InterlockedCompareExchange)
 
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, void *, _InterlockedCompareExchangePointer)
 
-DECLARE_LOAD_ACQUIRE(uint8_t, uint8, char, _InterlockedOr8)
-DECLARE_LOAD_ACQUIRE(uint16_t, uint16, short, _InterlockedOr16)
-DECLARE_LOAD_ACQUIRE(uint32_t, uint32, long, _InterlockedOr)
+DECLARE_LOAD_ACQUIRE(uint8_t, uint8)
+DECLARE_LOAD_ACQUIRE(uint16_t, uint16)
+DECLARE_LOAD_ACQUIRE(uint32_t, uint32)
 
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, char, _InterlockedOr8)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, short, _InterlockedOr16)
@@ -155,8 +157,8 @@ uint32_t uint32_pop_cnt(uint32_t x)
 
 #   ifdef _M_X64
 
-DECLARE_LOAD_ACQUIRE(uint64_t, uint64, long long, _InterlockedOr64)
-DECLARE_LOAD_ACQUIRE(size_t, size, long long, _InterlockedOr64)
+DECLARE_LOAD_ACQUIRE(uint64_t, uint64)
+DECLARE_LOAD_ACQUIRE(size_t, size)
 
 void size_inc_interlocked(volatile size_t *mem)
 {
