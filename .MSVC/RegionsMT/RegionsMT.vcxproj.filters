@@ -120,6 +120,9 @@
     <ClInclude Include="src\intdom.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="..\..\RegionsMT\src\lm.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="src\argv.c">
@@ -208,6 +211,9 @@
     </ClCompile>
     <ClCompile Include="src\test\categorical.c">
       <Filter>Source Files\test</Filter>
+    </ClCompile>
+    <ClCompile Include="..\..\RegionsMT\src\lm.c">
+      <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>
