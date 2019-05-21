@@ -394,7 +394,8 @@ static int Main(int argc, char **argv)
     *(size_t *) persistent_array_fetch(&arr, 127, 8) = 10;
     *(size_t *) persistent_array_fetch(&arr, 510, 8) = 10;
     */
-    lm_test();
+
+    //lm_test();
 
     bool succ = 1;
     struct style style = {
@@ -410,7 +411,7 @@ static int Main(int argc, char **argv)
     struct log log;
     if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, style, NULL))
     {
-        log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "AA%!-s1%1C.\n", "B");
+        log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1%1C%$F", "B", "%$E", "D" }, "G%%.\n");
         
         size_t pos_cnt;
         char **pos_arr;

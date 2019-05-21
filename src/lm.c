@@ -101,16 +101,15 @@ enum {
 
 void lmf_expr_arg_close(void *Arg)
 {
-    struct lmf_expr_arg *arg = arg;
+    struct lmf_expr_arg *arg = Arg;
     free(arg->len);
     free(arg->ent);
 }
 
 bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric metric, struct log *log)
 {
-    struct lmf_expr_arg *arg = arg;
+    struct lmf_expr_arg *arg = Arg;
     struct base_context *context = Context;
-
     for (;;) switch (context->st)
     {
     case LMF_EXPR_ST_INIT:
@@ -202,15 +201,13 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
             break;
         default:
             if (utf8.val < '0' && utf8.val > '9') log_message_error_str_xml(log, CODE_METRIC, metric, utf8.byte, utf8.len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
-            else if (size_fused_mul_add(&context->reg,  utf8.val - '0', 10)) log_message_error_val_xml(log, CODE_METRIC, metric, context->reg, XML_ERROR_VAL_RANGE);
+            else if (size_fused_mul_add(&context->reg, utf8.val - '0', 10)) log_message_error_val_xml(log, CODE_METRIC, metric, context->reg, XML_ERROR_VAL_RANGE);
             else return 1;
-
         }
         arg->ent[arg->ent_cnt - 1].deg = context->reg;
         return 1;
     }
 }
-
 
 struct entry {
     size_t *deg;

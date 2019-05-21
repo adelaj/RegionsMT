@@ -120,7 +120,7 @@
     <ClInclude Include="src\intdom.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\RegionsMT\src\lm.h">
+    <ClInclude Include="src\lm.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>
@@ -197,9 +197,6 @@
     <ClCompile Include="src\module\root.c">
       <Filter>Source Files\module</Filter>
     </ClCompile>
-    <ClCompile Include="src\test\utf8.c">
-      <Filter>Source Files\test</Filter>
-    </ClCompile>
     <ClCompile Include="src\test\sort.c">
       <Filter>Source Files\test</Filter>
     </ClCompile>
@@ -212,8 +209,11 @@
     <ClCompile Include="src\test\categorical.c">
       <Filter>Source Files\test</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\RegionsMT\src\lm.c">
+    <ClCompile Include="src\lm.c">
       <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="src\test\utf8.c">
+      <Filter>Source Files\test</Filter>
     </ClCompile>
   </ItemGroup>
 </Project>

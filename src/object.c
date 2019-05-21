@@ -6,6 +6,7 @@
 #include "ll.h"
 #include "strproc.h"
 #include "utf8.h"
+#include "intdom.h"
 
 #include <errno.h>
 #include <inttypes.h>
@@ -109,109 +110,86 @@ struct message_xml_context {
 
 #define XML_POS_SUBS xml_pos_fmt, log->style.pth, STRL(metric.path), log->style.num, metric.row + 1, log->style.num, metric.col + 1, log->style.num, metric.byte + 1
 
-bool log_message_error_generic_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *str, size_t len, uint32_t val, enum xml_status status)
+static bool log_message_error_generic_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status, ...)
 {
-    static const char xml_pos_fmt[] = " (file: %<>s; line: %<>uz; character: %<>uz; byte: %<>uq)!\n";
-    void *xml_pos_fmt_arg[] = {
-        &xml_pos_fmt,
-        &log->style.pth, &metric.path.str, &metric.path.len,
+    static const char fmt[] = " (file: %<>s; line: %<>uz; character: %<>uz; byte: %<>uq)!\n";
+    const void *fmt_sub[] = {
+        fmt,
+        &log->style.pth, metric.path.str, &metric.path.len,
         &log->style.num, &(size_t) { metric.row + 1 },
         &log->style.num, &(size_t) { metric.col + 1 },
-        &log->style.num, &(size_t) { metric.byte + 1 }
+        &log->style.num, &(uint64_t) { metric.byte + 1 }
     };
+    Va_list arg;
+    Va_start(arg, status);
     switch (status)
     {
     case XML_ERROR_INVALID_UTF:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid UTF-8 byte sequence%$", XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid UTF-8 byte sequence%@@$", fmt_sub);
     case XML_ERROR_INVALID_CHAR:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid character%$", XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid character%@@$", fmt_sub);
     case XML_ERROR_DECL:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid XML declaration%$", XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid XML declaration%@@$", fmt_sub);
     case XML_ERROR_ROOT:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "No root element found%$", XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "No root element found%@@$", fmt_sub);
     case XML_ERROR_COMPILER:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Compiler malfunction%$", XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Compiler malfunction%@@$", fmt_sub);
     case XML_ERROR_CHAR_UNEXPECTED_EOF:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected end of file %<>s*%$", log->style.chr, str, len, XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected end of file %<>@s*%@@$", &arg, fmt_sub);
     case XML_ERROR_CHAR_UNEXPECTED_CHAR:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected character %<>s*%$", log->style.chr, str, len, XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected character %<>@s*%@@$", &arg, fmt_sub);
     case XML_ERROR_STR_UNEXPECTED_TAG:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected tag %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected tag %<>@s*%@@$", &arg, fmt_sub);
     case XML_ERROR_STR_UNEXPECTED_ATTRIBUTE:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected attribute %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected attribute %<>@s*%@@$", &arg, fmt_sub);
     case XML_ERROR_STR_ENDING:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected closing tag %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected closing tag %<>@s*%@@$", &arg, fmt_sub);
     case XML_ERROR_STR_DUPLICATED_ATTRIBUTE:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Duplicated attribute %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Duplicated attribute %<>@s*%@@$", &arg, fmt_sub);
     case XML_ERROR_STR_UNHANDLED_VALUE:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to handle value %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to handle value %<>@s*%@@$", &arg, fmt_sub);
     case XML_ERROR_STR_CONTROL:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid control sequence %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid control sequence %<>@s*%@@$", &arg, fmt_sub);
     case XML_ERROR_STR_INVALID_PI:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid processing instruction %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid processing instruction %<>@s*%@@$", &arg, fmt_sub);
     case XML_ERROR_VAL_RANGE:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Numeric value %<>ud is out of range%$", log->style.num, val, XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Numeric value %<>@ud is out of range%@@$", &arg, fmt_sub);
     case XML_ERROR_VAL_REFERENCE:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Numeric value %<>ud referencing to invalid character%$", log->style.num, val, XML_POS_SUBS);
+        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Numeric value %<>@ud referencing to invalid character%@@$", &arg, fmt_sub);
     default:
         break;
     }
-    return 0;
-}
-
-bool log_message_error_str_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *str, size_t len, enum xml_status status)
-{
-    switch (status)
-    {
-    case XML_ERROR_CHAR_UNEXPECTED_EOF:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected end of file %<>s*%$", log->style.chr, str, len, XML_POS_SUBS);
-    case XML_ERROR_CHAR_UNEXPECTED_CHAR:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected character %<>s*%$", log->style.chr, str, len, XML_POS_SUBS);
-    case XML_ERROR_STR_UNEXPECTED_TAG:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected tag %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
-    case XML_ERROR_STR_UNEXPECTED_ATTRIBUTE:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected attribute %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
-    case XML_ERROR_STR_ENDING:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unexpected closing tag %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
-    case XML_ERROR_STR_DUPLICATED_ATTRIBUTE:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Duplicated attribute %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
-    case XML_ERROR_STR_UNHANDLED_VALUE:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to handle value %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
-    case XML_ERROR_STR_CONTROL:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid control sequence %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
-    case XML_ERROR_STR_INVALID_PI:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Invalid processing instruction %<>s*%$", log->style.str, str, len, XML_POS_SUBS);
-    default:
-        break;
-    }
-    return 0;
-}
-
-bool log_message_error_val_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, uint32_t val, enum xml_status status)
-{
-    switch (status)
-    {
-    case XML_ERROR_VAL_RANGE:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Numeric value %<>ud is out of range%$", log->style.num, val, XML_POS_SUBS);
-    case XML_ERROR_VAL_REFERENCE:
-        return log_message_fmt(log, code_metric, MESSAGE_ERROR, "Numeric value %<>ud referencing to invalid character%$", log->style.num, val, XML_POS_SUBS);
-    default:
-        break;
-    }
+    Va_end(arg);
     return 0;
 }
 
 bool log_message_error_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status)
 {
-
+	return log_message_error_generic_xml(log, code_metric, metric, status);
 }
 
-bool log_message_error_str_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, const char *str, size_t len, enum xml_status status)
+bool log_message_error_str_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status, const char *str, size_t len)
 {
+	return log_message_error_generic_xml(log, code_metric, metric, status, log->style.str, str, len);
 }
 
-bool log_message_error_val_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, uint32_t val, enum xml_status status)
+bool log_message_error_chr_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status, const char *str, size_t len)
 {
+    return log_message_error_generic_xml(log, code_metric, metric, status, log->style.chr, str, len);
+}
+
+bool log_message_error_val_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status, uint32_t val)
+{
+	return log_message_error_generic_xml(log, code_metric, metric, status, log->style.num, val);
+}
+
+bool log_message_error_user_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status, ...)
+{
+    Va_list arg;
+    Va_start(arg, status);
+    bool res = log_message_error_generic_xml(log, code_metric, metric, status, &arg);
+    Va_end(arg);
+    return res;
 }
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -356,7 +334,7 @@ static unsigned xml_char_ref_impl(uint32_t *p_val, bool hex, struct utf8 *utf8, 
         if (val != utf8->val)
         {
             *p_val &= 0x7fffffff; // 'init' flag should be resetted        
-            if (uint32_fused_mul_add(p_val, hex ? 16 : 10, val)) log_message_error_val_xml(log, CODE_METRIC, metric, path, utf8->val, XML_ERROR_VAL_RANGE);
+            if (uint32_fused_mul_add(p_val, hex ? 16 : 10, val)) log_message_error_val_xml(log, CODE_METRIC, metric, XML_ERROR_VAL_RANGE, path, utf8->val);
             else
             {
                 *p_val |= 0x80000000;
@@ -736,6 +714,7 @@ struct xml_decl_context {
     struct text_metric *snapshot;
 };
 
+/*
 static unsigned xml_decl_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric metric, struct log log)
 {
     switch (utf8.val)
@@ -749,8 +728,9 @@ static unsigned xml_decl_impl(void *Arg, void *Context, struct utf8 utf8, struct
         }
     }
 }
+*/
 
-static bool xml_decl_impl(uint32_t *restrict p_st, struct xml_decl_context context, struct bits *bits, struct utf8 *restrict utf8, struct buff *restrict buff, struct text_metric metric, const char *restrict path, struct log *restrict log)
+static bool xml_decl_impl(uint32_t *restrict p_st, struct xml_decl_context context, struct bits *bits, struct utf8 *restrict utf8, struct buff *restrict buff, struct text_metric metric, struct log *restrict log)
 {
     uint32_t st = *p_st;
     for (;;)
@@ -783,20 +763,20 @@ static bool xml_decl_impl(uint32_t *restrict p_st, struct xml_decl_context conte
                 st = XML_DECL_ST_ATTRIBUTE_A_BEGIN;
                 continue;
             }
-            log_message_error_char_xml(log, CODE_METRIC, metric, path, utf8->byte, utf8->len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+            log_message_error_char_xml(log, CODE_METRIC, metric, utf8->byte, utf8->len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
             return 0;
         case XML_DECL_ST_END_A:
             if (utf8->val == '>')
             {
                 // Checking if version number is provided in the XML declaration
-                if (bits->arr && !uint8_bit_test(bits->arr, 0)) log_message_error_xml(log, CODE_METRIC, metric, path, XML_ERROR_DECL);
+                if (bits->arr && !uint8_bit_test(bits->arr, 0)) log_message_error_xml(log, CODE_METRIC, metric, XML_ERROR_DECL);
                 else
                 {
                     st = 0;
                     break;
                 }
             }
-            else log_message_error_char_xml(log, CODE_METRIC, metric, path, utf8->byte, utf8->len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+            else log_message_error_char_xml(log, CODE_METRIC, metric, utf8->byte, utf8->len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
             return 0;
             
             /*
@@ -826,7 +806,7 @@ static bool xml_decl_impl(uint32_t *restrict p_st, struct xml_decl_context conte
             if (XML_DECL_ST_ATTRIBUTE_A_BEGIN <= st && st <= XML_DECL_ST_ATTRIBUTE_A_END)
             {
                 st -= XML_DECL_ST_ATTRIBUTE_A_BEGIN;
-                if (!xml_att_impl(&st, (struct xml_att_context) { .snapshot = &context.snapshot }, NULL, NULL, xml_decl_val_selector, NULL, NULL, bits, utf8, buff, metric, path, log)) return 0;
+                if (!xml_att_impl(&st, (struct xml_att_context) { .snapshot = &context.snapshot }, NULL, NULL, xml_decl_val_selector, NULL, NULL, bits, utf8, buff, metric, log)) return 0;
                 if (!st) st++;
             }
         }
@@ -1016,7 +996,7 @@ static bool xml_doc_impl(struct xml_context *context, struct utf8 *utf8, struct 
             {
                 // Not implemented
             }
-            log_message_error_xml(log, CODE_METRIC, metric, path, XML_ERROR_COMPILER);
+            log_message_error_xml(log, CODE_METRIC, metric, XML_ERROR_COMPILER);
             return 0;
                 /*
                 
@@ -1074,7 +1054,7 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
     size_t dep = 0;
     // Buffer should be able to store UTF_BOM + XML_DECL + whitespace
     char buff[MAX(BLOCK_READ, lengthof(UTF8_BOM) + countof(XML_DECL))] = { '\0' }, *buff0 = NULL;
-    struct text_metric metric = { .path = path, 0 }; // Text metrics        
+	struct text_metric metric = { .path = { .str =  path, .len = strlen(path) }, 0 }; // Text metrics        
     struct xml_att xml_val = { 0 };
     struct xml_node xml_node = { 0 };
     
@@ -1100,13 +1080,13 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
     for (; !halt && rd; rd = fread(buff, 1, sizeof buff, f), pos = 0) for (halt = 1; pos < rd; halt = 1)
     {
         // UTF-8 decoder coroutine
-        if (!utf8_decode(buff[pos], &utf8.val, utf8.byte, &utf8.len, &utf8.context)) log_message_error_xml(log, CODE_METRIC, metric, path, XML_ERROR_INVALID_UTF);
+        if (!utf8_decode(buff[pos], &utf8.val, utf8.byte, &utf8.len, &utf8.context)) log_message_error_xml(log, CODE_METRIC, metric, XML_ERROR_INVALID_UTF);
         else
         {
             pos++;
             metric.byte++;
             if (utf8.context) continue;
-            if (!utf8_is_valid(utf8.val, utf8.len)) log_message_error_xml(log, CODE_METRIC, metric, path, XML_ERROR_INVALID_UTF);
+            if (!utf8_is_valid(utf8.val, utf8.len)) log_message_error_xml(log, CODE_METRIC, metric, XML_ERROR_INVALID_UTF);
             else
             {
                 switch (utf8.val)
@@ -1130,7 +1110,7 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
                 default:
                     metric.col++; 
                     cr = 0;
-                    if (!utf8_is_xml_char_len(utf8.val, utf8.len)) log_message_error_xml(log, CODE_METRIC, metric, path, XML_ERROR_INVALID_CHAR);
+                    if (!utf8_is_xml_char_len(utf8.val, utf8.len)) log_message_error_xml(log, CODE_METRIC, metric, XML_ERROR_INVALID_CHAR);
                     else halt = 0;
                 }
             }

@@ -12,6 +12,7 @@
 #       pragma warning(disable : 4201) // "Nameless structure/union"
 #       pragma warning(disable : 4204) // "Non-constant aggregate initializer"
 #       pragma warning(disable : 4221) // "Initialization by using the address of automatic variable"
+//#       pragma warning(disable : 4090) // "'=': different 'const' qualifiers" -- gives some false-positives
 //#       pragma warning(disable : 4706) // "Assignment within conditional expression"
 #       define restrict __restrict
 #       define inline __inline

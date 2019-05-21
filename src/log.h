@@ -5,6 +5,12 @@
 #include "strproc.h"
 #include "utf8.h"
 
+#define ARG_FETCH_STR(FLAG, ARG) \
+    ((FLAG) ? (const char *) *(*(void ***) (ARG))++ : Va_arg(*(Va_list *) (ARG), const char *))
+
+#define ARG_FETCH(FLAG, ARG, TYPE, TYPE_DOM) \
+    ((FLAG) ? *(TYPE *) *(*(void ***) (ARG))++ : Va_arg(*(Va_list *) (ARG), TYPE_DOM))
+
 enum fmt_execute_flags {
     FMT_EXE_FLAG_PHONY = 1,
     FMT_EXE_FLAG_BLANK = 2,
@@ -13,7 +19,7 @@ enum fmt_execute_flags {
 
 typedef bool (*fmt_callback)(char *, size_t *, void *, enum fmt_execute_flags);
 
-void print(char *, size_t *, const char *, size_t);
+void print(char *, size_t *, const char *, size_t, bool);
 bool print_fmt(char *, size_t *, ...);
 bool print_time_diff(char *, size_t *, uint64_t, uint64_t);
 void print_time_stamp(char *, size_t *);

@@ -22,29 +22,30 @@ enum argv_status {
     ARGV_WARNING_INVALID_UTF,
 };
 
-static bool log_message_warning_argv(struct log *restrict log, struct code_metric code_metric, char *name_str, size_t name_len, char *val_str, size_t val_len, size_t ind, enum argv_status status)
+static bool log_message_warning_argv(struct log *restrict log, struct code_metric code_metric, enum argv_status status, char *name_str, size_t name_len, char *val_str, size_t val_len, size_t ind)
 {
     static const char fmt[] = " the command-line argument no. %<>uz!\n";
+    const void *fmt_sub[] = { fmt, &log->style.num, &ind };
     struct env style = status & 1 ? log->style.chr : log->style.str;
     switch (status)
     {
     case ARGV_WARNING_MISSING_VALUE_LONG:
     case ARGV_WARNING_MISSING_VALUE_SHRT:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Expected a value for the parameter %<>s* within%$", style, name_str, name_len, fmt, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Expected a value for the parameter %<>s* within%@@$", style, name_str, name_len, fmt_sub);
     case ARGV_WARNING_UNHANDLED_PAR_LONG:
     case ARGV_WARNING_UNHANDLED_PAR_SHRT:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unable to handle the value %<>s* of the parameter %<>s* near%$", log->style.str, val_str, val_len, style, name_str, name_len, fmt, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unable to handle the value %<>s* of the parameter %<>s* near%@@$", log->style.str, val_str, val_len, style, name_str, name_len, fmt_sub);
     case ARGV_WARNING_UNHANDLED_OPT_LONG:
     case ARGV_WARNING_UNHANDLED_OPT_SHRT:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unable to handle the option %<>s* within%$", style, name_str, name_len, fmt, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unable to handle the option %<>s* within%@@$", style, name_str, name_len, fmt_sub);
     case ARGV_WARNING_UNEXPECTED_VALUE_LONG:
     case ARGV_WARNING_UNEXPECTED_VALUE_SHRT:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Redundant value %<>s* for the option %<>s* within%$", log->style.str, val_str, val_len, style, name_str, name_len, fmt, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Redundant value %<>s* for the option %<>s* within%@@$", log->style.str, val_str, val_len, style, name_str, name_len, fmt_sub);
     case ARGV_WARNING_INVALID_PAR_LONG:
     case ARGV_WARNING_INVALID_PAR_SHRT:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Invalid identifier %<>s* within%$", style, name_str, name_len, fmt, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Invalid identifier %<>s* within%@@$", style, name_str, name_len, fmt_sub);
     case ARGV_WARNING_INVALID_UTF:
-        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unexpected UTF-8 continuation byte at the position %<>uz within%$", log->style.num, name_len + 1, fmt, log->style.num, ind);
+        return log_message_fmt(log, code_metric, MESSAGE_WARNING, "Unexpected UTF-8 continuation byte at the position %<>uz within%@@$", log->style.num, name_len + 1, fmt_sub);
     }
     return 0;
 }
@@ -86,10 +87,10 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                 if (!(par.mode == PAR_VALUED_OPTION && hyph))
                 {
                     size_t tmp = strlen(argv[i]);
-                    if (par.handler && !par.handler(argv[i], tmp, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, argv[i], tmp, i - 1, shrt ? ARGV_WARNING_UNHANDLED_PAR_SHRT : ARGV_WARNING_UNHANDLED_PAR_LONG);
+                    if (par.handler && !par.handler(argv[i], tmp, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, shrt ? ARGV_WARNING_UNHANDLED_PAR_SHRT : ARGV_WARNING_UNHANDLED_PAR_LONG, str, len, argv[i], tmp, i - 1);
                     continue;
                 }
-                else if (par.handler && !par.handler(NULL, 0, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, shrt ? ARGV_WARNING_UNHANDLED_OPT_SHRT : ARGV_WARNING_UNHANDLED_OPT_LONG);
+                else if (par.handler && !par.handler(NULL, 0, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, shrt ? ARGV_WARNING_UNHANDLED_OPT_SHRT : ARGV_WARNING_UNHANDLED_OPT_LONG, str, len, NULL, 0, i);
             }
             if (hyph)
             {
@@ -99,19 +100,19 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                     if (*str)
                     {
                         len = Strchrnul(str, '=');
-                        if (!selector(&par, str, len, res, context, 0)) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, ARGV_WARNING_INVALID_PAR_LONG);
+                        if (!selector(&par, str, len, res, context, 0)) log_message_warning_argv(log, CODE_METRIC, ARGV_WARNING_INVALID_PAR_LONG, str, len, NULL, 0, i);
                         else
                         {
                             if (par.mode == PAR_OPTION)
                             {
-                                if (str[len]) log_message_warning_argv(log, CODE_METRIC, str, len, str + len + 1, strlen(str + len + 1), i, ARGV_WARNING_UNEXPECTED_VALUE_LONG);
-                                if (par.handler && !par.handler(NULL, 0, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, ARGV_WARNING_UNHANDLED_OPT_LONG);
+                                if (str[len]) log_message_warning_argv(log, CODE_METRIC, ARGV_WARNING_UNEXPECTED_VALUE_LONG, str, len, str + len + 1, strlen(str + len + 1), i);
+                                if (par.handler && !par.handler(NULL, 0, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, ARGV_WARNING_UNHANDLED_OPT_LONG, str, len, NULL, 0, i);
                             }
                             else if (!str[len]) capture = 1;
                             else
                             {
                                 size_t tmp = strlen(str + len + 1);
-                                if (par.handler && !par.handler(str + len + 1, tmp, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, str + len + 1, tmp, i, ARGV_WARNING_UNHANDLED_PAR_LONG);
+                                if (par.handler && !par.handler(str + len + 1, tmp, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, ARGV_WARNING_UNHANDLED_PAR_LONG, str, len, str + len + 1, tmp, i);
                             }
                         }
                     }
@@ -123,10 +124,10 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                     for (size_t k = 1; argv[i][k];) // Inner loop for handling multiple option-like parameters
                     {
                         str = argv[i] + k;
-                        if (!utf8_decode_len(str, tot, &len)) log_message_warning_argv(log, CODE_METRIC, NULL, k + len, NULL, 0, i, ARGV_WARNING_INVALID_UTF);
+                        if (!utf8_decode_len(str, tot, &len)) log_message_warning_argv(log, CODE_METRIC, ARGV_WARNING_INVALID_UTF, NULL, k + len, NULL, 0, i);
                         else
                         {
-                            if (!selector(&par, str, len, res, context, 1)) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, ARGV_WARNING_INVALID_PAR_SHRT);
+                            if (!selector(&par, str, len, res, context, 1)) log_message_warning_argv(log, CODE_METRIC, ARGV_WARNING_INVALID_PAR_SHRT, str, len, NULL, 0, i);
                             else
                             {
                                 if (par.mode != PAR_OPTION) // Parameter expects value
@@ -135,11 +136,11 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                                     else
                                     {
                                         size_t tmp = strlen(str + len);
-                                        if (par.handler && !par.handler(str + len, tmp, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, str + len, tmp, i, ARGV_WARNING_UNHANDLED_PAR_SHRT);
+                                        if (par.handler && !par.handler(str + len, tmp, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, ARGV_WARNING_UNHANDLED_PAR_SHRT, str, len, str + len, tmp, i);
                                     }
                                     break; // Exiting from the inner loop
                                 }
-                                else if (par.handler && !par.handler(NULL, 0, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, i, ARGV_WARNING_UNHANDLED_OPT_SHRT);
+                                else if (par.handler && !par.handler(NULL, 0, par.ptr, par.context)) log_message_warning_argv(log, CODE_METRIC, ARGV_WARNING_UNHANDLED_OPT_SHRT, str, len, NULL, 0, i);
                             }
                             if ((k += len) > tot) break;
                         }
@@ -159,7 +160,7 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
     }
     if (succ)
     {
-        if (capture && par.mode == PAR_VALUED) log_message_warning_argv(log, CODE_METRIC, str, len, NULL, 0, argc - 1, capture > 0 ? ARGV_WARNING_MISSING_VALUE_LONG : ARGV_WARNING_MISSING_VALUE_SHRT);
+        if (capture && par.mode == PAR_VALUED) log_message_warning_argv(log, CODE_METRIC, capture > 0 ? ARGV_WARNING_MISSING_VALUE_LONG : ARGV_WARNING_MISSING_VALUE_SHRT, str, len, NULL, 0, argc - 1);
         if (!array_test(p_arr, p_cnt, sizeof(**p_arr), 0, ARRAY_REDUCE, cnt)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else return 1;
     }

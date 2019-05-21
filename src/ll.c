@@ -66,7 +66,7 @@ uint32_t uint32_bit_scan_reverse(uint32_t x)
 uint32_t uint32_bit_scan_forward(uint32_t x)
 {
     return x ? __builtin_ctz((unsigned) x) : UINT_MAX;
-}
+}ggm
 
 uint32_t uint32_pop_cnt(uint32_t x)
 {
