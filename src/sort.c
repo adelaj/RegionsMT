@@ -493,7 +493,7 @@ static bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, s
     tbl->flags = flags;
     tbl->lcap = lcnt;
     tbl->tot = tbl->cnt;
-    tbl->lim = (size_t) ((double) cnt * .77 + .5);
+    tbl->lim = (size_t) ((double) cnt * .77 + .5); // Magic constants from the 'khash.h'
     return 1;
 }
 
@@ -515,7 +515,7 @@ unsigned hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, 
         }
         else lcnt = cap > 5 ? size_log2(cap - 1, 1) : 2;
         size_t cnt = (size_t) 1 << lcnt;
-        if (tbl->cnt >= (size_t) ((double) cnt * .77 + .5) || cap == cnt) res |= HASH_UNTOUCHED;
+        if (tbl->cnt >= (size_t) ((double) cnt * .77 + .5) || cap == cnt) res |= HASH_UNTOUCHED; // Magic constants from the 'khash.h'
         else
         {
             if (!(cap < cnt ?
@@ -523,9 +523,9 @@ unsigned hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, 
                 array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
                 hash_table_rehash(tbl, lcnt, szk, szv, hash, context) :
                 hash_table_rehash(tbl, lcnt, szk, szv, hash, context) &&
-                array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
-                array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC))) return 0;
-            cap = (size_t) 1 << tbl->lcap; // Update capacity after rehash
+                array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE) &&
+                array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE))) return 0;
+            cap = cnt; // Update capacity after rehashing
         }
     }
     else res |= HASH_UNTOUCHED;

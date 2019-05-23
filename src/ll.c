@@ -525,6 +525,17 @@ size_t size_fused_mul_add(size_t *p_res, size_t m, size_t a)
     return hi + car;
 }
 
+// On failure 'result' is untouched
+bool size_mul_add_test(size_t *p_res, size_t m, size_t a)
+{
+    size_t hi, lo = size_mul(&hi, *p_res, m);
+    if (hi) return 0;
+    lo = size_add(&hi, lo, a);
+    if (hi) return 0;
+    *p_res = lo;
+    return 1;
+}
+
 #define DECLARE_BIT_TEST(TYPE, PREFIX) \
     bool PREFIX ## _bit_test(TYPE *arr, size_t bit) \
     { \

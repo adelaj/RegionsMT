@@ -103,6 +103,7 @@ int flt64_sign(double x);
 
 uint32_t uint32_fused_mul_add(uint32_t *, uint32_t, uint32_t);
 size_t size_fused_mul_add(size_t *, size_t, size_t);
+bool size_mul_add_test(size_t *, size_t m, size_t a);
 
 bool uint8_bit_test(uint8_t *, size_t);
 bool uint8_bit_test_set(uint8_t *, size_t);

@@ -47,7 +47,7 @@ enum {
     HASH_FAILURE = ARRAY_FAILURE,
     HASH_SUCCESS = ARRAY_SUCCESS,
     HASH_UNTOUCHED = ARRAY_UNTOUCHED,
-    HASH_PRESENT = 4,
+    HASH_PRESENT = HASH_UNTOUCHED << 1,
 };
 
 // Heavily based on the 'khash.h'

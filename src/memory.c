@@ -39,32 +39,33 @@ unsigned array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, 
     {
         size_t log2 = size_log2(cnt, 1);
         cnt = log2 == SIZE_BIT ? cnt : (size_t) 1 << log2;
-    }        
-    size_t hi, pr = size_mul(&hi, cnt, sz);
-    if (!hi)
+    }
+    size_t tot;
+    if ((flags & ARRAY_STRICT) && (flags & ARRAY_FAILSAFE)) tot = cnt * sz + diff;
+    else
     {
-        size_t car, tot = size_add(&car, pr, diff);
-        if (!car)
+        tot = cnt;
+        if (!size_mul_add_test(&tot, sz, diff))
         {
-            void *res;
-            if (src && (flags & ARRAY_REALLOC))
-            {
-                res = realloc(src, tot);
-                if (res && p_cap && (flags & ARRAY_CLEAR))
-                {
-                    size_t off = *p_cap * sz + diff;
-                    memset((char *) res + off, 0, tot - off);
-                }
-            }
-            else res = flags & ARRAY_CLEAR ? calloc(tot, 1) : malloc(tot);
-            *p_src = res;
-            bool succ = !tot || res;
-            if (succ && p_cap) *p_cap = cnt;
-            return succ;
+            errno = ERANGE;
+            return 0;
         }
     }
-    errno = ERANGE;
-    return 0;
+    void *res;
+    if (src && (flags & ARRAY_REALLOC))
+    {
+        res = realloc(src, tot);
+        if (res && p_cap && (flags & ARRAY_CLEAR))
+        {
+            size_t off = *p_cap * sz + diff;
+            memset((char *) res + off, 0, tot - off);
+        }
+    }
+    else res = flags & ARRAY_CLEAR ? calloc(tot, 1) : malloc(tot);
+    *p_src = res;
+    bool succ = !tot || res;
+    if (succ && p_cap) *p_cap = cnt;
+    return succ;
 }
 
 unsigned array_test_impl(void *p_Arr, size_t *restrict p_cap, size_t sz, size_t diff, enum array_flags flags, size_t *restrict arg, size_t cnt)

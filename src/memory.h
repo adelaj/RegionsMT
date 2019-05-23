@@ -11,7 +11,8 @@ enum array_flags {
     ARRAY_CLEAR = 1,
     ARRAY_STRICT = 2,
     ARRAY_REDUCE = 4,
-    ARRAY_REALLOC = 8 // Default in 'array_test'
+    ARRAY_REALLOC = 8, // Default in 'array_test'
+    ARRAY_FAILSAFE = 16 // Disables internal checks
 };
 
 enum {

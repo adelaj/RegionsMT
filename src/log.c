@@ -214,9 +214,9 @@ static bool fmt_decode_str(size_t *p_cnt, enum fmt_arg_mode *p_mode, const char 
     }
     const char *tmp;
     unsigned cvt = str_to_size(fmt + pos, &tmp, p_cnt);
-    if (tmp == fmt + pos) return 1;
-    *p_pos = tmp - fmt;
+    if (tmp == fmt + pos) return 1; // No argument provided
     if (!cvt) return 0;
+    *p_pos = tmp - fmt + (fmt[tmp - fmt] == ';'); // Skipping optional delimiter
     *p_mode = ARG_SET;
     return 1;
 }
@@ -225,21 +225,22 @@ static bool fmt_decode_utf(uint32_t *p_val, enum fmt_arg_mode *p_mode, const cha
 {
     bool hex = 0;
     size_t pos = *p_pos;
-    if (fmt[pos] == 'x' || fmt[pos] == 'X')
+    switch (fmt[pos])
     {
-        pos++;
-        hex = 1;
-    }
-    if (fmt[pos] == '*')
-    {
+    case '*':
         *p_mode = ARG_FETCH;
         *p_pos = pos + 1;
         return 1;
+    case 'x':
+    case 'X':
+        pos++;
+        hex = 1;
     }
     const char *tmp;
     unsigned cvt = (hex ? str_to_uint32_hex : str_to_uint32)(fmt + pos, &tmp, p_val);
-    *p_pos = tmp - fmt;
-    if (tmp == fmt + pos || !cvt || *p_val >= UTF8_BOUND) return 0;
+    if (tmp == fmt + pos) return 1; // No argument provided
+    if (!cvt || *p_val >= UTF8_BOUND) return 0;
+    *p_pos = tmp - fmt + (fmt[tmp - fmt] == ';'); // Skipping optional delimiter
     *p_mode = ARG_SET;
     return 1;
 }
@@ -276,22 +277,22 @@ static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
         if (res->flags >= tmp) return 1;
         res->flags |= tmp;
     }
-    switch (fmt[pos])
+    switch (fmt[pos++])
     {
     case 'u':
         res->int_arg.flags |= INT_FLAG_UNSIGNED;
     case 'i':
         res->type = TYPE_INT;
-        *p_pos = pos + 1;
-        return fmt_decode_int(&res->int_arg.spec, &res->int_arg.flags, fmt, p_pos);
+        if (!fmt_decode_int(&res->int_arg.spec, &res->int_arg.flags, fmt, &pos)) return 0;
+        break;
     case 'c':
         res->type = TYPE_CHAR;
-        *p_pos = pos + 1;
-        return fmt_decode_str(&res->char_arg.rep, &res->char_arg.mode, fmt, p_pos);
+        if (!fmt_decode_str(&res->char_arg.rep, &res->char_arg.mode, fmt, &pos)) return 0;
+        break;
     case 's':
         res->type = TYPE_STR;
-        *p_pos = pos + 1;
-        return fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
+        if (!fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, &pos)) return 0;
+        break;
     case 'A':
         res->flt_arg.flags |= FLT_FLAG_UPPERCASE;
     case 'a':
@@ -299,15 +300,15 @@ static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
         res->flt_arg.spec = FLT_SPEC_EXP;
     case 'f':
         res->type = TYPE_FLT;
-        *p_pos = pos + 1;
-        return fmt_decode_str(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
+        if (!fmt_decode_str(&res->flt_arg.prec, &res->flt_arg.mode, fmt, &pos)) return 0;
+        break;
     case 'E':
         res->flt_arg.flags |= FLT_FLAG_UPPERCASE;
     case 'e':
         res->flt_arg.spec = FLT_SPEC_EXP;
         res->type = TYPE_FLT;
-        *p_pos = pos + 1;
-        return fmt_decode_str(&res->flt_arg.prec, &res->flt_arg.mode, fmt, p_pos);
+        if (!fmt_decode_str(&res->flt_arg.prec, &res->flt_arg.mode, fmt, &pos)) return 0;
+        break;
     case 'T':
         res->type = TYPE_TIME_DIFF;
         break;
@@ -325,16 +326,16 @@ static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
         break;
     case '#':
         res->type = TYPE_UTF;
-        *p_pos = pos + 1;
-        return fmt_decode_utf(&res->utf_arg.val, &res->utf_arg.mode, fmt, p_pos);
+        if (!fmt_decode_utf(&res->utf_arg.val, &res->utf_arg.mode, fmt, &pos)) return 0;
+        break;
     case '&':
         res->type = TYPE_CALLBACK;
         break;
     default:
-        *p_pos = pos;
-        return fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, p_pos);
+        pos--;
+        if (!fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, &pos)) return 0;
     }
-    *p_pos = pos + 1;
+    *p_pos = pos;
     return 1;
 }
 
@@ -441,6 +442,16 @@ static void fmt_execute_char(size_t rep, enum fmt_arg_mode mode, char *buff, siz
     if (mode == ARG_DEFAULT) rep = 1;
     if (rep <= *p_cnt) memset(buff, ch, rep * sizeof(buff));
     *p_cnt = rep;
+}
+
+static void fmt_execute_utf(uint32_t val, enum fmt_arg_mode mode, char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
+{
+    if (mode == ARG_DEFAULT) return;
+    if (mode == ARG_FETCH) val = ARG_FETCH(flags & FMT_EXE_FLAG_PTR, p_arg, uint32_t, Uint32_dom_t);
+    if (flags & FMT_EXE_FLAG_PHONY) return;
+    uint8_t str[UTF8_COUNT], len;
+    utf8_encode(val, str, &len);
+    print(buff, p_cnt, (char *) str, len, 0);
 }
 
 static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute_flags flags)
@@ -555,7 +566,8 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute
             if (!(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, "%", 1, 0);
             break;        
         case TYPE_UTF:
-            //fmt_execute_
+            fmt_execute_utf(res.utf_arg.val, res.utf_arg.mode, buff + cnt, &len, p_arg_sub, tf);
+            break;
         case TYPE_FLT: // NOT IMPLEMENTED!
             if (!(tf & FMT_EXE_FLAG_PHONY)) i++;
         }

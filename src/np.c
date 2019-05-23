@@ -184,10 +184,7 @@ uint64_t get_time()
 
 bool aligned_alloca_chk(size_t cnt, size_t sz, size_t al)
 {
-    size_t hi, res = size_mul(&hi, cnt, sz);
-    if (hi) return 0;
-    size_add(&hi, res, al - 1);
-    return hi;
+    return size_mul_add_test(&cnt, sz, al - 1);
 }
 
 int Fclose(FILE *file)

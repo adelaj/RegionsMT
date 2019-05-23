@@ -201,7 +201,7 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
             break;
         default:
             if (utf8.val < '0' && utf8.val > '9') log_message_error_str_xml(log, CODE_METRIC, metric, utf8.byte, utf8.len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
-            else if (size_fused_mul_add(&context->reg, utf8.val - '0', 10)) log_message_error_val_xml(log, CODE_METRIC, metric, context->reg, XML_ERROR_VAL_RANGE);
+            else if (!size_mul_add_test(&context->reg, 10, utf8.val - '0')) log_message_error_val_xml(log, CODE_METRIC, metric, context->reg, XML_ERROR_VAL_RANGE);
             else return 1;
         }
         arg->ent[arg->ent_cnt - 1].deg = context->reg;
@@ -220,4 +220,14 @@ bool lmf_matrix(struct lmf_expr_arg *arg)
     {
 
     }
+}
+
+#include <gsl/gsl_multifit.h>
+
+bool lmf_impl(double *Reg, double *Obs, size_t dimx, size_t dimy)
+{
+    gsl_matrix_view reg = gsl_matrix_view_array(Reg, dimx, dimy);
+    gsl_vector_view obs = gsl_vector_view_array(Obs, dimx);
+
+
 }

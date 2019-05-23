@@ -411,7 +411,7 @@ static int Main(int argc, char **argv)
     struct log log;
     if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, style, NULL))
     {
-        log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1%1C%$F", "B", "%$E", "D" }, "G%%.\n");
+        log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%#*%#*.\n", 0x393, 920);
         
         size_t pos_cnt;
         char **pos_arr;
