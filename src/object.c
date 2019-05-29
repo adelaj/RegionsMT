@@ -119,6 +119,11 @@ bool log_message_error_xml_generic(struct log *restrict log, struct code_metric 
     return res;
 }
 
+bool log_message_error_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status)
+{
+    return log_message_error_generic_xml(log, code_metric, metric, status);
+}
+
 static bool log_message_error_xml_generic2(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status, ...)
 {
     switch (status)
