@@ -124,7 +124,7 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
         }
         return 0;
     case LMF_EXPR_ST_VAR_INIT:
-        if (utf8.val == '^' || utf8.val == '*' || utf8.val == '+') log_message_error_str_xml(log, CODE_METRIC, metric, utf8.byte, utf8.len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+        if (utf8.val == '^' || utf8.val == '*' || utf8.val == '+') log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
         else if (!buff_append(context->buff, utf8.byte, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
