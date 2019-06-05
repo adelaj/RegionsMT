@@ -48,7 +48,17 @@ enum xml_status_chr {
     XML_UNEXPECTED_CHAR
 };
 
+enum xml_status {
+    XML_INVALID_UTF = 0,
+    XML_INVALID_CHAR,
+    XML_INVALID_DECL,
+    XML_MISSING_ROOT,
+    XML_OUT_OF_RANGE,
+    XML_ERROR_COMPILER
+};
+
 bool log_message_error_xml_generic(struct log *restrict, struct code_metric, struct text_metric, ...);
-bool log_message_error_xml_chr(struct log *restrict, struct code_metric, struct text_metric, enum status_xml_chr, const uint8_t *, size_t);
+bool log_message_error_xml_chr(struct log *restrict, struct code_metric, struct text_metric, enum xml_status_chr, const uint8_t *, size_t);
+bool log_message_error_xml(struct log *restrict, struct code_metric, struct text_metric, enum xml_status);
 
 struct xml_object *xml_compile(const char *, xml_node_selector_callback, xml_val_selector_callback, void *, struct log *);

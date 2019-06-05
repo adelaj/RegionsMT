@@ -138,39 +138,22 @@ enum xml_status_str {
 
 bool log_message_error_xml_str(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum status_xml_str status, const char *str, size_t len)
 {
-    static const *fmt[] = {
-        "Unexpected tag %<>s*",
-        "Unexpected attribute %<>s*",
-        "Unexpected closing tag %<>s*",
-        "Duplicated attribute %<>s*",
-        "Unable to handle value %<>s*",
-        "Invalid control sequence %<>s*",
-        "Invalid processing instruction %<>s*"
+    static const struct strl fmt[] = {
+        STRI("Unexpected tag"),
+        STRI("Unexpected attribute"),
+        STRI("Unexpected closing tag"),
+        STRI("Duplicated attribute"),
+        STRI("Unable to handle value"),
+        STRI("Invalid control sequence"),
+        STRI("Invalid processing instruction")
     };
-    return log_message_error_xml_generic(log, code_metric, metric, fmt[status], log->style.str, str, len);
+    return log_message_error_xml_generic(log, code_metric, metric, "%s* %<>s*", STRL(fmt[status]), log->style.str, str, len);
 }
 
-enum xml_status_val {
-    XML_OUT_OF_RANGE,
-    XML_INVALID_REFERENCE,
-};
-
-bool log_message_error_xml_val(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status_val status, uint32_t val)
+bool log_message_error_xml_val(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, uint32_t val)
 {
-    static const *fmt[] = {
-        "Numeric value %<>ud is out of range",
-        "Numeric value %<>ud referencing to invalid character"
-    };
-    return log_message_error_xml_generic(log, code_metric, metric, fmt[status], log->style.num, val);
+    return log_message_error_xml_generic(log, code_metric, metric, "Numeric value %<>ud referencing to invalid character", log->style.num, val);
 }
-
-enum xml_status {
-    XML_INVALID_UTF = 0,
-    XML_INVALID_CHAR,
-    XML_INVALID_DECL,
-    XML_MISSING_ROOT,
-    XML_ERROR_COMPILER
-};
 
 bool log_message_error_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status)
 {
@@ -179,6 +162,7 @@ bool log_message_error_xml(struct log *restrict log, struct code_metric code_met
         "Invalid character",
         "Invalid XML declaration",
         "No root element found",
+        "Numeric value is out of range",
         "Compiler malfunction"
     };
     return log_message_error_xml_generic(log, code_metric, metric, fmt[status]);
@@ -326,7 +310,7 @@ static unsigned xml_char_ref_impl(uint32_t *p_val, bool hex, struct utf8 *utf8, 
         if (val != utf8->val)
         {
             *p_val &= 0x7fffffff; // 'init' flag should be resetted        
-            if (uint32_fused_mul_add(p_val, hex ? 16 : 10, val)) log_message_error_val_xml(log, CODE_METRIC, metric, XML_ERROR_VAL_RANGE, path, utf8->val);
+            if (uint32_fused_mul_add(p_val, hex ? 16 : 10, val)) log_message_error_xml(log, CODE_METRIC, metric, XML_OUT_OF_RANGE);
             else
             {
                 *p_val |= 0x80000000;
@@ -334,7 +318,7 @@ static unsigned xml_char_ref_impl(uint32_t *p_val, bool hex, struct utf8 *utf8, 
             }
         }
         else if (val == ';') return 1;
-        log_message_error_char_xml(log, CODE_METRIC, metric, path, utf8->byte, utf8->len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+        log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8->byte, utf8->len);
     }
     else
     {
@@ -343,7 +327,7 @@ static unsigned xml_char_ref_impl(uint32_t *p_val, bool hex, struct utf8 *utf8, 
             *p_val = val | 0x80000000; // Setting 'init' flag
             return 1 | STATUS_REPEAT;
         }
-        log_message_error_char_xml(log, CODE_METRIC, metric, path, utf8->byte, utf8->len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+        log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8->byte, utf8->len);
     }
     return 0;
 }
@@ -627,7 +611,8 @@ static bool xml_att_impl(uint32_t *p_st, struct xml_att_context context, xml_val
     return 1;
 }*/
 
-static bool xml_match_impl(size_t *p_context, const char *str, size_t len, uint8_t *utf8_byte, uint32_t utf8_val, uint8_t utf8_len, struct text_metric metric, const char *path, struct log *log)
+/*
+static bool xml_match_impl(size_t *p_context, const char *str, size_t len, struct *utf8byte, uint32_t utf8_val, uint8_t utf8_len, struct text_metric metric, const char *path, struct log *log)
 {
     size_t ind = *p_context;
     if (utf8_val == (uint32_t) str[ind])
@@ -635,9 +620,9 @@ static bool xml_match_impl(size_t *p_context, const char *str, size_t len, uint8
         *p_context = ind < len ? ind + 1 : 0;
         return 1;
     }
-    log_message_error_char_xml(log, CODE_METRIC, metric, path, utf8_byte, utf8_len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+    log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8->byte, utf8->len);
     return 0;
-}
+}*/
 
 static bool *xml_decl_read(const char *str, size_t len, void *ptr, void *Context)
 {
@@ -1072,13 +1057,13 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
     for (; !halt && rd; rd = fread(buff, 1, sizeof buff, f), pos = 0) for (halt = 1; pos < rd; halt = 1)
     {
         // UTF-8 decoder coroutine
-        if (!utf8_decode(buff[pos], &utf8.val, utf8.byte, &utf8.len, &utf8.context)) log_message_error_xml(log, CODE_METRIC, metric, XML_ERROR_INVALID_UTF);
+        if (!utf8_decode(buff[pos], &utf8.val, utf8.byte, &utf8.len, &utf8.context)) log_message_error_xml(log, CODE_METRIC, metric, XML_INVALID_UTF);
         else
         {
             pos++;
             metric.byte++;
             if (utf8.context) continue;
-            if (!utf8_is_valid(utf8.val, utf8.len)) log_message_error_xml(log, CODE_METRIC, metric, XML_ERROR_INVALID_UTF);
+            if (!utf8_is_valid(utf8.val, utf8.len)) log_message_error_xml(log, CODE_METRIC, metric, XML_INVALID_UTF);
             else
             {
                 switch (utf8.val)
@@ -1102,7 +1087,7 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
                 default:
                     metric.col++; 
                     cr = 0;
-                    if (!utf8_is_xml_char_len(utf8.val, utf8.len)) log_message_error_xml(log, CODE_METRIC, metric, XML_ERROR_INVALID_CHAR);
+                    if (!utf8_is_xml_char_len(utf8.val, utf8.len)) log_message_error_xml(log, CODE_METRIC, metric, XML_INVALID_CHAR);
                     else halt = 0;
                 }
             }

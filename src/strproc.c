@@ -186,8 +186,6 @@ unsigned buff_append(struct buff *buff, const char *str, size_t len, enum buff_f
     return res;
 }
 
-
-
 bool str_pool_init(struct str_pool *pool, size_t cnt, size_t len)
 {
     if (array_init(&pool->buff.str, &pool->buff.cap, size_add_sat(len, 1), sizeof(*pool->buff.str), 0, 0))

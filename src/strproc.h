@@ -15,6 +15,8 @@ struct strl {
 };
 
 #define STRL(STRL) (STRL).str, (STRL).len
+#define STREQ(STRA, LENA, STR, BACKEND) ((lengthof(STR) == (LENA)) && !(BACKEND((STRA), (STR), (LENA))))
+#define STRLEQ(STRA, STR, BACKEND) STREQ(STRL(STRA), STR, BACKEND)
 
 struct text_metric {
     struct strl path;
