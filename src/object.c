@@ -119,7 +119,7 @@ bool log_message_error_xml_generic(struct log *restrict log, struct code_metric 
 
 bool log_message_error_xml_chr(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum status_xml_chr status, const uint8_t *buff, size_t len)
 {
-    static const *fmt[] = {
+    static const char *fmt[] = {
         "Unexpected end of file %<>s*"
         "Unexpected character %<>s*"
     };
@@ -157,7 +157,7 @@ bool log_message_error_xml_val(struct log *restrict log, struct code_metric code
 
 bool log_message_error_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status)
 {
-    static const *fmt[] = {
+    static const char *fmt[] = {
         "Invalid UTF-8 byte sequence",
         "Invalid character",
         "Invalid XML declaration",
@@ -740,20 +740,20 @@ static bool xml_decl_impl(uint32_t *restrict p_st, struct xml_decl_context conte
                 st = XML_DECL_ST_ATTRIBUTE_A_BEGIN;
                 continue;
             }
-            log_message_error_char_xml(log, CODE_METRIC, metric, utf8->byte, utf8->len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+            log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8->byte, utf8->len);
             return 0;
         case XML_DECL_ST_END_A:
             if (utf8->val == '>')
             {
                 // Checking if version number is provided in the XML declaration
-                if (bits->arr && !uint8_bit_test(bits->arr, 0)) log_message_error_xml(log, CODE_METRIC, metric, XML_ERROR_DECL);
+                if (bits->arr && !uint8_bit_test(bits->arr, 0)) log_message_error_xml(log, CODE_METRIC, metric, XML_INVALID_DECL);
                 else
                 {
                     st = 0;
                     break;
                 }
             }
-            else log_message_error_char_xml(log, CODE_METRIC, metric, utf8->byte, utf8->len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+            else log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8->byte, utf8->len);
             return 0;
             
             /*
@@ -862,7 +862,7 @@ static bool xml_comment_impl(uint32_t *restrict p_st, struct utf8 *utf8, struct 
                 st++;
                 break;
             }
-            log_message_error_char_xml(log, CODE_METRIC, metric, path, utf8->byte, utf8->len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+            log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8->byte, utf8->len);
             return 0;
         case XML_COMMENT_ST_C:
             if (utf8->val == '-') st++;
@@ -877,7 +877,7 @@ static bool xml_comment_impl(uint32_t *restrict p_st, struct utf8 *utf8, struct 
                 st = 0;
                 break;
             }
-            log_message_error_char_xml(log, CODE_METRIC, metric, path, utf8->byte, utf8->len, XML_ERROR_CHAR_UNEXPECTED_CHAR);
+            log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8->byte, utf8->len);
             return 0;
         } 
         break;
