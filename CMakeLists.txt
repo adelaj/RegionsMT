@@ -1,12 +1,13 @@
+# Run sample: 
+#     cmake -D CMAKE_GENERATOR_PLATFORM="x64" -D MSVC="true" ..\RegionsMT\
+
 cmake_minimum_required(VERSION 3.14)
 
 macro(msvc_set_static_runtime)
-    if(MSVC)
-        set(_vars CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO)
-        foreach(_var IN ITEMS ${_vars})
-            string(REGEX REPLACE "/MD" "/MT" ${_var} "${${_var}}")
-        endforeach()
-    endif()
+    set(_vars CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO)
+    foreach(_var IN ITEMS ${_vars})
+        string(REGEX REPLACE "/MD" "/MT" ${_var} "${${_var}}")
+    endforeach()
 endmacro()
 
 function(assign_source_group filter src_dir list)
@@ -30,33 +31,36 @@ function(add_libraries)
             file(TO_NATIVE_PATH "${_p}/$(Configuration)" _p)
             set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /LIBPATH:\"${_p}\"" PARENT_SCOPE)
         endif()
-        message(STATUS "Reference of the library \"${_lib}\" added to the project")
+        message(STATUS "Library \"${_lib}\" added to the project")
     endforeach()
 endfunction(add_libraries)
 
 set(target RegionsMT)
 set(src_dir src)
 set(libraries gsl)
-msvc_set_static_runtime()
 
 project(${target})
 enable_language(C)
+
+if (MSVC)
+    msvc_set_static_runtime()
+    remove_definitions(-D_MBCS)
+    add_definitions(-D_UNICODE)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4 /GL /arch:AVX /volatile:ms")
+    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /LTCG")
+endif()
+
+if (NOT DEFINED ${CMAKE_LIBRARY_PATH})
+    set(CMAKE_LIBRARY_PATH "..")
+    message(STATUS "Variable \"CMAKE_LIBRARY_PATH\" is undefined. Default value \"..\" is used")
+endif()
+
+add_libraries(${libraries})
 
 file(GLOB_RECURSE source_list RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/${src_dir}/" *.c)
 assign_source_group("Source Files" ${src_dir} source_list)
 file(GLOB_RECURSE header_list RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/${src_dir}/" *.h)
 assign_source_group("Header Files" ${src_dir} header_list)
 
-if (MSVC)
-    set(CMAKE_C_FLAGS "${CMAKE_CXX_FLAGS} /W4 /GL /arch:AVX /volatile:ms")
-    set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /LTCG")
-endif()
-
-if (NOT DEFINED ${CMAKE_LIBRARY_PATH})
-    set(CMAKE_LIBRARY_PATH "..")
-    message(STATUS "Variable \"CMAKE_LIBRARY_PATH\" is undefined. Default value \"..\" is used!")
-endif()
-
-add_libraries(${libraries})
 add_executable(${target} ${source_list} ${header_list})
-target_link_libraries(RegionsMT ${libs})
+target_link_libraries(RegionsMT ${libraries})
