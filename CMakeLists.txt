@@ -50,6 +50,8 @@ set(library_files_gsl gsl gslcblas)
 project(${target})
 enable_language(C)
 
+option(FORCE_POSIX_THREAD "Enable POSIX threads instead of direct usage of WinAPI" OFF)
+
 if (MSVC)
     msvc_set_static_runtime()
     remove_definitions(-D_MBCS)
@@ -63,7 +65,7 @@ if (MSVC)
     endif()
 endif()
 
-if (NOT DEFINED ${CMAKE_LIBRARY_PATH})
+if (NOT DEFINED CMAKE_LIBRARY_PATH)
     set(CMAKE_LIBRARY_PATH "..")
     message(STATUS "Variable \"CMAKE_LIBRARY_PATH\" is undefined. Default value \"..\" is used")
 endif()

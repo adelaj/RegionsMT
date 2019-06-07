@@ -6,6 +6,10 @@ ifeq ($(strip $(CFG)),)
 CFG = Release
 endif
 
+ifeq ($(strip $(LIB_PREFIX)),)
+LIB_PREFIX = ..
+endif
+
 CC = gcc
 CC_OPT = -std=c11 -flto -fuse-linker-plugin -Wall -mavx
 CC_OPT-i386 = -m32
