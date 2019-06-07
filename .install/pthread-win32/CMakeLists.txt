@@ -16,13 +16,18 @@ set(target pthread-win32)
 set(out_prefix pthread)
 
 project(${target})
+option(PTHREAD_SINGLE_FILE "All source files are aggregated into a single translation unit" ON)
 
 enable_language(C)
 
 msvc_set_static_runtime()
 
-file(GLOB pthread_sources ${CMAKE_CURRENT_SOURCE_DIR}/*.c)
-list(REMOVE_ITEM pthread_sources ${CMAKE_CURRENT_SOURCE_DIR}/pthread.c)
+if(PTHREAD_SINGLE_FILE)
+    set(pthread_sources ${CMAKE_CURRENT_SOURCE_DIR}/pthread.c)
+else()
+    file(GLOB pthread_sources ${CMAKE_CURRENT_SOURCE_DIR}/*.c)
+    list(REMOVE_ITEM pthread_sources ${CMAKE_CURRENT_SOURCE_DIR}/pthread.c)
+endif()
 source_group("Source Files" FILES ${pthread_sources})
 
 file(GLOB pthread_resources ${CMAKE_CURRENT_SOURCE_DIR}/*.rc)
@@ -74,4 +79,6 @@ add_definitions(-DPTW32_STATIC_LIB)
 include_directories(${CMAKE_CURRENT_BINARY_DIR})
 
 add_library(${target} STATIC ${pthread_sources} ${pthread_headers} ${pthread_headers_api} ${pthread_resources})
-set_target_properties(${target} PROPERTIES OUTPUT_NAME "${out_name}")
+set_target_properties(${target} PROPERTIES OUTPUT_NAME ${out_name})
+set_target_properties(${target} PROPERTIES COMPILE_PDB_NAME ${out_name})
+set_target_properties(${target} PROPERTIES COMPILE_PDB_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR})

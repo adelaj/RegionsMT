@@ -6,8 +6,12 @@ ifeq ($(strip $(CFG)),)
 CFG = Release
 endif
 
-ifeq ($(strip $(LIB_PREFIX)),)
-LIB_PREFIX = ..
+ifeq ($(strip $(INC_PREFIX)),)
+CC_INC_PREFIX = ..
+endif
+
+ifeq ($(strip $(LD_INC_PREFIX)),)
+LD_INC_PREFIX = ..
 endif
 
 CC = gcc
@@ -16,7 +20,7 @@ CC_OPT-i386 = -m32
 CC_OPT-x86_64 = -m64
 CC_OPT-Release = -O3
 CC_OPT-Debug = -D_DEBUG -Og -ggdb
-CC_INC = ../gsl
+CC_INC = gsl
 
 LD = $(CC)
 LD_OPT = -flto -fuse-linker-plugin -mavx
@@ -25,7 +29,7 @@ LD_OPT-x86_64 = -m64
 LD_OPT-Release = -O3
 LD_OPT-Debug = -Og
 LD_LIB = m pthread gsl gslcblas
-LD_INC = ../gsl
+LD_INC = gsl
 
 TARGET = RegionsMT
 OBJ_DIR = ./obj
@@ -58,8 +62,8 @@ define build =
 .PHONY: build$1
 build$1: | $(STRUCT$1) $(TARGET)$1;
 $(STRUCT$1):; mkdir $$@
-$(TARGET)$1: $(OBJ$1); $(LD) $(BUILD_LD_OPT$1) -o $$@ $$^ $(addprefix -L,$(BUILD_LD_INC$1)) $(addprefix -l,$(BUILD_LD_LIB$1))
-$(OBJ_DIR)$1/%.c.o: $(SRC_DIR)/%.c; $(CC) $(BUILD_CC_OPT$1) $(addprefix -I,$(BUILD_CC_INC$1)) -o $$@ -c $$^
+$(TARGET)$1: $(OBJ$1); $(LD) $(BUILD_LD_OPT$1) -o $$@ $$^ $(addprefix -L,$(addprefix $(LD_INC_PREFIX)/,$(BUILD_LD_INC$1))) $(addprefix -l,$(BUILD_LD_LIB$1))
+$(OBJ_DIR)$1/%.c.o: $(SRC_DIR)/%.c; $(CC) $(BUILD_CC_OPT$1) $(addprefix -I,$(addprefix $(CC_INC_PREFIX)/,$(BUILD_CC_INC$1))) -o $$@ -c $$^
 endef
 
 define clean =

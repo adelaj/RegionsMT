@@ -1,5 +1,6 @@
-# Run sample: 
+# Run samples: 
 #     cmake -D CMAKE_GENERATOR_PLATFORM="x64" -D MSVC="true" ..\RegionsMT\
+#     cmake -D CMAKE_GENERATOR_PLATFORM="x64" -D MSVC="true" -D CMAKE_LIBRARY_PATH="../lib" -D FORCE_POSIX_THREADS="ON"  ..\RegionsMT\
 
 cmake_minimum_required(VERSION 3.14)
 
@@ -11,6 +12,7 @@ macro(msvc_set_static_runtime)
 endmacro()
 
 function(assign_source_group filter src_dir list)
+    unset(_tmp)
     foreach(_s IN ITEMS ${${list}})
         get_filename_component(_f "${_s}" DIRECTORY)
         file(TO_NATIVE_PATH "${filter}/${_f}" _f)
@@ -33,6 +35,12 @@ macro(add_libraries)
         endif()
         message(STATUS "Library \"${_lib}\" added to the project")
     endforeach()
+endmacro()
+
+macro(disable_incremental flag)
+    string(REPLACE "/INCREMENTAL:YES" "" _tmp ${${flag}})
+    string(REPLACE "/INCREMENTAL" "" _tmp ${${flag}})
+    set(${flag} "/INCREMENTAL:NO ${_tmp}")
 endmacro()
 
 macro(link_libraries target)
@@ -58,8 +66,10 @@ if (MSVC)
     add_definitions(-D_UNICODE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4 /GL /arch:AVX /volatile:ms")
     set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /LTCG")
+    disable_incremental(CMAKE_EXE_LINKER_FLAGS_DEBUG)
+    disable_incremental(CMAKE_EXE_LINKER_FLAGS_RELWITHDEBINFO)
     if (${FORCE_POSIX_THREADS})
-        add_definitions(-DFORCE_POSIX_THREADS)
+        add_definitions(-DFORCE_POSIX_THREADS -DPTW32_STATIC_LIB)
         set(libraries ${libraries} pthread-win32)
         set(library_files_pthread-win32 pthreadVSE)
     endif()
