@@ -1,6 +1,6 @@
 # Run samples: 
-#     cmake -D CMAKE_GENERATOR_PLATFORM="x64" -D MSVC="true" ..\RegionsMT\
-#     cmake -D CMAKE_GENERATOR_PLATFORM="x64" -D MSVC="true" -D CMAKE_LIBRARY_PATH="../lib" -D FORCE_POSIX_THREADS="ON"  ..\RegionsMT\
+#     cmake -D CMAKE_GENERATOR_PLATFORM="x64" ..\RegionsMT\
+#     cmake -D CMAKE_GENERATOR_PLATFORM="x64" -D CMAKE_LIBRARY_PATH="../lib" -D FORCE_POSIX_THREADS="ON"  ..\RegionsMT\
 
 cmake_minimum_required(VERSION 3.14)
 
@@ -15,9 +15,14 @@ function(assign_source_group filter src_dir list)
     unset(_tmp)
     foreach(_s IN ITEMS ${${list}})
         get_filename_component(_f "${_s}" DIRECTORY)
-        file(TO_NATIVE_PATH "${filter}/${_f}" _f)
         get_filename_component(_p "${src_dir}/${_s}" ABSOLUTE)
-        source_group("${_f}" FILES ${_p})
+        if(MSVC)
+            file(TO_NATIVE_PATH "${filter}/${_f}" _f)
+            source_group("${_f}" FILES ${_p})
+        elseif(XCODE)
+            string(REPLACE "/" " " _f "${_f}")
+            source_group("\"${filter}\" ${_f}" FILES ${_p})
+        endif()
         set(_tmp ${_tmp} ${_p})
         file(TO_NATIVE_PATH ${_p} _p)
         message(STATUS "File \"${_p}\" added to the group \"${filter}\"")
@@ -27,11 +32,13 @@ endfunction(assign_source_group)
 
 macro(add_libraries)
     foreach(_lib IN ITEMS ${ARGN})
-        get_filename_component(_p "${CMAKE_LIBRARY_PATH}/${_lib}-$(Platform)" ABSOLUTE)
-        include_directories(${_p})
         if (MSVC)
+            get_filename_component(_p "${CMAKE_LIBRARY_PATH}/${_lib}-$(Platform)" ABSOLUTE)
+            include_directories(${_p})
             file(TO_NATIVE_PATH "${_p}/$(Configuration)" _p)
             set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} /LIBPATH:\"${_p}\"")
+        else()
+            link_directories(${_p}-${CMAKE_OSX_ARCHITECTURES})
         endif()
         message(STATUS "Library \"${_lib}\" added to the project")
     endforeach()
@@ -55,10 +62,19 @@ set(src_dir src)
 set(libraries gsl)
 set(library_files_gsl gsl gslcblas)
 
+set(MSVC OFF)
+set(XCODE OFF)
+
+if(${CMAKE_GENERATOR} MATCHES "Visual Studio")
+    set(MSVC ON)
+elseif(${CMAKE_GENERATOR} MATCHES "Xcode")
+    set(XCODE ON)
+endif()
+
 project(${target})
 enable_language(C)
 
-option(FORCE_POSIX_THREAD "Enable POSIX threads instead of direct usage of WinAPI" OFF)
+option(FORCE_POSIX_THREAD "POSIX threads Windows library is used instead of WinAPI" OFF)
 
 if (MSVC)
     msvc_set_static_runtime()
