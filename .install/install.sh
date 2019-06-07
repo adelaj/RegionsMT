@@ -14,7 +14,7 @@ build_lib() {
     cd $DIR
     C_FLAGS_INIT=$(echo $C_FLAGS $(eval echo "\$C_FLAGS_$2") | xargs)
     cmake -D CMAKE_BUILD_TYPE="$3" -D CMAKE_C_FLAGS_INIT="$C_FLAGS_INIT" -D CMAKE_AR="/usr/bin/gcc-ar" -D CMAKE_C_ARCHIVE_CREATE="<CMAKE_AR> qcs <TARGET> <OBJECTS>" -D CMAKE_C_ARCHIVE_FINISH=true -D CMAKE_REQUIRED_LIBRARIES="m" ../$1
-    make VERBOSE=1 $1
+    cmake --build . --target $1 -- VERBOSE=1
     cd ..
 }
 for i in $LIB; do
