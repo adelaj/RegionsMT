@@ -87,7 +87,7 @@ if (MSVC)
     if (${FORCE_POSIX_THREADS})
         add_definitions(-DFORCE_POSIX_THREADS -DPTW32_STATIC_LIB)
         set(libraries ${libraries} pthread-win32)
-        set(library_files_pthread-win32 pthreadVSE)
+        set(library_files_pthread-win32 pthreadVSE2)
     endif()
 endif()
 
