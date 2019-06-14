@@ -65,6 +65,9 @@ set(library_files_gsl gsl gslcblas)
 set(MSVC OFF)
 set(XCODE OFF)
 
+set_property(GLOBAL PROPERTY USE_FOLDERS ON)
+enable_testing()
+
 if(${CMAKE_GENERATOR} MATCHES "Visual Studio")
     set(MSVC ON)
 elseif(${CMAKE_GENERATOR} MATCHES "Xcode")
@@ -74,7 +77,7 @@ endif()
 project(${target})
 enable_language(C)
 
-option(FORCE_POSIX_THREAD "POSIX threads Windows library is used instead of WinAPI" OFF)
+option(FORCE_POSIX_THREAD "POSIX threads library is used instead of WinAPI" OFF)
 
 if (MSVC)
     msvc_set_static_runtime()
