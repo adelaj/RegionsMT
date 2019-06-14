@@ -1,5 +1,5 @@
-param ([boolean]$CLR = $False)
-$lib = "pthread-win32"
+param ([boolean]$CLR = $False, [string]$SRC = ".")
+$lib = Join-Path "$SRC" "pthread-win32"
 if ($CLR -And (Test-Path $lib)) { rm $lib -Force -Recurse }
 if (-Not (Test-Path $lib)) { git clone "https://github.com/GerHobbelt/pthread-win32" $lib }
 $cmakelists = Join-Path $lib "CMakeLists.txt"

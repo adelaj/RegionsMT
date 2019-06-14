@@ -66,6 +66,7 @@ file(GLOB pthread_resources ${CMAKE_CURRENT_SOURCE_DIR}/*.rc)
 source_group("Resource Files" FILES ${pthread_resources})
 
 set(pthread_headers_api_names pthread.h sched.h semaphore.h)
+unset(pthread_headers_api)
 foreach(header ${pthread_headers_api_names})
     set(pthread_headers_api ${pthread_headers_api} ${CMAKE_CURRENT_SOURCE_DIR}/${header})
     configure_file(${CMAKE_CURRENT_SOURCE_DIR}/${header} ${CMAKE_CURRENT_BINARY_DIR}/${header} COPYONLY)
