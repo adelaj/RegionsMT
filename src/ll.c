@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <limits.h>
 #include <errno.h>
-#include <immintrin.h>
 
 #if defined __GNUC__ || defined __clang__
 
@@ -324,6 +323,25 @@ size_t size_pop_cnt(size_t x)
 size_t size_log2(size_t x, bool ceil)
 {
     return size_bit_scan_reverse(x) + (ceil && x && (x & (x - 1)));
+}
+
+size_t m128i_bit_scan_forward(__m128i a)
+{
+    const __m128i msk[] = {
+        _mm_set_epi64x(-1, 0),
+        _mm_set_epi32(-1, 0, -1, 0),
+        _mm_set_epi16(-1, 0, -1, 0, -1, 0, -1, 0),
+        _mm_set_epi8(-1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0)
+    };
+    size_t res = 0;
+    for (size_t i = 0, j = 1 << (countof(msk) - 1); i < countof(msk) - 1; i++, j >>= 1)
+    {
+        __m128i t = msk[i];
+        if (_mm_testz_si128(a, t)) a = _mm_andnot_si128(t, a);
+        else res += j, a = _mm_and_si128(t, a);
+    }
+    if (!_mm_testz_si128(a, msk[countof(msk) - 1])) res++;
+    return res;
 }
 
 void spinlock_acquire(spinlock_handle *p_spinlock)

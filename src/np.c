@@ -210,16 +210,9 @@ size_t Strlncpy(char *dst, char *src, size_t cnt)
     return len;
 }
 
-void *Memrchr(void const *Str, int ch, size_t cnt)
+void *Memrchr(const void *Str, int ch, size_t cnt)
 {
-    const __m128i test[] = { 
-        _mm_set_epi64x(-1, 0), 
-        _mm_set_epi32(-1, 0, -1, 0), 
-        _mm_set_epi16(-1, 0, -1, 0, -1, 0, -1, 0),
-        _mm_set_epi8(-1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0, -1, 0)
-    };
     const __m128i msk = _mm_set1_epi8((char) ch);
-
     const char *str = (const char *) Str;
     const size_t off = ((uintptr_t) Str + cnt) % alignof(__m128i), n = MIN(off, cnt);
     for (size_t i = 0; i < n; i++) if (str[--cnt] == ch) return (void *) (str + cnt);
@@ -228,19 +221,28 @@ void *Memrchr(void const *Str, int ch, size_t cnt)
     {
         cnt -= sizeof(__m128i);
         __m128i a = _mm_cmpeq_epi8(_mm_load_si128((const __m128i *) (str + cnt)), msk);
-        if (_mm_testz_si128(a, a)) continue;
-
-        size_t pos = 0;
-        for (size_t i = 0, j = 1 << (countof(test) - 1); i < countof(test) - 1; i++, j >>= 1)
-        {
-            __m128i t = test[i];
-            if (_mm_testz_si128(a, t)) a = _mm_andnot_si128(t, a);
-            else pos += j, a = _mm_and_si128(t, a);
-        }
-        if (!_mm_testz_si128(a, test[countof(test) - 1])) pos++;
-        return (void *) (str + cnt + pos);
+        if (!_mm_testz_si128(a, a)) return (void *) (str + cnt + m128i_bit_scan_forward(a));
     }
 
     while (cnt) if (str[--cnt] == ch) return (void *) (str + cnt);
+    return NULL;
+}
+
+void *Memrchr2(const void *Str, int ch0, int ch1, size_t cnt)
+{
+    const __m128i msk0 = _mm_set1_epi8((char) ch0), msk1 = _mm_set1_epi8((char) ch1);
+    const char *str = (const char *) Str;
+    const size_t off = ((uintptr_t) Str + cnt) % alignof(__m128i), n = MIN(off, cnt);
+    for (size_t i = 0; i < n; i++) if (str[--cnt] == ch0 || str[cnt] == ch1) return ( void *) (str + cnt);
+
+    while (cnt >= sizeof(__m128i))
+    {
+        cnt -= sizeof(__m128i);
+        __m128i tmp = _mm_load_si128((const __m128i *) (str + cnt));
+        __m128i a = _mm_or_si128(_mm_cmpeq_epi8(tmp, msk0), _mm_cmpeq_epi8(tmp, msk1));
+        if (!_mm_testz_si128(a, a)) return ( void *) (str + cnt + m128i_bit_scan_forward(a));
+    }
+
+    while (cnt) if (str[--cnt] == ch0 || str[cnt] == ch1) return ( void *) (str + cnt);
     return NULL;
 }

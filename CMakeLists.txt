@@ -1,6 +1,7 @@
 # Run samples: 
 #     cmake -D CMAKE_GENERATOR_PLATFORM="x64" ..\RegionsMT\
 #     cmake -D CMAKE_GENERATOR_PLATFORM="x64" -D CMAKE_LIBRARY_PATH="../lib" -D FORCE_POSIX_THREADS="ON"  ..\RegionsMT\
+#     cmake -D CMAKE_GENERATOR_PLATFORM="Win32" -D CMAKE_LIBRARY_PATH="../lib" -D FORCE_POSIX_THREADS="ON"  ..\RegionsMT\
 
 cmake_minimum_required(VERSION 3.14)
 

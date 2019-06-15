@@ -61,6 +61,7 @@ struct lmf_name_context {
     size_t cnt, cap;
 };
 
+/*
 unsigned lmf_name_impl(void *Context, struct utf8 *utf8, struct text_metric metric, struct log log)
 {
 
@@ -70,7 +71,7 @@ unsigned lmf_name_finalize(void *Context, struct text_metric metric, struct log 
 {
 
 }
-
+*/
 
 // 'deg' = 0 corresponds to the categorical (factor) type
 // 'deg' > 0 corresponds to the numeric/ordinal type
@@ -81,16 +82,6 @@ struct lmf_entry {
 struct lmf_expr_arg {
     struct lmf_entry *ent;
     size_t *len, ent_cnt, ent_cap, len_cnt, len_cap;
-};
-
-struct base_context {
-    struct buff *buff;
-    struct hash_table *tbl;
-    struct text_metric metric; // metric snapshot
-    unsigned st; // state
-    size_t len;
-    union int_val val;
-    void *context;
 };
 
 enum {
@@ -128,7 +119,7 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
             arg->len[arg->len_cnt++]++;
             arg->ent_cnt++;
             if (strchr("^*+()", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
-            else if (!buff_append(context->buff, utf8.byte, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            else if (!buff_append(context->buff, utf8.chr, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 context->metric = metric;
@@ -154,7 +145,7 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
             context->buff->len = 0;
             return 1;
         }
-        else if (!buff_append(context->buff, utf8.byte, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else if (!buff_append(context->buff, utf8.chr, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
             if (!utf8_is_whitespace_len(utf8.val, utf8.len)) context->len = context->buff->len;
@@ -166,7 +157,7 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
         if (!utf8_is_whitespace_len(utf8.val, utf8.len)) return 1;
         if (strchr("^*+(", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
         else if (utf8.val == ')') log_message_error_xml_generic(log, CODE_METRIC, metric, "Covariate name expected before %<>c", log->style.chr, ')');
-        else if (!buff_append(context->buff, utf8.byte, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else if (!buff_append(context->buff, utf8.chr, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
             context->metric = metric;
@@ -180,14 +171,14 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
         if (strchr("^*+(", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
         else if (utf8.val == ')')
         {
-            if (!str_pool_insert(context->tbl, context->buff, context->len, &arg->ent[arg->ent_cnt - 1].off)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            if (!str_pool_insert(context->tbl, context->buff->str, context->len, &arg->ent[arg->ent_cnt - 1].off)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 context->st = LMF_EXPR_OP;
                 return 1;
             }
         }
-        else if (!buff_append(context->buff, utf8.byte, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else if (!buff_append(context->buff, utf8.chr, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
             if (!utf8_is_whitespace_len(utf8.val, utf8.len)) context->len = context->buff->len;
@@ -234,7 +225,7 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
             arg->len[arg->len_cnt - 1]++;
             arg->ent_cnt++;
             if (strchr("^*+()", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
-            else if (!buff_append(context->buff, utf8.byte, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            else if (!buff_append(context->buff, utf8.chr, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 context->metric = metric;

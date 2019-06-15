@@ -7,6 +7,8 @@
 
 #include "common.h"
 
+#include <immintrin.h>
+
 #if defined __GNUC__ || defined __clang__
 typedef volatile int spinlock_handle;
 #elif defined _MSC_BUILD
@@ -52,6 +54,8 @@ uint32_t uint32_log10(uint32_t, bool);
 uint64_t uint64_log10(uint64_t, bool);
 size_t size_log10(size_t, bool);
 size_t size_log2(size_t, bool);
+
+size_t m128i_bit_scan_forward(__m128i a);
 
 #define SPINLOCK_INIT 0
 void spinlock_acquire(spinlock_handle *);

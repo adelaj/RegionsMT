@@ -40,6 +40,16 @@ struct xml_att {
     //};
 };*/
 
+struct base_context {
+    struct buff *buff;
+    struct hash_table *tbl;
+    struct text_metric metric; // metric snapshot
+    unsigned st; // state
+    size_t len;
+    union int_val val;
+    void *context;
+};
+
 typedef bool (*xml_node_selector_callback)(struct xml_node *, const char *, size_t, void *, void *);
 typedef bool (*xml_val_selector_callback)(struct xml_att *, const char *, size_t, void *, void *, size_t *);
 

@@ -296,7 +296,7 @@ static bool xml_ref_impl()
 
 }
 
-static unsigned xml_char_ref_impl(uint32_t *p_val, bool hex, struct utf8 *utf8, struct text_metric metric, const char *path, struct log *log)
+static unsigned xml_char_ref_impl(uint32_t *p_val, bool hex, struct utf8 *utf8, struct text_metric metric, struct log *log)
 {
     uint32_t val = utf8->val;
     if ('0' <= val && val <= '9') val -= '0';
