@@ -41,7 +41,7 @@ macro(add_libraries)
         else()
             link_directories(${_p}-${CMAKE_OSX_ARCHITECTURES})
         endif()
-        message(STATUS "Library \"${_lib}\" added to the project")
+        # message(STATUS "Library \"${_lib}\" added to the project")
     endforeach()
 endmacro()
 

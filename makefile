@@ -10,30 +10,34 @@ ifeq ($(strip $(INC_PREFIX)),)
 CC_INC_PREFIX = ..
 endif
 
-ifeq ($(strip $(LD_INC_PREFIX)),)
-LD_INC_PREFIX = ..
+ifeq ($(strip $(LIBRARY_PATH)),)
+LIBRARY_PATH = ..
+endif
+
+ifeq ($(strip $(INSTALL_PATH)),)
+INSTALL_PATH = ..
 endif
 
 CC = gcc
 CC_OPT = -std=c11 -flto -fuse-linker-plugin -Wall -mavx
 CC_OPT-i386 = -m32
 CC_OPT-x86_64 = -m64
-CC_OPT-Release = -O3
-CC_OPT-Debug = -D_DEBUG -Og -ggdb
+CC_OPT--Release = -O3
+CC_OPT--Debug = -D_DEBUG -Og -ggdb
 CC_INC = gsl
 
 LD = $(CC)
 LD_OPT = -flto -fuse-linker-plugin -mavx
 LD_OPT-i386 = -m32
 LD_OPT-x86_64 = -m64
-LD_OPT-Release = -O3
-LD_OPT-Debug = -Og
+LD_OPT--Release = -O3
+LD_OPT--Debug = -Og
 LD_LIB = m pthread gsl gslcblas
 LD_INC = gsl
 
 TARGET = RegionsMT
-OBJ_DIR = ./obj
-SRC_DIR = ./src
+OBJ_DIR = obj
+SRC_DIR = src
 
 target = $(foreach cfg,$(CFG),$(addsuffix -$(cfg),$(addprefix $1-,$(ARCH))))
 
@@ -45,36 +49,50 @@ clean: $(call target,clean);
 
 rwildcard = $(sort $(wildcard $(addprefix $1,$2))) $(foreach d,$(sort $(wildcard $1*)),$(call rwildcard,$d/,$2))
 uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
+tree = $(if $1,$(call tree,$(filter-out ./,$(dir $(patsubst %/,%,$1)))) $1)
 
-define build_var =
-BUILD_$1-$2-$3 = $(strip $(addsuffix $4,$($1)) $(addsuffix $4,$($1-$2)) $(addsuffix $4,$($1-$3)) $(addsuffix $4,$($1-$2-$3)))
+define arch_dir =
+ARCH_DIR-$1 = $(INSTALL_PATH)/$(TARGET)-$1
+$(INSTALL_PATH)/$(TARGET)-$1:; mkdir $$@
 endef
 
-define build_obj =
-OBJ$1 = $(patsubst $(SRC_DIR)/%,$(OBJ_DIR)$1/%.o,$(call rwildcard,$(SRC_DIR)/,*.c))
+define build_dir =
+INSTALL_PATH-$1-$2 = $(ARCH_DIR-$1)/$2
+$(ARCH_DIR-$1)/$2: $(ARCH_DIR-$1); mkdir $$@
+endef
+
+define build_var =
+BUILD_$1-$2-$3 = $(strip $(addsuffix $4,$($1)) $(addsuffix $4,$($1-$2)) $(addsuffix $4,$($1--$3)) $(addsuffix $4,$($1-$2-$3)))
+endef
+
+define build_res =
+OBJ$1 = $(patsubst $(SRC_DIR)/%,$(OBJ_DIR)/%.o,$(call rwildcard,$(SRC_DIR)/,*.c))
+TARGET$1 = $(INSTALL_PATH$1)/$(TARGET)
 endef
 
 define build_struct =
-STRUCT$1 = $(call uniq,$(dir $(OBJ$1)))
+STRUCT$1 = $(addprefix $(INSTALL_PATH$1)/,$(call uniq,$(foreach m,$(dir $(OBJ$1)),$(call tree,$m))))
 endef
 
 define build =
 .PHONY: build$1
-build$1: | $(STRUCT$1) $(TARGET)$1;
+build$1: | $(INSTALL_PATH$1) $(STRUCT$1) $(TARGET$1);
 $(STRUCT$1):; mkdir $$@
-$(TARGET)$1: $(OBJ$1); $(LD) $(BUILD_LD_OPT$1) -o $$@ $$^ $(addprefix -L,$(addprefix $(LD_INC_PREFIX)/,$(BUILD_LD_INC$1))) $(addprefix -l,$(BUILD_LD_LIB$1))
-$(OBJ_DIR)$1/%.c.o: $(SRC_DIR)/%.c; $(CC) $(BUILD_CC_OPT$1) $(addprefix -I,$(addprefix $(CC_INC_PREFIX)/,$(BUILD_CC_INC$1))) -o $$@ -c $$^
+$(TARGET$1): $(addprefix $(INSTALL_PATH$1)/,$(OBJ$1)); $(LD) $(BUILD_LD_OPT$1) -o $$@ $$^ $(addprefix -L,$(addprefix $(LIBRARY_PATH)/,$(BUILD_LD_INC$1))) $(addprefix -l,$(BUILD_LD_LIB$1))
+$(INSTALL_PATH$1)/$(OBJ_DIR)/%.c.o: $(SRC_DIR)/%.c; $(CC) $(BUILD_CC_OPT$1) $(addprefix -I,$(addprefix $(CC_INC_PREFIX)/,$(BUILD_CC_INC$1))) -o $$@ -c $$^
 endef
 
 define clean =
 .PHONY: clean$1 clean-obj$1 clean-target$1
 clean$1: clean-obj$1 clean-target$1;
-clean-obj$1:; rm -rf $(OBJ_DIR)$1
-clean-target$1:; rm -f $(TARGET)$1
+clean-obj$1:; rm -rf $(INSTALL_PATH$1)
 endef
 
-$(foreach arch,$(ARCH),$(foreach cfg,$(CFG),\
-$(eval $(call build_obj,-$(arch)-$(cfg)))\
+$(foreach arch,$(ARCH),\
+$(eval $(call arch_dir,$(arch)))\
+$(foreach cfg,$(CFG),\
+$(eval $(call build_dir,$(arch),$(cfg)))\
+$(eval $(call build_res,-$(arch)-$(cfg)))\
 $(eval $(call build_struct,-$(arch)-$(cfg)))\
 $(foreach var,CC_OPT LD_OPT LD_LIB,$(eval $(call build_var,$(var),$(arch),$(cfg),)))\
 $(foreach var,CC_INC LD_INC,$(eval $(call build_var,$(var),$(arch),$(cfg),-$(arch)-$(cfg))))\
