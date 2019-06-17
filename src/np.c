@@ -221,7 +221,7 @@ void *Memrchr(const void *Str, int ch, size_t cnt)
     {
         cnt -= sizeof(__m128i);
         __m128i a = _mm_cmpeq_epi8(_mm_load_si128((const __m128i *) (str + cnt)), msk);
-        if (!_mm_testz_si128(a, a)) return (void *) (str + cnt + m128i_bit_scan_forward(a));
+        if (!_mm_testz_si128(a, a)) return (void *) (str + cnt + m128i_byte_scan_forward(a));
     }
 
     while (cnt) if (str[--cnt] == ch) return (void *) (str + cnt);
@@ -240,7 +240,7 @@ void *Memrchr2(const void *Str, int ch0, int ch1, size_t cnt)
         cnt -= sizeof(__m128i);
         __m128i tmp = _mm_load_si128((const __m128i *) (str + cnt));
         __m128i a = _mm_or_si128(_mm_cmpeq_epi8(tmp, msk0), _mm_cmpeq_epi8(tmp, msk1));
-        if (!_mm_testz_si128(a, a)) return ( void *) (str + cnt + m128i_bit_scan_forward(a));
+        if (!_mm_testz_si128(a, a)) return ( void *) (str + cnt + m128i_byte_scan_forward(a));
     }
 
     while (cnt) if (str[--cnt] == ch0 || str[cnt] == ch1) return ( void *) (str + cnt);

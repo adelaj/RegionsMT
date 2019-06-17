@@ -1,7 +1,6 @@
 #include "ll.h"
 
 #include <stdint.h>
-#include <stdlib.h>
 #include <limits.h>
 #include <errno.h>
 
@@ -65,7 +64,7 @@ uint32_t uint32_bit_scan_reverse(uint32_t x)
 uint32_t uint32_bit_scan_forward(uint32_t x)
 {
     return x ? __builtin_ctz((unsigned) x) : UINT_MAX;
-}ggm
+}
 
 uint32_t uint32_pop_cnt(uint32_t x)
 {
@@ -325,7 +324,7 @@ size_t size_log2(size_t x, bool ceil)
     return size_bit_scan_reverse(x) + (ceil && x && (x & (x - 1)));
 }
 
-size_t m128i_bit_scan_forward(__m128i a)
+size_t m128i_byte_scan_forward(__m128i a)
 {
     const __m128i msk[] = {
         _mm_set_epi64x(-1, 0),

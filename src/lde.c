@@ -79,6 +79,7 @@ size_t lde_hwe(char *gen_pos, char *gen_neg, size_t phen_cnt, double *d_prime, d
     return it;
 }
 
+
 double lde_impl(uint8_t *gen_pos, uint8_t *gen_neg, size_t phen_cnt)
 {
     size_t t[9] = { 0 };
@@ -96,8 +97,7 @@ double lde_impl(uint8_t *gen_pos, uint8_t *gen_neg, size_t phen_cnt)
     size_t pr0, pr1;
     if (bor) pr0 = mar_pos[0] * mar_neg[0], pr1 = mar_pos[1] * mar_neg[1], cov = 0 - cov; 
     else pr0 = mar_pos[0] * mar_neg[1], pr1 = mar_pos[1] * mar_neg[0];
-    double dp = (double) cov / (double) MIN(pr0, pr1);
+    //double dp = (double) cov / (double) MIN(pr0, pr1);
     //return (struct lde) { .d_prime = (double) cov / (double) MIN(pr0, pr1), .r = (double) cov / sqrt(pr0 * pr1) };
     return (double) cov / (double) MIN(pr0, pr1);
 }
-

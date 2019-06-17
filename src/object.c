@@ -117,7 +117,7 @@ bool log_message_error_xml_generic(struct log *restrict log, struct code_metric 
     return res;
 }
 
-bool log_message_error_xml_chr(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum status_xml_chr status, const uint8_t *buff, size_t len)
+bool log_message_error_xml_chr(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status_chr status, const uint8_t *buff, size_t len)
 {
     static const char *fmt[] = {
         "Unexpected end of file %<>s*"
@@ -136,7 +136,7 @@ enum xml_status_str {
     XML_INVALID_PI,
 };
 
-bool log_message_error_xml_str(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum status_xml_str status, const char *str, size_t len)
+bool log_message_error_xml_str(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status_str status, const char *str, size_t len)
 {
     static const struct strl fmt[] = {
         STRI("Unexpected tag"),

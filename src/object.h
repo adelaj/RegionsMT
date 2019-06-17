@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "intdom.h"
 #include "strproc.h"
 #include "log.h"
 

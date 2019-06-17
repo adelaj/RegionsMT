@@ -1,3 +1,4 @@
+#include "np.h"
 #include "ll.h"
 #include "lm.h"
 #include "log.h"
