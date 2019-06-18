@@ -1,18 +1,19 @@
+.DEFAULT_GOAL = all
 .RECIPEPREFIX +=
 
-ifeq ($(strip $(ARCH)),)
+ifndef ARCH
 ARCH = $(shell arch)
 endif
 
-ifeq ($(strip $(CFG)),)
+ifndef CFG
 CFG = Release
 endif
 
-ifeq ($(strip $(LIBRARY_PATH)),)
+ifndef LIBRARY_PATH
 LIBRARY_PATH = ..
 endif
 
-ifeq ($(strip $(INSTALL_PATH)),)
+ifndef INSTALL_PATH
 INSTALL_PATH = ..
 endif
 
@@ -37,98 +38,82 @@ TARGET = RegionsMT
 OBJ_DIR = obj
 SRC_DIR = src
 
-target = $(foreach cfg,$(CFG),$(addsuffix -$(cfg),$(addprefix $1-,$(ARCH))))
-
-.PHONY: all
-all: $(call target,build);
-
-.PHONY: clean
-clean: | $(call target,clean) $(addprefix clean-,$(ARCH));
+GATHER_DIR =
 
 rwildcard = $(sort $(wildcard $(addprefix $1,$2))) $(foreach d,$(sort $(wildcard $1*)),$(call rwildcard,$d/,$2))
-rev = $(if $1,$(call rev,$(wordlist 2,$(words $1),$1)) $(firstword $1))
-uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
-tree = $(if $1,$(call tree,$(filter-out ./,$(dir $(patsubst %/,%,$1)))) $(dir $1))
 
-define clean_file =
-.PHONY: $(addprefix clean-,$1)
-$$(addprefix clean-,$1): clean-%: | $$(CLEAN-)
-    $$(if $$(wildcard $$*,rm $$*))
+define gather =
+$(if $(findstring $2,$(GATHER_$1)),,$(eval
+CLEAN-$2 =
+GATHER_$1 += $2
+GATHER_CLEAN_$1 += clean-$2
+$(eval PARENT-$2 = $(addprefix $(INSTALL_PATH)/,$(filter-out .,$(patsubst %/,%,$(dir $(patsubst $(INSTALL_PATH)/%,%,$2))))))
+$(if $(PARENT-$2),
+CLEAN-$(PARENT-$2) += clean-$2
+$(call gather,DIR,$(PARENT-$2)))))
 endef
 
-define make_dir =
-$1: $2/%: | $$(addprefix $2/,$$(filter-out .,$$(patsubst /%,%,$$(dir %))))
-    mkdir $$@
-    $$(eval $$(if $$|,$$(CLEAN-$$|) += $$@))
-    @echo $$(CLEAN-$$|)
-.PHONY: $(addprefix clean-,$1)
-$(addprefix clean-,$1): clean-%: | $$(CLEAN-%)
-    $$(if $$(wildcard $$*),$$(if $$(wildcard $$*/*),,rmdir $$*))
-endef
-
-define build_dir_arch =
-$(eval BUILD_DIR-$1 = $(INSTALL_PATH)/$(TARGET)-$1)
-$(call make_dir,$(BUILD_DIR-$1))
-.PHONY: clean-$1
-clean-$1: clean-$(BUILD_DIR-$1);
-endef
-
-define build_dir_arch_cfg =
-$(eval BUILD_DIR-$1-$2 = $(BUILD_DIR-$1)/$2)
-$(call make_dir,$(BUILD_DIR-$1-$2),$(BUILD_DIR-$1))
-endef
-
-define build_var_arch_cfg =
-BUILD_$1-$2-$3 = $(strip $(addsuffix $5,$(addprefix $4,$($1) $($1-$2) $($1--$3) $($1-$2-$3))))
+define build_var =
+$(eval 
+$(eval
+$1 +=
+$1-$2 +=
+$1--$3 +=
+$1-$2-$3 +=)
+BUILD_$1-$2-$3 = $(strip $(addsuffix $5,$(addprefix $4,$($1) $($1-$2) $($1--$3) $($1-$2-$3)))))
 endef
 
 define build =
-$(eval OBJ_TMP$1 = $(patsubst $(SRC_DIR)/%,$(OBJ_DIR)/%.o,$(call rwildcard,$(SRC_DIR)/,*.c)))
-$(eval STRUCT$1 = $(addprefix $(BUILD_DIR$1)/,$(call uniq,$(foreach m,$(OBJ_TMP$1),$(call tree,$m)))))
-$(eval OBJ$1 = $(addprefix $(BUILD_DIR$1)/,$(OBJ_TMP$1)))
-$(eval TARGET$1 = $(BUILD_DIR$1)/$(TARGET))
-$(call make_dir,$(STRUCT$1),$(BUILD_DIR$1))
-$(OBJ$1): $$(BUILD_DIR$1)/$$(OBJ_DIR)/%.c.o: $$(SRC_DIR)/%.c | $$(call tree $$(BUILD_DIR$1)/$$(OBJ_DIR)/%)
-    $$(CC) $$(BUILD_CC_OPT$1) $$(addprefix -I,$(BUILD_CC_INC$1)) -o $$@ -c $$^
-    $$(foreach dir,$$|,$$(eval $$(CLEAN-$(dir)) += $$@))
-$(call clean_obj,GET$1) $(OBJ$1))
-$$(TARGET$1): $$(OBJ$1) | $$(BUILD_DIR$1)
-    $$(LD) $$(BUILD_LD_OPT$1) -o $$@ $$^ $$(addprefix -L,$$(addprefix $$(LIBRARY_PATH)/,$$(BUILD_LD_INC$1))) $$(addprefix -l,$$(BUILD_LD_LIB$1))
-    $$(eval CLEAN-$(BUILD_DIR$1) += $$@)
+$(eval 
+$(eval 
+TARGET$1 = $(DIR$1)/$(TARGET)
+GATHER_TARGET$1 =
+GATHER_OBJ$1 =)
+$(call gather,TARGET$1,$(TARGET$1))
+$(foreach o,$(addprefix $(DIR$1)/,$(patsubst $(SRC_DIR)/%,$(OBJ_DIR)/%.o,$(call rwildcard,$(SRC_DIR)/,*.c))),\
+$(call gather,OBJ$1,$o))
 
-.PHONY: build$1
-build$1: $(TARGET$1);
-.PHONY: clean$1
-clean$1: | $(addprefix clean-,$(TARGET$1) $(call rev,$(OBJ$1)) $(call rev,$(STRUCT$1)) $(BUILD_DIR$1));
+.SECONDEXPANSION:
+$$(GATHER_OBJ$1): $(DIR$1)/$(OBJ_DIR)/%.c.o: $(SRC_DIR)/%.c | $$$$(PARENT-$$$$@)
+    $(CC) $(BUILD_CC_OPT$1) $(addprefix -I,$(BUILD_CC_INC$1)) -o $$@ -c $$^
+
+.SECONDEXPANSION:
+$$(GATHER_TARGET$1): $$(GATHER_OBJ$1) | $$$$(PARENT-$$$$@)
+    $(LD) $(BUILD_LD_OPT$1) -o $$@ $$^ $(addprefix -L,$(BUILD_LD_INC$1)) $(addprefix -l,$(BUILD_LD_LIB$1))
+
+.SECONDEXPANSION:
+$$(GATHER_CLEAN_OBJ$1) $$(GATHER_CLEAN_TARGET$1): clean-%: | $$$$(CLEAN-%)
+    $$(if $$(wildcard $$*),rm $$*))
 endef
 
-$(foreach arch,$(ARCH),\
-$(eval $(call build_dir_arch,$(arch)))\
-$(foreach cfg,$(CFG),\
-$(eval $(call build_dir_arch_cfg,$(arch),$(cfg)))\
-$(foreach var,CC_OPT LD_OPT LD_LIB,$(eval $(call build_var_arch_cfg,$(var),$(arch),$(cfg),,)))\
-$(foreach var,CC_INC LD_INC,$(eval $(call build_var_arch_cfg,$(var),$(arch),$(cfg),$(LIBRARY_PATH)/,-$(arch)/$(cfg))))\
-$(eval $(call build,-$(arch)-$(cfg)))))
+$(foreach a,$(ARCH),\
+$(eval DIR-$a = $(INSTALL_PATH)/$(TARGET)-$a)\
+$(foreach c,$(CFG),\
+$(eval DIR-$a-$c = $(DIR-$a)/$c)\
+$(foreach v,CC_OPT LD_OPT LD_LIB,\
+$(call build_var,$v,$a,$c,,))\
+$(foreach v,CC_INC LD_INC,\
+$(call build_var,$v,$a,$c,$(LIBRARY_PATH)/,-$a/$c))\
+$(call build,-$a-$c)))
 
-BUILD_DIR-x86_64 = $(INSTALL_PATH)/$(TARGET)-x86_64/Release
-uu-$(TARGET)-x86_64/Release = 100
+DIR = $(INSTALL_PATH)/$(TARGET)-x86_64/Release/1/2
+$(call gather,DIR,$(DIR))
+$(call gather,DIR,$(INSTALL_PATH)/$(TARGET)-x86_64/Release/1/2/123)
+$(call gather,DIR,$(INSTALL_PATH)/$(TARGET)-x86_64/Release/1/5)
+
+.PHONY: all
+all: $(foreach a,$(ARCH),$(foreach c,$(CFG),$(TARGET-$a-$c)))
+
 .SECONDEXPANSION:
-$(BUILD_DIR-x86_64): $(INSTALL_PATH)/%: | $(eval $(uu-%))
-    mkdir $@
-    $(eval $(if $|,$(CLEAN-$|) += $@))
-    @echo $(CLEAN-$|)
+$(GATHER_DIR): | $$(PARENT-$$@); mkdir $@
 
-# $(eval $(call make_dir,$(BUILD_DIR-x86_64),$(INSTALL_PATH)))
-
-define test =
+.PHONY: $(GATHER_CLEAN_DIR)
 .SECONDEXPANSION:
-TEST-x86_64-Release TEST-i386-Release: TEST-%:
-    @echo $$*
-    @echo $$(patsubst %/,%,$$(dir a/b,))
-    $$(eval CLEAN-$$(BUILD_DIR$$*) += $$@)
-endef
-$(eval $(call test))
-print-a: TEST-x86_64-Release TEST-i386-Release; @echo CLEAN-$(BUILD_DIR-x86_64-Release) = $(CLEAN-$(BUILD_DIR-x86_64-Release))
+$(GATHER_CLEAN_DIR): clean-%: | $$(CLEAN-%); 
+    $(if $(wildcard $*),$(if $(wildcard $*/*),,rmdir $*))
+
+.PHONY: clean
+clean: | $(foreach f,$(addprefix DIR-,$(ARCH)),clean-$($f));
 
 .PHONY: print-%
 print-%:; @echo $* = $($*)
