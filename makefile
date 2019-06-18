@@ -39,6 +39,7 @@ OBJ_DIR = obj
 SRC_DIR = src
 
 GATHER_DIR =
+GATHER_CLEAN_FILE =
 
 rwildcard = $(sort $(wildcard $(addprefix $1,$2))) $(foreach d,$(sort $(wildcard $1*)),$(call rwildcard,$d/,$2))
 
@@ -81,9 +82,7 @@ $$(GATHER_OBJ$1): $(DIR$1)/$(OBJ_DIR)/%.c.o: $(SRC_DIR)/%.c | $$$$(PARENT-$$$$@)
 $$(GATHER_TARGET$1): $$(GATHER_OBJ$1) | $$$$(PARENT-$$$$@)
     $(LD) $(BUILD_LD_OPT$1) -o $$@ $$^ $(addprefix -L,$(BUILD_LD_INC$1)) $(addprefix -l,$(BUILD_LD_LIB$1))
 
-.SECONDEXPANSION:
-$$(GATHER_CLEAN_OBJ$1) $$(GATHER_CLEAN_TARGET$1): clean-%: | $$$$(CLEAN-%)
-    $$(if $$(wildcard $$*),rm $$*))
+GATHER_CLEAN_FILE += $(GATHER_CLEAN_OBJ$1) $(GATHER_CLEAN_TARGET$1))
 endef
 
 $(foreach a,$(ARCH),\
@@ -109,8 +108,12 @@ $(GATHER_DIR): | $$(PARENT-$$@); mkdir $@
 
 .PHONY: $(GATHER_CLEAN_DIR)
 .SECONDEXPANSION:
-$(GATHER_CLEAN_DIR): clean-%: | $$(CLEAN-%); 
+$(GATHER_CLEAN_DIR): clean-%: | $$(CLEAN-%)
     $(if $(wildcard $*),$(if $(wildcard $*/*),,rmdir $*))
+
+.SECONDEXPANSION:
+$(GATHER_CLEAN_FILE): clean-%: | $$(CLEAN-%)
+    $(if $(wildcard $*),rm $*)
 
 .PHONY: clean
 clean: | $(foreach f,$(addprefix DIR-,$(ARCH)),clean-$($f));
