@@ -95,11 +95,6 @@ $(foreach v,CC_INC LD_INC,\
 $(call build_var,$v,$a,$c,$(LIBRARY_PATH)/,-$a/$c))\
 $(call build,-$a-$c)))
 
-DIR = $(INSTALL_PATH)/$(TARGET)-x86_64/Release/1/2
-$(call gather,DIR,$(DIR))
-$(call gather,DIR,$(INSTALL_PATH)/$(TARGET)-x86_64/Release/1/2/123)
-$(call gather,DIR,$(INSTALL_PATH)/$(TARGET)-x86_64/Release/1/5)
-
 .PHONY: all
 all: $(foreach a,$(ARCH),$(foreach c,$(CFG),$(TARGET-$a-$c)))
 
