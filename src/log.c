@@ -472,13 +472,13 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute
     struct fmt_res res = { 0 };
     for (size_t i = 0, len = *p_cnt, tmp = len, pos = 0, off = 0; ++i;) switch (i)
     {
-    case 4:
+    // case 4 is special
     case 6:
     case 8:
         cnt = size_add_sat(cnt, len);
     case 2:
         tmp = len = size_sub_sat(tmp, len);
-        if (!tmp) i = SIZE_MAX; // Exit loop if there is no more space
+        if (!tmp) i = SIZE_MAX; // Exit loop if there is no more space            
         break;
     case 9:
         if (res.flags & FMT_LEFT_JUSTIFY)
@@ -515,19 +515,15 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute
             tf |= FMT_EXE_FLAG_PTR;
             list_ptr = list_ptr || ptr;
         }
+        else if (res.flags & FMT_ARG_PTR)
+        {
+            Va_copy(arg_sub, *ARG_FETCH(ptr, p_arg, Va_list *, Va_list *));
+            p_arg_sub = &arg_sub;
+        }
         else
         {
-            if (res.flags & FMT_ARG_PTR)
-            {
-                Va_copy(arg_sub, *ARG_FETCH(ptr, p_arg, Va_list *, Va_list *));
-                p_arg_sub = &arg_sub;
-                // !!! ADD Va_end(arg_sub) somewhere !!!
-            }
-            else
-            {
-                p_arg_sub = p_arg;
-                list_ptr = ptr;
-            }
+            p_arg_sub = p_arg;
+            list_ptr = ptr;
         }
         if ((res.flags & FMT_CONDITIONAL) && !ARG_FETCH(list_ptr, p_arg_sub, bool, int)) tf |= FMT_EXE_FLAG_PHONY;
         if (res.flags & (FMT_ENV_BEGIN | FMT_ENV_END))
@@ -537,18 +533,27 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute
             else i++;
         }
         else i++;
-        break;    
+        break;
+    case 4:
+        cnt = size_add_sat(cnt, len);
+        tmp = len = size_sub_sat(tmp, len);
+        if (!tmp)
+        {
+            if (res.flags & FMT_ARG_PTR) Va_end(arg_sub);
+            i = SIZE_MAX; // Exit loop if there is no more space            
+        }
+        break;
     case 5:
         switch (res.type)
         {
         case TYPE_INT:
-            if (!fmt_execute_int(res.int_arg.spec, res.int_arg.flags, buff + cnt, &len, p_arg_sub, tf)) return 0;
+            if (!fmt_execute_int(res.int_arg.spec, res.int_arg.flags, buff + cnt, &len, p_arg_sub, tf)) i = SIZE_MAX; // Exit on error
             break;
         case TYPE_STR: 
             fmt_execute_str(res.str_arg.len, res.str_arg.mode, buff + cnt, &len, p_arg_sub, tf);
             break;
         case TYPE_TIME_DIFF:
-            if (!fmt_execute_time_diff(buff + cnt, &len, p_arg_sub, tf)) return 0;
+            if (!fmt_execute_time_diff(buff + cnt, &len, p_arg_sub, tf)) i = SIZE_MAX; // Exit on error
             break;
         case TYPE_TIME_STAMP:
             if (!(tf & FMT_EXE_FLAG_PHONY)) print_time_stamp(buff + cnt, &len);
@@ -557,13 +562,13 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute
             fmt_execute_crt(buff + cnt, &len, p_arg_sub, tf);
             break;
         case TYPE_FMT:
-            if (!fmt_execute(buff + cnt, &len, p_arg_sub, tf)) return 0;
+            if (!fmt_execute(buff + cnt, &len, p_arg_sub, tf)) i = SIZE_MAX; // Exit on error
             break;
         case TYPE_DEFAULT:
             fmt_execute_default(res.str_arg.len, res.str_arg.mode, &len, p_arg_sub, tf);
             break;
         case TYPE_CALLBACK:
-            if (!ARG_FETCH(list_ptr, p_arg_sub, fmt_callback, fmt_callback)(buff + cnt, &len, p_arg_sub, tf)) return 0;
+            if (!ARG_FETCH(list_ptr, p_arg_sub, fmt_callback, fmt_callback)(buff + cnt, &len, p_arg_sub, tf)) i = SIZE_MAX; // Exit on error
             break;
         case TYPE_CHAR:
             fmt_execute_char(res.char_arg.rep, res.char_arg.mode, buff + cnt, &len, p_arg_sub, tf);
@@ -577,6 +582,8 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute
         case TYPE_FLT: // NOT IMPLEMENTED!
             if (!(tf & FMT_EXE_FLAG_PHONY)) i++;
         }
+        if (res.flags & FMT_ARG_PTR) Va_end(arg_sub);
+        if (!(i + 1)) return 0;
         if (tf & FMT_EXE_FLAG_PHONY) i++;
         break;
     case 7:        

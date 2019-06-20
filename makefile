@@ -22,12 +22,8 @@ CC_OPT = -std=c11 -Wall -mavx
 CC_OPT-i386 = -m32
 CC_OPT-x86_64 = -m64
 CC_OPT--Release = -O3 -flto
-CC_OPT--Debug = -D_DEBUG
+CC_OPT--Debug = -D_DEBUG -g
 CC_INC = gsl
-
-CC_OPT--Release@gcc = -fuse-linker-plugin
-CC_OPT--Debug@gcc = -ggdb -Og
-CC_OPT--Debug@clang = -g -O0
 
 LD = $(CC)
 LD_OPT = -mavx
@@ -37,13 +33,22 @@ LD_OPT--Release = -O3 -flto
 LD_LIB = m pthread gsl gslcblas
 LD_INC = gsl
 
-LD_OPT--Release@clang = -fuse-ld=gold
-LD_OPT--Debug@clang = -O0
-LD_OPT--Release@gcc = -fuse-linker-plugin
-LD_OPT--Debug@gcc = -Og
+$(foreach v,CC LD,$(eval $v_TYPE = $(firstword $(subst -, ,$($v)))))
 
-CC_TYPE = $(firstword $(subst -, ,$(CC)))
-LD_TYPE = $(firstword $(subst -, ,$(LD)))
+ifeq ($(CC_TYPE),gcc)
+CC_OPT--Release += -fuse-linker-plugin
+CC_OPT--Debug += -Og
+else ifeq ($(CC_TYPE),clang)
+CC_OPT--Debug += -O0
+endif
+
+ifeq ($(LD_TYPE),gcc)
+LD_OPT--Release += -fuse-linker-plugin
+LD_OPT--Debug += -Og
+else ifeq ($(LD_TYPE),clang)
+LD_OPT--Release += -fuse-ld=gold
+LD_OPT--Debug += -O0
+endif
 
 TARGET = RegionsMT
 OBJ_DIR = obj
@@ -70,14 +75,10 @@ define build_var =
 $(eval
 $(eval
 $1 +=
-$1$6 +=
 $1-$2 +=
-$1-$2$6 +=
 $1--$3 +=
-$1--$3$6 +=
-$1-$2-$3 +=
-$1-$2-$3$6 +=)
-BUILD_$1-$2-$3 = $(addsuffix $5,$(addprefix $4,$($1) $($1$6) $($1-$2) $($1-$2$6) $($1--$3) $($1--$3$6) $($1-$2-$3) $($1-$2-$3$6))))
+$1-$2-$3 +=)
+BUILD_$1-$2-$3 = $(addsuffix $5,$(addprefix $4,$($1) $($1-$2) $($1--$3) $($1-$2-$3))))
 endef
 
 define build =
@@ -106,7 +107,7 @@ $(eval DIR-$a = $(INSTALL_PATH)/$(TARGET)-$a)\
 $(foreach c,$(CFG),\
 $(eval DIR-$a-$c = $(DIR-$a)/$c)\
 $(foreach v,CC_OPT LD_OPT LD_LIB,\
-$(call build_var,$v,$a,$c,,,@$($(firstword $(subst _, ,$v))_TYPE)))\
+$(call build_var,$v,$a,$c,,))\
 $(foreach v,CC_INC LD_INC,\
 $(call build_var,$v,$a,$c,$(LIBRARY_PATH)/,-$a/$c,@$($(firstword $(subst _, ,$v))_TYPE)))\
 $(call build,-$a-$c)))
