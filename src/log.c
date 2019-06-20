@@ -465,6 +465,7 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute
         if (!(flags & FMT_EXE_FLAG_PHONY)) *p_cnt = 0;
         return 1;
     }
+    Va_list arg_sub;
     enum fmt_execute_flags tf = 0;
     size_t cnt = 0;
     struct env env = { { 0 } };
@@ -516,7 +517,12 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute
         }
         else
         {
-            if (res.flags & FMT_ARG_PTR) p_arg_sub = ARG_FETCH(ptr, p_arg, Va_list *, Va_list *);
+            if (res.flags & FMT_ARG_PTR)
+            {
+                Va_copy(arg_sub, *ARG_FETCH(ptr, p_arg, Va_list *, Va_list *));
+                p_arg_sub = &arg_sub;
+                // !!! ADD Va_end(arg_sub) somewhere !!!
+            }
             else
             {
                 p_arg_sub = p_arg;
