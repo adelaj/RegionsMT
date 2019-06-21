@@ -1,8 +1,3 @@
-# Run samples: 
-#     cmake -D CMAKE_GENERATOR_PLATFORM="x64" ..\RegionsMT\
-#     cmake -D CMAKE_GENERATOR_PLATFORM="x64" -D CMAKE_LIBRARY_PATH="../lib" -D FORCE_POSIX_THREADS="ON"  ..\RegionsMT\
-#     cmake -D CMAKE_GENERATOR_PLATFORM="Win32" -D CMAKE_LIBRARY_PATH="../lib" -D FORCE_POSIX_THREADS="ON"  ..\RegionsMT\
-
 cmake_minimum_required(VERSION 3.14)
 
 macro(msvc_set_static_runtime)
@@ -79,9 +74,14 @@ project(${target})
 enable_language(C)
 
 option(FORCE_POSIX_THREAD "POSIX threads library is used instead of WinAPI" OFF)
-
+option(MSVC_RUNTIME_DYNAMIC "Use dynamically-linked runtime" OFF) 
+ 
 if (MSVC)
-    msvc_set_static_runtime()
+    if(NOT MSVC_RUNTIME_DYNAMIC)
+        msvc_set_static_runtime()
+    else()
+        add_definitions(-D_DLL)
+    endif()
     remove_definitions(-D_MBCS)
     add_definitions(-D_UNICODE)
     set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} /W4 /GL /arch:AVX /volatile:ms")
@@ -108,4 +108,5 @@ file(GLOB_RECURSE header_list RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/${src_dir}/"
 assign_source_group("Header Files" ${src_dir} header_list)
 
 add_executable(${target} ${source_list} ${header_list})
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${target})
 link_libraries(${target} ${libraries})
