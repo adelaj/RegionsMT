@@ -164,20 +164,18 @@ cmake --build . --config "Release"
 Resulting executables for the `Debug` and `Release` configurations are `~/build/msvc/RegionsMT-x64/Debug/RegionsMT.exe` and `~/build/msvc/RegionsMT-x64/Release/RegionsMT.exe` respectively.
 
 ### Installation via WSL
-A different way of installation for Windows 10 can be performed on top of the [Windows Subsystem for Linux](https://en.wikipedia.org/wiki/Windows_Subsystem_for_Linux). The build process is essentially identical to that of Linux, however `i386` executables are not supported, though still can be built.
+A different way of installation for Windows 10 can be performed on top of the [Windows Subsystem for Linux (WSL)](https://en.wikipedia.org/wiki/Windows_Subsystem_for_Linux). The build process is essentially identical to that of Linux, however `i386` executables are not supported, though still can be built.
 
 
 ### Installation via Cygwin or MinGW ---  TBD
 
-## Installation for Mac OS
+## Installation for Mac OS (preliminary)
 
 ### Prerequisites
 The following programs should be installed:
 * A Mac OS package manager such as [Homebrew](https://brew.sh/) or [MacPorts](https://www.macports.org/);
 * [Xcode](https://developer.apple.com/xcode/) with [Command Line Tools](https://stackoverflow.com/questions/9329243/xcode-install-command-line-tools).
 
-The following common packages are required for the installation: 
+The following packages are required for the installation: 
 * `git`;
-* `cmake` (3.14 or newer);
-* `make` (4.1 or newer, or may be older, but 3.8.1 will definitely not work).
-
+* `cmake` (3.14 or newer).
