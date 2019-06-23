@@ -71,7 +71,10 @@ elseif(${CMAKE_GENERATOR} MATCHES "Xcode")
 endif()
 
 project(${target})
+include(CheckIPOSupported)
+check_ipo_supported()
 enable_language(C)
+
 
 option(FORCE_POSIX_THREAD "POSIX threads library is used instead of WinAPI" OFF)
 option(MSVC_RUNTIME_DYNAMIC "Use dynamically-linked runtime" OFF) 
@@ -93,6 +96,10 @@ if (MSVC)
         set(libraries ${libraries} pthread-win32)
         set(library_files_pthread-win32 pthreadVSE2)
     endif()
+elseif(XCODE)
+    set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -mavx")
+    set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -flto")
+    set(CMAKE_C_FLAGS_MINSIZEREL "${CMAKE_C_FLAGS_MINSIZEREL} -flto")
 endif()
 
 if (NOT DEFINED CMAKE_LIBRARY_PATH)
@@ -109,4 +116,5 @@ assign_source_group("Header Files" ${src_dir} header_list)
 
 add_executable(${target} ${source_list} ${header_list})
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${target})
+set_property(${target} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 link_libraries(${target} ${libraries})

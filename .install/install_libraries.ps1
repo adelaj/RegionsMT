@@ -19,11 +19,11 @@ foreach ($i in $lib)
         if (-Not (Test-Path $i-$j)) { New-Item -ItemType Directory -Force -Path $i-$j }
         cd $i-$j
         ${lib-flags} = (Get-Variable -Name ("cmake-flags-" + $i)).Value.Trim()
-        cmake $(if (${lib-flags}) { ${lib-flags} + " " })-D CMAKE_C_FLAGS_INIT="/GL" -D CMAKE_STATIC_LINKER_FLAGS_INIT="/LTCG" -D CMAKE_GENERATOR_PLATFORM="$j" $(Join-Path .. $(Join-Path "$SRC" "$i"))
+        cmake $(if (${lib-flags}) { ${lib-flags} + " " })-D CMAKE_C_FLAGS_INIT="/GL" -D CMAKE_STATIC_LINKER_FLAGS_INIT="/LTCG" -A "$j" $(Join-Path .. $(Join-Path "$SRC" "$i"))
         foreach ($k in $CFG.Split(" ")) 
         {     
             # & $msbuild "$i.sln" /t:$i /p:Configuration=$k /p:CharacterSet=Unicode 
-            cmake --build . --target $i --config $k --verbose -- /p:CharacterSet=Unicode
+            cmake --build . --target $i --config $k --verbose --parallel -- /p:CharacterSet=Unicode
         }
         cd ..
     }

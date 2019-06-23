@@ -2,7 +2,7 @@
 # RegionsMT
 
 ## Installation for Linux
-Build process is described only for the `x86_64` target architecture. The `i386` architecture is also supported. To build `i386` executables, all the occurrences of `x86_64` in the subsequent text should be substituted by `i386`.
+Build process is described only for the `x86_64` target architecture. The `i386` architecture is supported as well. To build `i386` executables, all the occurrences of `x86_64` in the subsequent text should be substituted by `i386`.
 
 ### Prerequisites
 The following common packages are required for the installation: 
@@ -115,11 +115,11 @@ git clone --depth 1 https://github.com/adelaj/RegionsMT
    Resulting executables for the `Debug` and `Release` configurations are `~/build/clang/RegionsMT-x86_64/Debug/RegionsMT` and `~/build/clang/RegionsMT-x86_64/Release/RegionsMT` respectively.
 
 ## Installation for Windows
-Build process is described only for the `x64` (Windows alias of the `x86_64`) target architecture.  The `Win32` (alias `i386`) architecture is also supported. To build `Win32` executables all the occurrences of `x64` in the subsequent text should be substituted by `Win32`.
+Build process is described only for the `x64` (Windows alias of the `x86_64`) target architecture.  The `Win32` (alias `i386`) architecture is supported as well. To build `Win32` executables all the occurrences of `x64` in the subsequent text should be substituted by `Win32`.
 
 ### Prerequisites
 The following programs are required for the Windows installation:
-* [Visual Studio Community](https://visualstudio.microsoft.com/vs/community/) with C++ support enabled;
+* [Visual Studio 2019 Community](https://visualstudio.microsoft.com/vs/community/) with C++ support enabled;
 * [git for Windows](https://git-scm.com/);
 * [CMake](https://cmake.org/) (3.14 or newer version).
 
