@@ -1,7 +1,11 @@
-os: linux
-dist: xenial
-env:
-  - MATRIX_EVAL='CC=gcc && CXX=g++ && ARCH="x86_64" && CFG="Debug Release"'
+language: c
+
+matrix:
+    include:
+      - os: linux
+        dist: xenial
+        env:
+          - MATRIX_EVAL='CC=gcc && CXX=g++ && ARCH="x86_64" && CFG="Debug Release"'
 
 git:
   - depth: 1
