@@ -25,14 +25,14 @@ fi
 build_lib() {
     C_FLAGS_INIT=$(echo $C_FLAGS $(eval echo "\${C_FLAGS_$2} \${C_FLAGS__$3} \${C_FLAGS_$2_$3}") | xargs)
     cmake -D CMAKE_C_COMPILER="$CC" -D CMAKE_CXX_COMPILER="$CXX" -D CMAKE_AR="$AR" -D CMAKE_BUILD_TYPE="$3" -D CMAKE_C_FLAGS_INIT="$C_FLAGS_INIT" -D CMAKE_C_ARCHIVE_CREATE="<CMAKE_AR> qcs <TARGET> <OBJECTS>" -D CMAKE_C_ARCHIVE_FINISH=true -D CMAKE_REQUIRED_LIBRARIES="m" "../../$SRC/$1"
-    cmake --build . --target $1 --parallel -- VERBOSE=1
+    cmake --build . --target $1 -- VERBOSE=1 -j
 }
 
 build_lib_xcode() {
     C_FLAGS_INIT=$(echo $C_FLAGS $(eval echo "\${C_FLAGS_$2} \${C_FLAGS__$3} \${C_FLAGS_$2_$3}") | xargs)
     cmake -G "Xcode" -D CMAKE_OSX_ARCHITECTURES="$2" -D CMAKE_C_FLAGS_INIT="$C_FLAGS_INIT" -D CMAKE_REQUIRED_LIBRARIES="m" "../../$SRC/$1"
     for i in $CFG; do
-        cmake --build . --target $1 --config $i --parallel
+        cmake --build . --target $1 --config $i -- -j
     done
 }
 
@@ -57,4 +57,3 @@ for i in $LIB; do
     done
     if [ -f "$SDIR/epilogue.sh" ]; then SRC=$SRC CLR=$CLR bash $SDIR/epilogue.sh; fi
 done
-fi

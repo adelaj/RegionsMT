@@ -116,5 +116,5 @@ assign_source_group("Header Files" ${src_dir} header_list)
 
 add_executable(${target} ${source_list} ${header_list})
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${target})
-set_property(${target} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
+set_property(TARGET ${target} PROPERTY INTERPROCEDURAL_OPTIMIZATION TRUE)
 link_libraries(${target} ${libraries})
