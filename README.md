@@ -1,6 +1,8 @@
 
 # RegionsMT
 
+[![Build Status](https://api.travis-ci.org/adelaj/RegionsMT.svg?branch=master)](https://travis-ci.org/adelaj/RegionsMT)
+
 ## Installation for Linux
 Build process is described only for the `x86_64` target architecture. The `i386` architecture is supported as well. To build `i386` executables, all the occurrences of `x86_64` in the subsequent text should be substituted by `i386`.
 
