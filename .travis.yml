@@ -1,9 +1,7 @@
-matrix:
-    include:
-      - os: linux
-        dist: xenial
-        env:
-          - MATRIX_EVAL='CC=gcc && CXX=g++ && ARCH="x86_64" && CFG="Debug Release"'
+os: linux
+dist: xenial
+env:
+  - MATRIX_EVAL='CC=gcc && CXX=g++ && ARCH="x86_64" && CFG="Debug Release"'
 
 git:
   - depth: 1
@@ -17,6 +15,6 @@ install:
   - cd gcc
   - SRC=".." bash ../RegionsMT/.install/install_libraries.sh
 
-script: 
+script:
   - cd ../RegionsMT
   - LIBRARY_PATH="../gcc" INSTALL_PATH="../gcc" make -j
