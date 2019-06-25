@@ -8,7 +8,7 @@ matrix:
       - os: linux
         dist: xenial
         env:
-          - MATRIX_EVAL='MODE="linux" && export CC="gcc" && export CXX="g++" && expot ARCH="x86_64 i386" && expot CFG="Debug Release"'
+          - MATRIX_EVAL='MODE="linux" && export CC="gcc" && export CXX="g++" && export ARCH="x86_64 i386" && export CFG="Debug Release"'
 
 before_install:
   - eval "$MATRIX_EVAL"
