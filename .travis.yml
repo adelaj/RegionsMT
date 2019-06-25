@@ -8,7 +8,7 @@ matrix:
       - os: linux
         dist: xenial
         env:
-          - MATRIX_EVAL='CC="gcc" && CXX="g++" && ARCH="x86_64" && CFG="Debug Release"'
+          - MATRIX_EVAL='MODE="linux" && export CC="gcc" && export CXX="g++" && expot ARCH="x86_64 i386" && expot CFG="Debug Release"'
 
 before_install:
   - eval "$MATRIX_EVAL"
@@ -17,7 +17,11 @@ install:
   - cd ..
   - mkdir gcc
   - cd gcc
-  - SRC=".." bash ../RegionsMT/.install/install_libraries.sh
+  - if [ $MODE == "linux" ]; then
+  -     SRC=".." bash ../RegionsMT/.install/install_libraries.sh
+  - elif [ $MODE == "osx" ]; then
+  - elif [ $MODE == "windows" ]; then
+  - fi
 
 script:
   - cd ../RegionsMT
