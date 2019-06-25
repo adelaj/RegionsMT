@@ -5,13 +5,13 @@ matrix:
       - os: linux
         dist: xenial
         env:
-          - MATRIX_EVAL="CC=gcc && CXX=g++ && ARCH=\"x86_64\" && CFG=\"Debug Release\""
+          - CC="gcc"
+          - CXX="g++"
+          - ARCH="x86_64"
+          - CFG="Debug Release"
 
 git:
   - depth: 1
-
-before_install:
-  - eval "$MATRIX_EVAL"
 
 install:
   - cd ..
@@ -22,3 +22,4 @@ install:
 script:
   - cd ../RegionsMT
   - LIBRARY_PATH="../gcc" INSTALL_PATH="../gcc" make -j
+ 
