@@ -18,10 +18,10 @@ install:
   - mkdir gcc
   - cd gcc
   - if [ $MODE == "linux" ]; then
-  -     SRC=".." bash ../RegionsMT/.install/install_libraries.sh
-  - elif [ $MODE == "osx" ]; then
-  - elif [ $MODE == "windows" ]; then
-  - fi
+        SRC=".." bash ../RegionsMT/.install/install_libraries.sh
+    elif [ $MODE == "osx" ]; then
+    elif [ $MODE == "windows" ]; then
+    fi
 
 script:
   - cd ../RegionsMT
