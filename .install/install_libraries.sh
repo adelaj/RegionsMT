@@ -2,9 +2,9 @@
 
 if [ -z "$ARCH" ]; then ARCH=$(arch); fi
 if [ -z "$CFG" ]; then CFG=Release; fi
-if [ -z "$CC" ]; then CC="gcc"; fi
-if [ -z "$CXX" ]; then CXX="g++"; fi
-if [ -z "$AR" ]; then AR="/usr/bin/gcc-ar"; fi
+if [ -z "$BUILD_PATH" ]; then BUILD_PATH=".."; fi
+if [ -z "TOOLCHAIN" ]; then TOOLCHAIN="gcc"; fi
+
 if [ "${XCODE,,}" == "true" ]; then XCODE="true"; else XCODE="false"; fi
 if [ "${CLR,,}" == "true" ]; then CLR="true"; else CLR="false"; fi
 
@@ -15,7 +15,10 @@ C_FLAGS_i386="-m32"
 C_FLAGS_x86_64="-m64"
 C_FLAGS__Release="-flto"
 
-if [[ "$CC" == gcc* ]]; then 
+if [[ "$TOOLCHAIN" == gcc* ]]; then 
+    if [ -z "$CC" ]; then CC="gcc"; fi
+    if [ -z "$CXX" ]; then CXX="g++"; fi
+    if [ -z "$AR" ]; then AR="/usr/bin/gcc-ar"; fi
     C_FLAGS__Release+=" -fuse-linker-plugin"
     C_FLAGS__Debug+=" -Og"
 elif [[ "$CC" == clang* ]]; then
