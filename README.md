@@ -8,8 +8,9 @@ Build process is described only for the `x86_64` target architecture. The `i386`
 
 ### Prerequisites
 The following common packages are required for the installation: 
+* `bash` (4.3 or newer, older versions will definitely not work);
+* `cmake` (3.14 or newer, older versions will definitely not work);
 * `git`;
-* `cmake` (3.10.2 or newer);
 * `make` (4.1 or newer, or may be older, but 3.8.1 will definitely not work).
 
 User should make a decision about the toolchain to use. The following toolchains are available: `gcc`, custom versions of `gcc`, and `clang`. 

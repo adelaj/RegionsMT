@@ -10,7 +10,7 @@ if [ -z "$LIBRARY" ]; then LIBRARY="gsl"; fi
 declare -A \
 CC=([gcc]="gcc" [clang]="clang") \
 CXX=([gcc]="g++" [clang]="clang++") \
-AR=([gcc]="/usr/bin/gcc-ar" [clang]="/usr/bin/llvm-ar") \
+AR=([gcc]="gcc-ar" [clang]="llvm-ar") \
 C_FLAGS=( \
 [,,]="-mavx" \
 [,i386,]="-m32" \
@@ -20,10 +20,21 @@ C_FLAGS=( \
 [gcc,,Debug]="-Og" \
 [clang,,Debug]="-O0")
 
+
+crash() {
+    cat $2
+    return $1
+}
+
 wait_pid() {
     declare -i res=0 &&
-    for p in $1; do 
-        wait $p || let "res=1"
+    declare -n pidref=$1
+    for p in ${!pidref[@]}; do
+        wait $p || {
+            declare out=$? &&
+            let "res=-1" && 
+            echo "${pidref[$p]}: "`tput setaf 9`"*** Error $out"`tput sgr0` 
+        }
     done &&
     return $res
 }
@@ -47,16 +58,18 @@ build_vars_3() {
 toolset_vars() {
     for v in $1; do
         if [ -z "$(eval echo \${$v[$2]})" ]; then 
-            declare -g -A BUILD_$v[$2]="$(eval echo \${$v'[$3]'}$4)"
+            declare -g -A BUILD_$v[$2]="$(eval which \${$v'[$3]'}$4)"
         else
-            declare -g -A BUILD_$v[$2]="$(eval echo \${$v'[$2]'})"
+            declare -g -A BUILD_$v[$2]="$(eval which \${$v'[$2]'})"
         fi
     done
 }
 
 build_library_cmake_cfg() {
-    mkdir -p "$LOG_PATH/$2/$1-$3" &&
+    declare log="$LOG_PATH/$2/$1-$3/$4.log" &&
+    mkdir -p "${log%/*}" &&
     cmake \
+    -G "Unix Makefiles" \
     -B "$2/$1-$3/$4" \
     -D CMAKE_C_COMPILER="${BUILD_CC[$2]}" \
     -D CMAKE_CXX_COMPILER="${BUILD_CXX[$2]}" \
@@ -66,18 +79,19 @@ build_library_cmake_cfg() {
     -D CMAKE_C_ARCHIVE_CREATE="<CMAKE_AR> qcs <TARGET> <OBJECTS>" \
     -D CMAKE_C_ARCHIVE_FINISH="" \
     "$1" \
-    >"$LOG_PATH/$2/$1-$3/$4.log" 2>&1 &&
+    &>$log &&
     cmake --build "$2/$1-$3/$4" --target $1 -- VERBOSE=1 -j \
-    >>"$LOG_PATH/$2/$1-$3/$4.log" 2>&1
+    &>>$log ||
+    crash $? $log
 }
 
 build_library_cmake() {
-    declare pid &&
+    declare -a pid &&
     for k in $CFG; do
         build_library_cmake_cfg $1 $2 $3 $k &
-        pid="$pid $!"
+        pid[$!]="build_library_cmake_cfg $1 $2 $3 $k"
     done &&
-    wait_pid "$pid"
+    wait_pid pid 
 }
 
 build_library_xcode() {
@@ -88,25 +102,28 @@ build_library_xcode() {
     -D CMAKE_OSX_ARCHITECTURES="$2" \
     -D CMAKE_C_FLAGS_INIT="$(eval echo \${BUILD_C_FLAGS[Xcode,$2,$3]})" \
     "$1" &&
-    declare pid &&
+    declare -a pid &&
     for i in $CFG; do
-        cmake --build "Xcode/$1-$2" --target $1 --config $i -- -j &
-        pid="$pid $!"
+        {
+            mkdir -p "$LOG_PATH/$2/$1-$3" && 
+            cmake --build "Xcode/$1-$2" --target $1 --config $i -- -j &>"$LOG_PATH/Xcode/$1-$3/$k.log" ||
+            crash $? "$LOG_PATH/Xcode/$1-$3/$k.log"
+        } &
+        pid[$!]="cmake --build "Xcode/$1-$2" --target $1 --config $i -- -j"
     done &&
-    wait_pid "$pid"
+    wait_pid pid
 }
 
 download_library_git() {
+    declare log="$LOG_PATH/$1.log"
     mkdir -p "$LOG_PATH" &&
     if [ -d "$1" ]; then
-        git -C "$1" reset --hard HEAD \
-        >"$LOG_PATH/$1.log" 2>&1 &&
-        git -C "$1" pull \
-        >>"$LOG_PATH/$1.log" 2>&1    
+        git -C "$1" reset --hard HEAD &>$log &&
+        git -C "$1" pull &>>$log
     else
-        git clone --depth 1 "$2" "$1" \
-        >"$LOG_PATH/$1.log" 2>&1
-    fi
+        git clone --depth 1 "$2" "$1" &>$log
+    fi ||
+    crash $? $log
 }
 
 download_gsl() {
@@ -123,14 +140,14 @@ build_gsl() {
 
 install_library() {
     download_$1 &&
-    declare pid &&
+    declare -a pid &&
     for t in $TOOLCHAIN; do
         for i in $ARCH; do
             build_$1 $t $i &
-            pid="$pid $!"
+            pid[$!]="build_$1 $t $i"
         done
     done &&
-    wait_pid "$pid"
+    wait_pid pid
 }
 
 install_libraries() {
@@ -145,12 +162,12 @@ install_libraries() {
             done
         done
     done
-    declare pid &&
+    declare -a pid &&
     for i in $LIBRARY; do
         install_library $i &
-        pid="$pid $!"
+        pid[$!]="install_library $i"
     done &&
-    wait_pid "$pid"
+    wait_pid pid
 }
 
 uninstall_libraries() {
