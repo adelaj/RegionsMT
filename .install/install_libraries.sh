@@ -20,7 +20,6 @@ C_FLAGS=( \
 [gcc,,Debug]="-Og" \
 [clang,,Debug]="-O0")
 
-
 crash() {
     cat $2
     return $1
@@ -171,11 +170,14 @@ install_libraries() {
 }
 
 uninstall_libraries() {
-    echo "Not implemented!"
+    for t in $TOOLCHAIN; do
+        for i in $ARCH; do
+        done     
+    done    
 }
 
 if [ "$1" == "clean" ]; then
-    uninstall_libraries
+    clean_libraries
 else
     install_libraries
 fi
