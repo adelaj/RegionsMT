@@ -1,11 +1,16 @@
 #!/bin/bash
 
-if [ -z "$ARCH" ]; then ARCH=$(arch); fi
+declare -A \
+VALID_LIBRARY=([gsl]="https://github.com/ampl/gsl") \
+VALID_ARCH=([x86_64]="x86_64" [i386]="i386") \
+VALID_CONFIG=([Release]="Release" [Debug]="Debug")
+
+if [ -z "$ARCH" ]; then ARCH=${VALID_ARCH[`arch`]}; fi
 if [ -z "$CFG" ]; then CFG=Release; fi
 if [ -z "$BUILD_PATH" ]; then BUILD_PATH="."; fi
 if [ -z "$LOG_PATH" ]; then LOG_PATH=$BUILD_PATH/.`basename $0 .${0##*.}`_`date +%s`; fi
 if [ -z "$TOOLCHAIN" ]; then TOOLCHAIN="gcc"; fi
-if [ -z "$LIBRARY" ]; then LIBRARY="gsl"; fi
+if [ -z "$LIBRARY" ]; then LIBRARY=${!VALID_LIBRARY[@]}; fi
 
 declare -A \
 CC=([gcc]="gcc" [clang]="clang") \
@@ -20,6 +25,23 @@ C_FLAGS=( \
 [gcc,,Debug]="-Og" \
 [clang,,Debug]="-O0")
 
+unique() {
+    echo "$1" | xargs -n1 | awk '!x[$0]++' | xargs
+}
+
+validate_var() {
+    for i in $1; do
+        declare tmp &&
+        declare -n ref=VALID_$i &&
+        for j in ${!1}; do
+            if [ ! -z ${ref[$j]} ]; then
+                tmp="$tmp $j"
+            fi
+        done &&
+        declare -g $i=`unique "$tmp"`
+    done
+}
+
 crash() {
     cat $2
     return $1
@@ -27,7 +49,7 @@ crash() {
 
 wait_pid() {
     declare -i res=0 &&
-    declare -n pidref=$1
+    declare -n pidref=$1 &&
     for p in ${!pidref[@]}; do
         wait $p || {
             declare out=$? &&
@@ -38,7 +60,7 @@ wait_pid() {
     return $res
 }
 
-build_vars_2() {
+build_var_2() {
     for v in $1; do
         declare -g -A BUILD_$v[$2,$3,]="$(echo $(eval echo \
         \${$v'[,,]'} \${$v'[$2,,]'} \${$v'[,$3,]'} \${$v'[$2,$3,]'}) | xargs)"
@@ -46,7 +68,7 @@ build_vars_2() {
     done
 }
 
-build_vars_3() {
+build_var_3() {
     for v in $1; do
         declare -g -A BUILD_$v[$2,$3,$4]="$(echo $(eval echo \
         \${BUILD_$v'[$2,$3,]'} \${$v'[,,$4]'} \${$v'[$2,,$4]'} \${$v'[,$3,$4]'} \${$v'[$2,$3,$4]'}) | xargs)"
@@ -54,9 +76,9 @@ build_vars_3() {
     done
 }
 
-toolset_vars() {
+toolset_var() {
     for v in $1; do
-        if [ -z "$(eval echo \${$v[$2]})" ]; then 
+        if [ -z "$(eval echo \${$v'[$2]'})" ]; then 
             declare -g -A BUILD_$v[$2]="$(eval which \${$v'[$3]'}$4)"
         else
             declare -g -A BUILD_$v[$2]="$(eval which \${$v'[$2]'})"
@@ -69,7 +91,7 @@ build_library_cmake_cfg() {
     mkdir -p "${log%/*}" &&
     cmake \
     -G "Unix Makefiles" \
-    -B "$2/$1-$3/$4" \
+    -B "$BUILD_PATH/$2/$1-$3/$4" \
     -D CMAKE_C_COMPILER="${BUILD_CC[$2]}" \
     -D CMAKE_CXX_COMPILER="${BUILD_CXX[$2]}" \
     -D CMAKE_AR="${BUILD_AR[$2]}" \
@@ -79,7 +101,7 @@ build_library_cmake_cfg() {
     -D CMAKE_C_ARCHIVE_FINISH="" \
     "$1" \
     &>$log &&
-    cmake --build "$2/$1-$3/$4" --target $1 -- VERBOSE=1 -j \
+    cmake --build "$BUILD_PATH/$2/$1-$3/$4" --target $1 -- VERBOSE=1 -j \
     &>>$log ||
     crash $? $log
 }
@@ -94,21 +116,27 @@ build_library_cmake() {
 }
 
 build_library_xcode() {
-    # mkdir -p "Xcode/$1-$2"
-    cmake \
-    -B "Xcode/$1-$2"
-    -G "Xcode" \
-    -D CMAKE_OSX_ARCHITECTURES="$2" \
-    -D CMAKE_C_FLAGS_INIT="$(eval echo \${BUILD_C_FLAGS[Xcode,$2,$3]})" \
-    "$1" &&
+    {
+        declare log="$LOG_PATH/$2/$1-$3.log" &&
+        mkdir -p "${log%/*}" &&
+        cmake \
+        -B "Xcode/$1-$2" \
+        -G "Xcode" \
+        -D CMAKE_OSX_ARCHITECTURES="$2" \
+        -D CMAKE_C_FLAGS_INIT="$(eval echo \${BUILD_C_FLAGS[Xcode,$2,$3]})" \
+        "$1" \
+        &>$log ||
+        crash $? $log
+    } &&
     declare -a pid &&
     for i in $CFG; do
         {
-            mkdir -p "$LOG_PATH/$2/$1-$3" && 
-            cmake --build "Xcode/$1-$2" --target $1 --config $i -- -j &>"$LOG_PATH/Xcode/$1-$3/$k.log" ||
-            crash $? "$LOG_PATH/Xcode/$1-$3/$k.log"
+            declare log="$LOG_PATH/Xcode/$1-$3/$i.log" &&
+            mkdir -p "${log%/*}" && 
+            cmake --build "$BUILD_PATH/Xcode/$1-$2" --target $1 --config $i -- -j &>$log ||
+            crash $? $log
         } &
-        pid[$!]="cmake --build "Xcode/$1-$2" --target $1 --config $i -- -j"
+        pid[$!]="cmake --build "$BUILD_PATH/Xcode/$1-$2" --target $1 --config $i -- -j"
     done &&
     wait_pid pid
 }
@@ -125,10 +153,6 @@ download_library_git() {
     crash $? $log
 }
 
-download_gsl() {
-    download_library_git gsl "https://github.com/ampl/gsl"
-}
-
 build_gsl() {
     if [ "$1" == "Xcode" ]; then
         build_library_xcode gsl $2
@@ -138,7 +162,7 @@ build_gsl() {
 }
 
 install_library() {
-    download_$1 &&
+    download_library_git $1 ${VALID_LIBRARY[$1]} &&
     declare -a pid &&
     for t in $TOOLCHAIN; do
         for i in $ARCH; do
@@ -149,15 +173,15 @@ install_library() {
     wait_pid pid
 }
 
-install_libraries() {
+install() {
     for t in $TOOLCHAIN; do
         if [ "$t" != "Xcode" ]; then
-            toolset_vars "CC CXX AR" $t ${t%%-*} ${t#${t%%-*}*}
+            toolset_var "CC CXX AR" $t ${t%%-*} ${t#${t%%-*}*}
         fi
         for i in $ARCH; do
-            build_vars_2 "C_FLAGS" $t $i
+            build_var_2 "C_FLAGS" $t $i
             for j in $CFG; do 
-                build_vars_3 "C_FLAGS" $t $i $j
+                build_var_3 "C_FLAGS" $t $i $j
             done
         done
     done
@@ -169,15 +193,38 @@ install_libraries() {
     wait_pid pid
 }
 
-uninstall_libraries() {
+clean() {
     for t in $TOOLCHAIN; do
-        for i in $ARCH; do
-        done     
-    done    
+        if [ "$t" == "Xcode" ]; then
+            for i in $LIBRARY; do
+                if [ ! -z ${VALID_LIBRARY[$i]} ]; then
+                    for j in $ARCH; do
+                        rm -rf "$BUILD_DIR/$i-$j"
+                    done
+                fi
+            done
+        else
+            for i in $LIBRARY; do
+            
+            done
+            if [ -z "`ls -A "$t"`" ]; then rm -rf "$t"; fi
+        fi
+    done
 }
 
-if [ "$1" == "clean" ]; then
-    clean_libraries
-else
-    install_libraries
-fi
+validate_var LIBRARY ARCH CFG 
+validate_toolchain_var TOOLCHAIN
+
+case "$1" in
+    clean-log)
+        rm -rf `find . -type d -name '.install_libraries_*'`
+        ;;
+    clean-source)
+        for i in $LIBRARY; do rm -rf "$i"; done 
+        ;;
+    clean-build)
+        clean
+        ;;
+    *)
+        install
+esac
