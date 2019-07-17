@@ -1,4 +1,5 @@
 * text=auto
+*.mk text eol=lf
 *.sh text eol=lf
 *.ps1 text eol=crlf
 *.c text eol=lf
