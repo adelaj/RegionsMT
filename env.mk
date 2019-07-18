@@ -1,18 +1,7 @@
-ifndef ARCH
-ARCH = $(shell arch)
-endif
-
-ifndef CFG
-CFG = Release
-endif
-
-ifndef TOOLCHAIN
-TOOLCHAIN = gcc
-endif
-
-ifndef BUILD_PATH
-BUILD_PATH = ..
-endif
+ARCH ?= $(shell arch)
+CFG ?= Release
+TOOLCHAIN ?= gcc
+BUILD_PATH ?= ..
 
 ARCH := $(call uniq,$(filter $(VALID_ARCH),$(ARCH)))
 CFG := $(call uniq,$(filter $(VALID_CONFIG),$(CFG)))

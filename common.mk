@@ -13,19 +13,23 @@ uniq = $(if $1,$(firstword $1) $(call uniq,$(filter-out $(firstword $1),$1)))
 inflate = $(if $1,$(call inflate,$(call nofirstword,$1),$(subst $(firstword $1),$(firstword $1) ,$2)),$(wordlist 1,$(words $2),$2 0))
 compress = $(if $1,$(firstword $1)$(call compress,$(call nofirstword,$1)))
 
-inc = $(call compress,$(call incl,$(call inflate,0 1 2 3 4 5 6 7 8 9,$1)))
-incl = $(call incl$(lastword 0 $1),$(call nolastword,$1))
+inc = $(call compress,$(call __inc,$(call inflate,0 1 2 3 4 5 6 7 8 9,$1)))
+__inc = $(call __inc$(lastword 0 $1),$(call nolastword,$1))
 
-incl0 = $1 1
-incl1 = $1 2
-incl2 = $1 3
-incl3 = $1 4
-incl4 = $1 5
-incl5 = $1 6
-incl6 = $1 7
-incl7 = $1 8
-incl8 = $1 9
-incl9 = $(call incl,$1) 0
+__inc0 = $1 1
+__inc1 = $1 2
+__inc2 = $1 3
+__inc3 = $1 4
+__inc4 = $1 5
+__inc5 = $1 6
+__inc6 = $1 7
+__inc7 = $1 8
+__inc8 = $1 9
+__inc9 = $(call __inc,$1) 0
+
+argmsk = $(if $(filter $1,$2),,$(COMMA)$$($(call inc,$1))$(call argmsk,$(call inc,$1),$2))
+argcnt = $(eval __tmp := 0)$(__argcnt)$(__tmp)
+__argcnt = $(if $(filter simple,$(flavor $(call inc,$(__tmp)))),$(eval __tmp := $(call inc,$(__tmp)))$(eval $(value __argcnt)))
 
 define gather =
 $(if $(filter $2,$(GATHER_$1)),,

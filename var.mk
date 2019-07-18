@@ -42,54 +42,26 @@ LD_INC := gsl
 LD_LIB := m pthread gsl gslcblas
 
 define foreach3 =
-$(foreach a,$2,\
-$(foreach b,$3,\
-$(foreach c,$4,\
-$(eval $$(call $$1,$$a,$$b,$$c$5)))))
+$(foreach i,$2,\
+$(foreach j,$3,\
+$(foreach k,$4,\
+$(eval $$(call $$1,$$i,$$j,$$k$(call argmsk,4,$(argcnt)))))))
 endef
 
 define foreach4 =
-$(foreach a,$2,\
-$(foreach b,$3,\
-$(foreach c,$4,\
-$(foreach d,$5,\
-$(call $1,$a,$b,$c,$d)))))
+$(foreach i,$2,\
+$(foreach j,$3,\
+$(foreach k,$4,\
+$(foreach l,$5,\
+$(eval $$(call $$1,$$i,$$j,$$k,$$l$(call argmsk,5,$(argcnt))))))))
 endef
 
-define var3_autocomplete =
-$(eval 
-$(call rremsuffix,/*,$1/$2/$3/$4) +=)
-endef
-
-define var3_set_o =
-$(foreach t,$2 *,\
-$(foreach a,$3 *,\
-$(foreach c,$4 *,\
-$(eval
-BUILD_$1/$2/$3/$4 += $($(call rremsuffix,/*,$1/$t/$a/$c))
-BUILD += $1/$2/$3/$4
-))))
-endef
-
-define var3_append =
-BUILD_$4/$5/$6/$7 += $($(call rremsuffix,/*,$4/$1/$2/$3))
-BUILD += $4/$5/$6/$7
-endef
-
-define var3_set =
-$(call foreach3 var3_append,$2 *,$3 *,$4 *,$(COMMA)$$$$6$(COMMA)$$$$7$(COMMA)$$$$8$(COMMA)$$$$9,$1,$2,$3,$4)
-endef
-
-
-define var3_copy =
-$(eval
-BUILD_$1/$2/$3/$4 += $(BUILD_$1/$(firstword $(subst -, ,$2))/$3/$4))
-endef
-
-define var3_last =
-$(eval
-BUILD_$1/$2/$3/$4 := $(lastword BUILD_$1/$2/$3/$4))
-endef
+var3_autocomplete = $(eval $(call rremsuffix,/*,$1/$2/$3/$4) +=)
+var3_append = $(eval BUILD_$4/$5/$6/$7 += $($(call rremsuffix,/*,$4/$1/$2/$3)))
+var3_set = $(call foreach3,var3_append,$2 *,$3 *,$4 *,$1,$2,$3,$4)
+var3_copy = $(eval BUILD_$1/$2/$3/$4 += $(BUILD_$1/$(firstword $(subst -, ,$2))/$3/$4))
+var3_last = $(eval BUILD_$1/$2/$3/$4 := $(lastword BUILD_$1/$2/$3/$4))
+var3_decorate = $(eval BUILD_$1/$2/$3/$4 := $(addsuffix $6,$(addprefix $5,$(BUILD_$1/$2/$3/$4))))
 
 EXEC := CC CXX LD AR
 INC := CC_INC LD_INC
@@ -99,5 +71,5 @@ $(call foreach4,var3_autocomplete,$(VAR),$(TOOLCHAIN_BASE) *,$(ARCH) *,$(CFG) *)
 $(call foreach4,var3_set,$(VAR),$(TOOLCHAIN_BASE),$(ARCH),$(CFG))
 $(call foreach4,var3_copy,$(VAR),$(TOOLCHAIN_VER),$(ARCH),$(CFG))
 $(call foreach4,var3_last,$(EXEC),$(TOOLCHAIN),$(ARCH),$(CFG))
-
+$(call foreach4,var3_decorate,$(INC),$(TOOLCHAIN),$(ARCH),$(CFG),,)
 
