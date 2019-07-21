@@ -13,7 +13,6 @@ TARGET := RegionsMT
 OBJ_DIR := obj
 SRC_DIR := src
 
-GATHER_DIR :=
 
 define build =
 $(eval 
@@ -36,25 +35,14 @@ $$(GATHER_TARGET$1): $$(GATHER_OBJ$1) | $$$$(PARENT-$$$$@)
 GATHER_CLEAN_FILE += $(GATHER_CLEAN_OBJ$1) $(GATHER_CLEAN_TARGET$1))
 endef
 
-$(foreach t,$(TOOLCHAIN),\
-$(foreach a,$(ARCH),\
-$(foreach c,$(CFG),\
-$(call build,/$t/$a/$c))))
+$(call foreach3,build,$(TOOLCHAIN),$(ARCH),$(CFG),/$t/$a/$c)
 
 .PHONY: all
-all: $(foreach t,$(TOOLCHAIN),$(foreach a,$(ARCH),$(foreach c,$(CFG),$(TARGET/$t/$a/$c))))
+all: $(call foreach4,var3_list,TARGET,$(TOOLCHAIN),$(ARCH),$(CFG))
 
-.SECONDEXPANSION:
-$(GATHER_DIR): | $$(PARENT-$$@); mkdir $@
-
-.PHONY: $(GATHER_CLEAN_DIR)
-.SECONDEXPANSION:
-$(GATHER_CLEAN_DIR): clean-%: | $$(CLEAN-%)
-    $(if $(wildcard $*),$(if $(wildcard $*/*),,rmdir $*))
-
-.SECONDEXPANSION:
-$(GATHER_CLEAN_FILE): clean-%: | $$(CLEAN-%)
-    $(if $(wildcard $*),rm $*)
+$(call gather_dir)
+$(call gather_clean_dir)
+$(call gather_clean_file)
 
 .PHONY: clean
 clean: | $(foreach t,$(TOOLCHAIN),clean-$(DIR/$t));

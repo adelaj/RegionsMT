@@ -41,35 +41,23 @@ LD_OPT/clang/*/Debug := -O0
 LD_INC := gsl
 LD_LIB := m pthread gsl gslcblas
 
-define foreach3 =
-$(foreach i,$2,\
-$(foreach j,$3,\
-$(foreach k,$4,\
-$(eval $$(call $$1,$$i,$$j,$$k$(call argmsk,4,$(argcnt)))))))
-endef
-
-define foreach4 =
-$(foreach i,$2,\
-$(foreach j,$3,\
-$(foreach k,$4,\
-$(foreach l,$5,\
-$(eval $$(call $$1,$$i,$$j,$$k,$$l$(call argmsk,5,$(argcnt))))))))
-endef
-
 var3_autocomplete = $(eval $(call rremsuffix,/*,$1/$2/$3/$4) +=)
 var3_append = $(eval BUILD_$4/$5/$6/$7 += $($(call rremsuffix,/*,$4/$1/$2/$3)))
 var3_set = $(call foreach3,var3_append,$2 *,$3 *,$4 *,$1,$2,$3,$4)
-var3_copy = $(eval BUILD_$1/$2/$3/$4 += $(BUILD_$1/$(firstword $(subst -, ,$2))/$3/$4))
-var3_last = $(eval BUILD_$1/$2/$3/$4 := $(lastword BUILD_$1/$2/$3/$4))
-var3_decorate = $(eval BUILD_$1/$2/$3/$4 := $(addsuffix $6,$(addprefix $5,$(BUILD_$1/$2/$3/$4))))
+var3_copy = $(eval BUILD_$1/$2/$3/$4 := $$(BUILD_$5/$6/$7/$8))
+var3_last = $(eval BUILD_$1/$2/$3/$4 := $(firstword $(BUILD_$1/$2/$3/$4)))
+var3_decorate = $(eval BUILD_$1/$2/$3/$4 := $$(addsuffix $6,$$(addprefix $5,$$(BUILD_$1/$2/$3/$4))))
+var3_list = $($1/$2/$3/$4)
 
 EXEC := CC CXX LD AR
 INC := CC_INC LD_INC
-VAR := $(EXEC) $(INC) CC_OPT CC_INC LD_OPT LD_LIB 
+VAR := $(EXEC) $(INC) CC_OPT LD_OPT LD_LIB
 
 $(call foreach4,var3_autocomplete,$(VAR),$(TOOLCHAIN_BASE) *,$(ARCH) *,$(CFG) *)
 $(call foreach4,var3_set,$(VAR),$(TOOLCHAIN_BASE),$(ARCH),$(CFG))
-$(call foreach4,var3_copy,$(VAR),$(TOOLCHAIN_VER),$(ARCH),$(CFG))
+$(call foreach4,var3_copy,$(VAR),$(TOOLCHAIN_VER),$(ARCH),$(CFG),$$1,$$(firstword $$(subst -, ,$$2)),$$3,$$4)
 $(call foreach4,var3_last,$(EXEC),$(TOOLCHAIN),$(ARCH),$(CFG))
-$(call foreach4,var3_decorate,$(INC),$(TOOLCHAIN),$(ARCH),$(CFG),,)
+$(call foreach4,var3_decorate,$(INC),$(TOOLCHAIN),$(ARCH),$(CFG),$(BUILD_PATH)/$$2/,-$$3/$$4)
+$(call foreach4,var3_decorate,$(EXEC),$(TOOLCHAIN_VER),$(ARCH),$(CFG),,$$(patsubst $$(firstword $$(subst -, ,$$2))%,%,$$2))
 
+B:=$(call dec,78586)
