@@ -1,0 +1,8 @@
+Exception: STATUS_STACK_OVERFLOW at eip=611684FE
+eax=0044320F ebx=00000001 ecx=004433A5 edx=00000001 esi=00000001 edi=004432D0
+ebp=00443174 esp=00442FF0 program=C:\msys32\usr\bin\make.exe, pid 1359, thread 
+cs=0023 ds=002B es=002B fs=0053 gs=002B ss=002B
+Stack trace:
+Frame     Function  Args
+00443174  611684FE (00000000, 00000000, 00000000, 00000000)
+End of stack trace

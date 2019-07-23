@@ -41,23 +41,19 @@ LD_OPT/clang/*/Debug := -O0
 LD_INC := gsl
 LD_LIB := m pthread gsl gslcblas
 
-var3_autocomplete = $(eval $(call rremsuffix,/*,$1/$2/$3/$4) +=)
-var3_append = $(eval BUILD_$4/$5/$6/$7 += $($(call rremsuffix,/*,$4/$1/$2/$3)))
-var3_set = $(call foreach3,var3_append,$2 *,$3 *,$4 *,$1,$2,$3,$4)
-var3_copy = $(eval BUILD_$1/$2/$3/$4 := $$(BUILD_$5/$6/$7/$8))
-var3_last = $(eval BUILD_$1/$2/$3/$4 := $(firstword $(BUILD_$1/$2/$3/$4)))
-var3_decorate = $(eval BUILD_$1/$2/$3/$4 := $$(addsuffix $6,$$(addprefix $5,$$(BUILD_$1/$2/$3/$4))))
-var3_list = $($1/$2/$3/$4)
+define var3_set = 
+$(eval $1 :=) \
+$(call foreachl,6 7 8,feval,$1 += $$($$(call rremsuffix,/*,$2/$$6/$$7/$$8)),$2,$3,$4,$5,$3 *,$4 *,$5 *) \
+$(eval $1 := $$(strip $$($1)))
+endef
 
 EXEC := CC CXX LD AR
 INC := CC_INC LD_INC
 VAR := $(EXEC) $(INC) CC_OPT LD_OPT LD_LIB
 
-$(call foreach4,var3_autocomplete,$(VAR),$(TOOLCHAIN_BASE) *,$(ARCH) *,$(CFG) *)
-$(call foreach4,var3_set,$(VAR),$(TOOLCHAIN_BASE),$(ARCH),$(CFG))
-$(call foreach4,var3_copy,$(VAR),$(TOOLCHAIN_VER),$(ARCH),$(CFG),$$1,$$(firstword $$(subst -, ,$$2)),$$3,$$4)
-$(call foreach4,var3_last,$(EXEC),$(TOOLCHAIN),$(ARCH),$(CFG))
-$(call foreach4,var3_decorate,$(INC),$(TOOLCHAIN),$(ARCH),$(CFG),$(BUILD_PATH)/$$2/,-$$3/$$4)
-$(call foreach4,var3_decorate,$(EXEC),$(TOOLCHAIN_VER),$(ARCH),$(CFG),,$$(patsubst $$(firstword $$(subst -, ,$$2))%,%,$$2))
-
-B:=$(call dec,78586)
+$(call foreachl,2 3 4 5,feval,$$(call rremsuffix,/*,$$2/$$3/$$4/$$5) ?=,$(VAR),$(TOOLCHAIN_BASE) *,$(ARCH) *,$(CFG) *)
+$(call foreachl,2 3 4 5,var3_set,BUILD_$$2/$$3/$$4/$$5,$(VAR),$(TOOLCHAIN_BASE),$(ARCH),$(CFG))
+$(call foreachl,2 3 4 5,feval,BUILD_$$2/$$3/$$4/$$5 := $$(BUILD_$$2/$$(firstword $$(subst -, ,$$3))/$$4/$$5),$(VAR),$(TOOLCHAIN_VER),$(ARCH),$(CFG))
+$(call foreachl,2 3 4 5,feval,BUILD_$$2/$$3/$$4/$$5 := $$(firstword $$(BUILD_$$2/$$3/$$4/$$5)),$(EXEC),$(TOOLCHAIN),$(ARCH),$(CFG))
+$(call foreachl,2 3 4 5,feval,BUILD_$$2/$$3/$$4/$$5 := $$(addsuffix -$$4/$$5,$$(addprefix $(BUILD_PATH)/$$3/,$$(BUILD_$$2/$$3/$$4/$$5))),$(INC),$(TOOLCHAIN),$(ARCH),$(CFG))
+$(call foreachl,2 3 4 5,feval,BUILD_$$2/$$3/$$4/$$5 := $$(addsuffix $$(patsubst $$(firstword $$(subst -, ,$$3))%,%,$$3),$$(BUILD_$$2/$$3/$$4/$$5)),$(EXEC),$(TOOLCHAIN_VER),$(ARCH),$(CFG))
