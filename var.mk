@@ -1,10 +1,3 @@
-VALID_ARCH := x86_64 i386 i686
-VALID_CONFIG := Debug Release
-VALID_TOOLCHAIN := gcc gcc-% clang clang-% icc
-
-include common.mk
-include env.mk
-
 CC/gcc := gcc
 CC/clang := clang
 
