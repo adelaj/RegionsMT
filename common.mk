@@ -3,6 +3,8 @@ PERC := %
 COMMA := ,
 
 feval = $(eval $1)
+id = $(eval __tmp := $1)$(__tmp)
+proxy = $(eval $$(call $1,$2))
 nofirstword = $(wordlist 2,$(words $1),$1)
 nolastword = $(wordlist 2,$(words $1),0 $1)
 stripfirst = $(wordlist 2,$(words 0 $1),0 $1)
