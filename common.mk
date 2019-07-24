@@ -4,7 +4,7 @@ COMMA := ,
 
 feval = $(eval $1)
 id = $(eval __tmp := $1)$(__tmp)
-proxy = $(eval $$(call $1,$2))
+proxycall = $(eval $$(call $1,$2))
 nofirstword = $(wordlist 2,$(words $1),$1)
 nolastword = $(wordlist 2,$(words $1),0 $1)
 stripfirst = $(wordlist 2,$(words 0 $1),0 $1)
@@ -24,6 +24,8 @@ compress = $(if $1,$(firstword $1)$(call compress,$(call nofirstword,$1)))
 
 awrap = $(call compress,$(call $1,$(call inflate,0 1 2 3 4 5 6 7 8 9,$2),$3))
 inc = $(call awrap,__inc,$1,)
+incx2 = $(call awrap,__incx2,$1,)
+__incx2 = $(call __inc,$(call __inc,$1))
 __inc = $(call __inc$(lastword 0 $1),$(call nolastword,$1))
 __inc0 = $1 1
 __inc1 = $1 2
@@ -53,9 +55,9 @@ argcnt = $(eval __tmp := 0)$(__argcnt)$(__tmp)
 __argcnt = $(if $(filter simple,$(flavor $(call inc,$(__tmp)))),$(eval __tmp := $(call inc,$(__tmp)))$(eval $(value __argcnt)))
 
 foreachi = $(foreach i,$($1),$(eval __tmp := $$(call $$2$(call argmsk,2,$(call dec,$1)),$$i$(call argmsk,$1,$(argcnt))))$(__tmp))
-foreachl = $(eval __tmp := $$(call __foreachl,$(foreach i,$1,$(call inc,$(call inc,$i)))$(call argmsk,1,$(argcnt))))$(__tmp)
+foreachl = $(eval __tmp := $$(call __foreachl,$(foreach i,$1,$(call incx2,$i))$(call argmsk,1,$(argcnt))))$(__tmp)
 __foreachl = $(eval __tmp := $(if $1,\
-$$(call foreachl,$(call nolastword,$1),foreachi,$(lastword $1)$(call argmsk,1,$(argcnt))),\
+$$(call foreachi,$(call incx2,$(firstword $1)),__foreachl,$(call nofirstword,$1)$(call argmsk,1,$(argcnt))),\
 $$(call $$2$(call argmsk,2,$(argcnt)))))$(__tmp)
 
 .PHONY: print-%
