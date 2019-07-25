@@ -16,9 +16,25 @@ LIBRARY := $(call uniq,$(filter $(VALID_LIBRARY),$(LIBRARY)))
 TARGET := $(LIBRARY)
 
 define build_cmake =
+$(eval
 
 
+$(GATHER_PROJ-$1$2$3) : | download-$1
+    cmake \
+    -G "Unix Makefiles" \
+    -B "$(GATHER_PROJ-$1$2$3)" \
+    -D CMAKE_C_COMPILER="$(BUILD_CC$2)" \
+    -D CMAKE_CXX_COMPILER="$(BUILD_CXX$2)" \
+    -D CMAKE_AR="$(BUILD_AR$2)" \
+    -D CMAKE_BUILD_TYPE="$4" \
+    -D CMAKE_C_FLAGS_INIT="$(BUILD_C_FLAGS$2)" \
+    -D CMAKE_C_ARCHIVE_CREATE="<CMAKE_AR> qcs <TARGET> <OBJECTS>" \
+    -D CMAKE_C_ARCHIVE_FINISH="" \
+    "$1" \
+    &>$log
 
+
+GATHER_PROJ += $(GATHER_PROJ-$1$2))
 endef
 
 URL-gsl := https://github.com/ampl/gsl
@@ -31,9 +47,9 @@ DOWNLOAD_GIT := $(addprefix download-,$(TARGET))
 .PHONY: $(DOWNLOAD_GIT)
 $(DOWNLOAD_GIT): download-%:
     $(if $(wildcard $(BUILD_PATH)/$*),\
-    git -C "$(BUILD_PATH)/$*" reset --hard HEAD > "$(BUILD_PATH)/$*.log" && \
-    git -C "$(BUILD_PATH)/$*" pull >> "$(BUILD_PATH)/$*.log",\
-    git clone --depth 1 "$(URL-$*)" "$(BUILD_PATH)/$*" > "$(BUILD_PATH)/$*.log")
+    git -C "$(BUILD_PATH)/$*" reset --hard HEAD &>"$(BUILD_PATH)/$*.log" && \
+    git -C "$(BUILD_PATH)/$*" pull &>>"$(BUILD_PATH)/$*.log",\
+    git clone --depth 1 "$(URL-$*)" "$(BUILD_PATH)/$*" &>"$(BUILD_PATH)/$*.log")
 
 $(call gather,LOG,$(BUILD_PATH)/gsl.log)
 $(call gather,SRC,$(BUILD_PATH)/gsl)
@@ -41,9 +57,9 @@ $(call gather,SRC,$(BUILD_PATH)/gsl)
 GATHER_CLEAN_FILE += GATHER_CLEAN_LOG
 $(call gather_clean_file)
 
-.PHONY: $(GATHER_CLEAN_PROJ)
+.PHONY: $(GATHER_CLEAN_SRC) $(GATHER_CLEAN_PROJ)
 .SECONDEXPANSION:
-$(GATHER_CLEAN_PROJ): clean-%: | $$(CLEAN-%)
+$(GATHER_CLEAN_SRC) $(GATHER_CLEAN_PROJ): clean-%: | $$(CLEAN-%)
     $(if $(wildcard $*),rm -rf $*)
 
 .PHONY: all
