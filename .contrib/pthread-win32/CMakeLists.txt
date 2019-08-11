@@ -47,7 +47,7 @@ if(${CMAKE_GENERATOR} MATCHES "Visual Studio")
     set(MSVC ON)
 endif()
 
-project(${target})
+project(${target} LANGUAGES C)
 option(PTHREAD_MONOLITHIC_SOURCE "All source files are aggregated into a single translation unit" ON)
 option(BUILD_SHARED_LIBS "Build shared library" OFF)
 option(MSVC_RUNTIME_DYNAMIC "Use dynamically-linked runtime" OFF) 

@@ -1,7 +1,7 @@
 .DEFAULT_GOAL = all
 
 VALID_ARCH := x86_64 i386 i686
-VALID_CONFIG := Debug Release
+VALID_CFG := Debug Release
 VALID_TOOLCHAIN := gcc gcc-% clang clang-% icc
 
 TARGET := RegionsMT
@@ -14,7 +14,7 @@ include var.mk
 include gather.mk
 include build.mk
 
-$(call foreachl,1 2 3,build,$(TARGET),$(TOOLCHAIN),$(ARCH))
+$(call foreachl,1 2 3,build_cc_cfg,$(TARGET),$(TOOLCHAIN),$(ARCH),$(CFG))
 
 .PHONY: all
 all: $(call foreachl,2 3 4 5,id,$$($$2/$$3/$$4/$$5),$(TARGET),$(TOOLCHAIN),$(ARCH),$(CFG));

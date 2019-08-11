@@ -1,4 +1,4 @@
-﻿define build_cc =
+﻿define build_cc_impl =
 $(eval
 $(eval
 GATHER_TARGET-$1$2 :=
@@ -17,14 +17,14 @@ $$(GATHER_TARGET-$1$2): $(GATHER_OBJ-$1$2) | $$$$(PARENT-$$$$@)
 GATHER_CLEAN_FILE += $(GATHER_CLEAN_OBJ-$1$2) $(GATHER_CLEAN_TARGET-$1$2))
 endef
 
-define build_cfg =
+define build_cc =
 $(eval DIR-$1/$2/$3/$4 := $(DIR-$1/$2/$3)/$4) \
 $(eval $1/$2/$3/$4 := $$(DIR-$1/$2/$3/$4)/$1) \
-$(call build_cc,$1,/$2/$3/$4)
+$(call build_cc_impl,$1,/$2/$3/$4)
 endef
 
-define build =
+define build_cc_cfg =
 $(eval DIR-$1/$2/$3 := $(DIR/$2)/$1-$3) \
 $(call gather,DIR,$(DIR-$1/$2/$3)) \
-$(call foreachl,4,build_cfg,$1,$2,$3,$(CFG))
+$(call foreachl,4,build_cc,$1,$2,$3,$4)
 endef

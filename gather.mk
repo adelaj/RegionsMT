@@ -37,5 +37,4 @@ GATHER_DIR :=
 GATHER_CLEAN_DIR :=
 GATHER_CLEAN_FILE :=
 
-$(call foreachl,2,feval,DIR/$$2 := $(BUILD_PATH)/$$2,$(TOOLCHAIN))
 $(call foreachl,3,proxycall,gather,DIR$(COMMA)$$(DIR/$$3),$(TOOLCHAIN))

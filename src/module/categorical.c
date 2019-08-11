@@ -73,17 +73,17 @@ struct interval { size_t left; size_t right; };
 
 static bool tbl_top_hit_selector(struct tbl_col *cl, size_t row, size_t col, void *tbl, void *p_Cap)
 {
-    if (col < 3)
+    if (col < 2)
     {
         cl->handler.read = NULL;
         return 1;
     }
-    else if (col == 3)
+    else if (col == 2)
     {
         if (!array_test(tbl, p_Cap, sizeof(struct interval), 0, 0, row, 1)) return 0;
         *cl = (struct tbl_col) { .handler = { .read = size_handler }, .ptr = &(*(struct interval **) tbl)[row].left };
     }
-    else if (col == 4)
+    else if (col == 3)
     {
         *cl = (struct tbl_col) { .handler = { .read = size_handler }, .ptr = &(*(struct interval **) tbl)[row].right };
     }

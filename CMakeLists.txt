@@ -70,11 +70,11 @@ elseif(${CMAKE_GENERATOR} MATCHES "Xcode")
     set(XCODE ON)
 endif()
 
-project(${target})
+project(${target} LANGUAGES C)
 include(CheckIPOSupported)
 check_ipo_supported()
-enable_language(C)
 
+enable_language(C)
 
 option(FORCE_POSIX_THREAD "POSIX threads library is used instead of WinAPI" OFF)
 option(MSVC_RUNTIME_DYNAMIC "Use dynamically-linked runtime" OFF) 
