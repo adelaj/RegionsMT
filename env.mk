@@ -31,4 +31,8 @@ TOOLCHAIN_VER := $(filter-out $(TOOLCHAIN_BASE),$(TOOLCHAIN))
 
 $(call foreachl,2,feval,DIR/$$2 := $(BUILD_PATH)/$$2,$(TOOLCHAIN))
 
+define def_build_var=
+$(eval
 
+)
+endef
