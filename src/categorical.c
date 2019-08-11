@@ -313,7 +313,7 @@ double qas_fisher(size_t *tbl, size_t *xval, size_t *yval, size_t *xmar, size_t 
 
 static void perm_init(size_t *perm, size_t cnt, gsl_rng *rng)
 {
-    for (size_t i = 0; i < cnt - 1; i++) // Performing 'Knuth shuffle'
+    for (size_t i = 0; i + 1 < cnt; i++) // Performing 'Knuth shuffle'
     {
         size_t j = i + (size_t) floor(gsl_rng_uniform(rng) * (cnt - i));
         size_t swp = perm[i];
