@@ -1,6 +1,7 @@
 .RECIPEPREFIX +=
 PERC := %
 COMMA := ,
+COL := :
 
 feval = $(eval $1)
 id = $(eval __tmp := $1)$(__tmp)
@@ -24,9 +25,10 @@ __rwildcard = $(sort $(wildcard $(addprefix $1,$2))) $(foreach d,$(sort $(wildca
 uniq = $(call striplast,$(call __uniq,$1))
 __uniq = $(if $1,$(firstword $1) $(call __uniq,$(filter-out $(firstword $1),$1)))
 inflate = $(if $1,$(call inflate,$(call nofirstword,$1),$(subst $(firstword $1),$(firstword $1) ,$2)),$(call striplast,$2))
-compress = $(if $1,$(firstword $1)$(call compress,$(call nofirstword,$1)))
+compress = $(if $1,$(firstword $1)$(call __compress,$(call nofirstword,$1),$2))
+__compress = $(if $1,$2$(firstword $1)$(call __compress,$(call nofirstword,$1),$2))
 
-awrap = $(call compress,$(call $1,$(call inflate,0 1 2 3 4 5 6 7 8 9,$2),$3))
+awrap = $(call compress,$(call $1,$(call inflate,0 1 2 3 4 5 6 7 8 9,$2),$3),)
 inc = $(call awrap,__inc,$1,)
 incx2 = $(call awrap,__incx2,$1,)
 __incx2 = $(call __inc,$(call __inc,$1))
@@ -54,15 +56,24 @@ __dec7 = $1 6
 __dec8 = $1 7
 __dec9 = $1 8
 
-argmsk = $(if $(filter $1,$2),,$(COMMA)$$($(call inc,$1))$(call argmsk,$(call inc,$1),$2))
+rangel = $(call striplast,$(call __rangel,$1,$2))
+__rangel = $(if $(filter-out $1,$2),$1 $(call rangel,$(call inc,$1),$2))
+rangeu = $(call stripfirst,$(call __rangeu,$1,$2))
+__rangeu = $(if $(filter-out $1,$2),$(call rangeu,$1,$(call dec,$2)) $2)
+range = $(call rangel,$1,$(call inc,$2))
+
+argmskud = $(if $(filter $1,$2),,$3$$($(call inc,$1))$(call argmskud,$(call inc,$1),$2,$3))
+argmsku = $(call argmskud,$1,$2,$(COMMA))
 argcnt = $(eval __tmp := 0)$(__argcnt)$(__tmp)
 __argcnt = $(if $(filter simple,$(flavor $(call inc,$(__tmp)))),$(eval __tmp := $(call inc,$(__tmp)))$(eval $(value __argcnt)))
 
-foreachi = $(foreach i,$($1),$(eval __tmp := $$(call $$2$(call argmsk,2,$(call dec,$1)),$$i$(call argmsk,$1,$(argcnt))))$(__tmp))
-foreachl = $(eval __tmp := $$(call __foreachl,$(foreach i,$1,$(call incx2,$i))$(call argmsk,1,$(argcnt))))$(__tmp)
-__foreachl = $(eval __tmp := $(if $1,\
-$$(call foreachi,$(call incx2,$(firstword $1)),__foreachl,$(call nofirstword,$1)$(call argmsk,1,$(argcnt))),\
-$$(call $$2$(call argmsk,2,$(argcnt)))))$(__tmp)
+foreachi = $(foreach i,$($1),$(eval __tmp := $$(call $$2$(call argmsku,2,$(call dec,$1)),$$i$(call argmsku,$1,$(argcnt))))$(__tmp))
+foreachl = $(eval __tmp := $$(call __foreachl,$(foreach i,$1,$(call incx2,$i))$(call argmsku,1,$(argcnt))))$(__tmp)
+__foreachl = $(eval __tmp := $(if $1,$(eval __tmp := $(argcnt))\
+$$(call foreachi,$(call incx2,$(firstword $1)),__foreachl,$(call nofirstword,$1)$(call argmsku,1,$(__tmp))),\
+$$(call $$2$(call argmsku,2,$(__tmp)))))$(__tmp)
 
-.PHONY: print-%
-print-%:; @echo '$* = $($*)'
+var = $(eval $(eval __tmp := $(argcnt))\
+$$(call foreachl,$(call rangeu,1,$(__tmp)),feval,$$$$2$(call argmskud,2,$(__tmp),$$$$(COL)$$) := $$$$($(call inc,$(__tmp))),$$1$(call argmsku,1,$(__tmp))))
+
+print(%):; @echo '$* = $($*)'

@@ -1,3 +1,15 @@
+$(call var2,CC,gcc%,gcc%)
+$(call var2,CC,clang%,clang%)
+
+$(call var2,CXX,gcc%,g++%)
+$(call var2,CXX,clang%,clang%)
+
+$(call var2,LD,gcc%,gcc%)
+$(call var2,LD,clang%,clang%)
+
+$(call var2,AR,gcc%,gcc-ar%)
+$(call var2,AR,clang%,llvm-ar%)
+
 CC/gcc := gcc
 CC/clang := clang
 
