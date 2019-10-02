@@ -18,6 +18,7 @@
 #       define inline __inline
 #       define alignof __alignof
 #       define _Static_assert static_assert
+#       define _Thread_local __declspec(thread)
 #   endif
 #endif
 

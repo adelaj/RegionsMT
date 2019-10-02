@@ -10,13 +10,9 @@ nofirstword = $(wordlist 2,$(words $1),$1)
 nolastword = $(wordlist 2,$(words $1),0 $1)
 stripfirst = $(wordlist 2,$(words 0 $1),0 $1)
 striplast = $(wordlist 1,$(words $1),$1 0)
-firstsep = $(firstword $(subst $1, ,$(firstword $2)))
-lastsep = $(lastword $(subst $1, ,$(firstword $2)))
+firstsep = $(foreach i,$2,$(firstword $(subst $1, ,$i)))
+lastsep = $(foreach i,$2,$(lastword $(subst $1, ,$i)))
 
-#firstsep = $(call striplast,$(call __firstsep,$1,$2))
-#__firstsep = $(if $2,$(firstword $(subst $1, ,$(firstword $2))) $(call __firstsep,$1,$(call nofirstword,$2)))
-#lastsep = $(call striplast,$(call __lastsep,$1,$2))
-#__lastsep = $(if $2,$(lastword $(subst $1, ,$(firstword $2))) $(call __lastsep,$1,$(call nofirstword,$2)))
 rev = $(call stripfirst,$(call __rev,$1))
 __rev = $(if $1,$(call __rev,$(call nofirstword,$1)) $(firstword $1))
 rremsuffix = $(if $(filter-out $2,$(patsubst %$1,%,$2)),$(call rremsuffix,$1,$(patsubst %$1,%,$2)),$2)
@@ -25,10 +21,10 @@ __rwildcard = $(sort $(wildcard $(addprefix $1,$2))) $(foreach d,$(sort $(wildca
 uniq = $(call striplast,$(call __uniq,$1))
 __uniq = $(if $1,$(firstword $1) $(call __uniq,$(filter-out $(firstword $1),$1)))
 inflate = $(if $1,$(call inflate,$(call nofirstword,$1),$(subst $(firstword $1),$(firstword $1) ,$2)),$(call striplast,$2))
-compress = $(if $1,$(firstword $1)$(call __compress,$(call nofirstword,$1),$2))
-__compress = $(if $1,$2$(firstword $1)$(call __compress,$(call nofirstword,$1),$2))
+compress = $(if $2,$(firstword $2)$(call __compress,$1,$(call nofirstword,$2)))
+__compress = $(if $2,$1$(firstword $2)$(call __compress,$1,$(call nofirstword,$2)))
 
-awrap = $(call compress,$(call $1,$(call inflate,0 1 2 3 4 5 6 7 8 9,$2),$3),)
+awrap = $(call compress,,$(call $1,$(call inflate,0 1 2 3 4 5 6 7 8 9,$2),$3))
 inc = $(call awrap,__inc,$1,)
 incx2 = $(call awrap,__incx2,$1,)
 __incx2 = $(call __inc,$(call __inc,$1))
@@ -60,20 +56,31 @@ rangel = $(call striplast,$(call __rangel,$1,$2))
 __rangel = $(if $(filter-out $1,$2),$1 $(call rangel,$(call inc,$1),$2))
 rangeu = $(call stripfirst,$(call __rangeu,$1,$2))
 __rangeu = $(if $(filter-out $1,$2),$(call rangeu,$1,$(call dec,$2)) $2)
-range = $(call rangel,$1,$(call inc,$2))
+range = $(call striplast,$1 $(call rangeu,$1,$2))
 
-argmskud = $(if $(filter $1,$2),,$3$$($(call inc,$1))$(call argmskud,$(call inc,$1),$2,$3))
-argmsku = $(call argmskud,$1,$2,$(COMMA))
-argcnt = $(eval __tmp := 0)$(__argcnt)$(__tmp)
-__argcnt = $(if $(filter simple,$(flavor $(call inc,$(__tmp)))),$(eval __tmp := $(call inc,$(__tmp)))$(eval $(value __argcnt)))
+argmskdu = $(if $(filter $1,$2),,$3$$($(call inc,$1))$(call argmskdu,$(call inc,$1),$2,$3))
+argmskd = $$($1)$(call argmskdu,$1,$2,$3)
+argmsku = $(call argmskdu,$1,$2,$(COMMA))
+argmsk = $$($1)$(call argmsku,$1,$2)
 
-foreachi = $(foreach i,$($1),$(eval __tmp := $$(call $$2$(call argmsku,2,$(call dec,$1)),$$i$(call argmsku,$1,$(argcnt))))$(__tmp))
+# There is no reliable way to track trailing empty arguments: unused arguments are not being undefined in the nested function calls
+argcnt = $(eval __tmp := 0)$(__argcnt_asc)$(__argcnt_dsc)$(__tmp)
+__argcnt_asc = $(if $(filter simple,$(flavor $(call inc,$(__tmp)))),$(eval __tmp := $(call inc,$(__tmp)))$(eval $(value __argcnt_asc)))
+__argcnt_dsc = $(if $($(__tmp)),,$(eval __tmp := $(call dec,$(__tmp)))$(eval $(value __argcnt_dsc)))
+
 foreachl = $(eval __tmp := $$(call __foreachl,$(foreach i,$1,$(call incx2,$i))$(call argmsku,1,$(argcnt))))$(__tmp)
+__foreachl_base = $(foreach i,$($1),$(eval __tmp := $$(call $(call argmsk,2,$(call dec,$1)),$$i$(call argmsku,$1,$(argcnt))))$(__tmp))
 __foreachl = $(eval __tmp := $(if $1,$(eval __tmp := $(argcnt))\
-$$(call foreachi,$(call incx2,$(firstword $1)),__foreachl,$(call nofirstword,$1)$(call argmsku,1,$(__tmp))),\
-$$(call $$2$(call argmsku,2,$(__tmp)))))$(__tmp)
+$$(call __foreachl_base,$(call incx2,$(firstword $1)),__foreachl,$(call nofirstword,$1)$(call argmsku,1,$(__tmp))),\
+$$(call $(call argmsk,2,$(__tmp)))))$(__tmp)
 
-var = $(eval $(eval __tmp := $(argcnt))\
-$$(call foreachl,$(call rangeu,1,$(__tmp)),feval,$$$$2$(call argmskud,2,$(__tmp),$$$$(COL)$$) := $$$$($(call inc,$(__tmp))),$$1$(call argmsku,1,$(__tmp))))
+var = $(eval $(eval __tmp := $(argcnt))$$(call foreachl,$(call range,1,$(__tmp)),var_base,$(call argmsk,1,$(__tmp))))
+var_base = $(eval $(eval __tmp := $(argcnt))\
+$(eval __tmp2 := $$$(call argmskd,1,$(call dec,$(__tmp)),$$$$(COL)$$))\
+$(eval __tmp3 := $(__tmp2))\
+$(if $(filter undefined,$(flavor $(__tmp3))),$(__tmp2) := $($(__tmp)),$(__tmp2) += $($(__tmp))))
+
+find_var = $(strip $(foreach i,$2,$(if $(strip $(foreach j,$(join $(subst :, ,$i),$(addprefix :,$1)),$(call __find_var_ftr,$(subst :, ,$j)))),,$i)))
+__find_var_ftr = $(if $(filter $(words $1),2),$(filter-out $(firstword $1),$(lastword $1)),0)
 
 print(%):; @echo '$* = $($*)'

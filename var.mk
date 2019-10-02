@@ -1,47 +1,24 @@
-$(call var2,CC,gcc%,gcc%)
-$(call var2,CC,clang%,clang%)
+$(call var,CC LD,gcc%,gcc%)
+$(call var,CXX,gcc%,,g++%)
+$(call var,CC CXX LD,clang%,clang%)
+$(call var,AR,gcc%,gcc-ar%)
+$(call var,AR,clang%,llvm-ar%)
 
-$(call var2,CXX,gcc%,g++%)
-$(call var2,CXX,clang%,clang%)
+$(call var,CFLAGS,gcc% clang%,%,%,-std=c11 -Wall -mavx)
+$(call var,CFLAGS LDFLAGS,gcc% clang%,i386 i686,%,-m32)
+$(call var,CFLAGS LDFLAGS,gcc% clang%,x86_64,%,-m64)
+$(call var,CFLAGS LDFLAGS,gcc% clang%,%,Release,-O3 -flto)
+$(call var,CFLAGS,gcc% clang%,%,Debug,-D_DEBUG -g)
+$(call var,CFLAGS LDFLAGS,gcc%,%,Release,-fuse-linker-plugin)
+$(call var,CFLAGS LDFLAGS,gcc%,%,Debug,-Og)
+$(call var,CFLAGS LDFLAGS,clang%,%,Debug,-O0)
+$(call var,LDFLAGS,gcc% clang%,%,%,-mavx)
+$(call var,LDFLAGS,clang%,%,Release,-fuse-ld=gold)
 
-$(call var2,LD,gcc%,gcc%)
-$(call var2,LD,clang%,clang%)
 
-$(call var2,AR,gcc%,gcc-ar%)
-$(call var2,AR,clang%,llvm-ar%)
-
-CC/gcc := gcc
-CC/clang := clang
-
-CXX/gcc := g++
-CXX/clang := clang++
-
-LD/gcc := $(CC/gcc)
-LD/clang := $(CC/clang)
-
-AR/gcc := gcc-ar
-AR/clang := llvm-ar
-
-CC_OPT := -std=c11 -Wall -mavx
-CC_OPT/*/i386 := -m32
-CC_OPT/*/i686 := $(CC_OPT/*/i386)
-CC_OPT/*/x86_64 := -m64
-CC_OPT/*/*/Release := -O3 -flto
-CC_OPT/*/*/Debug := -D_DEBUG -g
-CC_OPT/gcc/*/Release := -fuse-linker-plugin
-CC_OPT/gcc/*/Debug := -Og
-CC_OPT/clang/*/Debug := -O0
 
 CC_INC := gsl
 
-LD_OPT/*/i386 := -m32
-LD_OPT/*/i686 := $(LD_OPT/*/i386)
-LD_OPT/*/x86_64 := -m64
-LD_OPT/*/*/Release := -mavx -O3 -flto
-LD_OPT/gcc/*/Release := -fuse-linker-plugin
-LD_OPT/gcc/*/Debug := -Og
-LD_OPT/clang/*/Release := -fuse-ld=gold
-LD_OPT/clang/*/Debug := -O0
 
 LD_INC := gsl
 LD_LIB := m pthread gsl gslcblas

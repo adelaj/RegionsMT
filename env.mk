@@ -1,46 +1,35 @@
 include common.mk
-VALID_ARCH := x86_64 i386 i686
-VALID_CFG := Debug Release
-VALID_TOOLCHAIN := gcc gcc-% clang clang-% icc
 
 ARCH ?= $(shell arch)
 CFG ?= Release
 TOOLCHAIN ?= gcc
-BUILD_PATH ?= ..
+PREFIX ?= ..
 
-cont = $(if $(filter-out $(subst $2, ,$1),$1),,$1)
-pred = $(strip $(foreach i,$2,$(if $(eval __tmp := $$(call $$1,$$i$(call argmsku,2,$(argcnt))))$(__tmp),$(__tmp))))
+override ARCH := $(call uniq, $(ARCH))
+override CFG := $(call uniq,$(CFG))
+override TOOLCHAIN := $(foreach i,$(TOOLCHAIN),$(call rremsuffix,:,$(call compress,,$(wordlist 1,3,$(subst :, : ,$i)))))
+override TOOLCHAIN := $(foreach i,$(call uniq,$(call firstsep,:,$(TOOLCHAIN))),$(patsubst %:,%,$(lastword $(filter $i:%,$(addsuffix :,$(TOOLCHAIN))))))
+override PREFIX := $(lastword $(PREFIX))
 
-W := $(call cont,a/b,/) $(call cont,ab/,/) $(call cont,/ab,/)
-V := $(call pred,cont,a/b a/ /b x y a/b/c a b,a)
-U := $(filter-out ,a/b a/ /b a/b/c)
+$(call var,CFLAGS,gcc% clang%,%,%,-std=c11 -Wall -mavx)
+$(call var,CFLAGS LDFLAGS,gcc% clang%,i386 i686,%,-m32)
+$(call var,CFLAGS LDFLAGS,gcc% clang%,x86_64,%,-m64)
+$(call var,CFLAGS LDFLAGS,gcc% clang%,%,Release,-O3 -flto)
+$(call var,CFLAGS,gcc% clang%,%,Debug,-D_DEBUG -g)
+$(call var,CFLAGS LDFLAGS,gcc%,%,Release,-fuse-linker-plugin)
+$(call var,CFLAGS LDFLAGS,gcc%,%,Debug,-Og)
+$(call var,CFLAGS LDFLAGS,clang%,%,Debug,-O0)
+$(call var,LDFLAGS,gcc% clang%,%,%,-mavx)
+$(call var,LDFLAGS,clang%,%,Release,-fuse-ld=gold)
 
-define toolchain_arrange =
-$(eval
-$(if $(filter $(VALID_TOOLCHAIN),$1),
-DIR/$(call lastsep,:,$1) := 1
-))
-endef
+k := $(call find_var,LDFLAGS clang-8 i686 Release,$(.VARIABLES))
 
-$(call foreachl,2,feval,$$2 := $$(call uniq,$$(filter $$(VALID_$$2),$$($$2))),ARCH CFG TOOLCHAIN)
+build_var_z = $(eval __tmp := $(call argmskd,1,$(argcnt), ))$(__tmp)
+build_var = $(eval $(eval __tmp := $(argcnt)) __tmp := $$(call foreachl,$(call range,1,$(__tmp)),build_var_z,$(call argmsk,1,$(__tmp))))$(__tmp)
 
-TOOLCHAIN_NAME := $(call lastsep,:,$(TOOLCHAIN))
+TARGET := RegionsMT
 
-TOOLCHAIN_BASE := $(call firstsep,-,$(TOOLCHAIN))
-TOOLCHAIN_VER := $(filter-out $(TOOLCHAIN_BASE),$(TOOLCHAIN))
+$(call foreachl,1 2 3 4,var_base,$(TARGET),$(call firstsep,:,$(TOOLCHAIN)),$(ARCH),$(CFG),$(PREFIX)/$$2/$$3/$$4/$$1)
 
-$(call foreachl,2,feval,DIR/$$2 := $(BUILD_PATH)/$$2,$(TOOLCHAIN))
-
-m := $(firstword $(filter CXX%,$(.VARIABLES)))
-l := gcc-8
-n := $(subst %,$(patsubst $(word 2,$(subst $(COL), ,$m)),%,$l),$($m))
-t := $(foreach i,a b c %,a$i)
-
-var6 = $(call foreachl,3 4 5 6,feval,$$3$$(COL)$$4$$(COL)$$5$$(COL)$$6 := $$2,$1,$2,$3,$4,$5)
-
-var = $(eval $(eval __tmp := $(argcnt))$$(call foreachl,$(call rangeu,1,$(__tmp)),feval,$$$$2$(call argmskud,2,$(__tmp),$$$$(COL)$$) := $$$$($(call inc,$(__tmp))),$$1$(call argmsku,1,$(__tmp))))
-
-
-m := $(call rangeu,3,10)
-
-z := $(call var,CC CC1,%,x86_64 i386,Debug Release MinRel,gcc%)
+$(warning $(LDFLAGS:clang%:%:Release))
+$(warning $k)
