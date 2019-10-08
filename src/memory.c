@@ -14,6 +14,11 @@ void array_broadcast(void *arr, size_t cnt, size_t sz, void *val)
     for (size_t i = 0; i < tot; i += sz) memcpy((char *) arr + i, val, sz);
 }
 
+struct array_init_status {
+    size_t tot;
+    unsigned status;
+};
+
 // 'p_cap' -- pointer to initial capacity
 // 'cnt' -- desired capacity
 unsigned array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, size_t diff, enum array_flags flags)

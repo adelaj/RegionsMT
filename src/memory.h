@@ -15,7 +15,7 @@ enum array_flags {
     ARRAY_FAILSAFE = 16 // Disables internal checks
 };
 
-enum {
+enum array_status {
     ARRAY_FAILURE = 0,
     ARRAY_SUCCESS,
     ARRAY_UNTOUCHED,

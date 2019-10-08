@@ -33,13 +33,14 @@ void print_time_stamp(char *buff, size_t *p_cnt)
     else *p_cnt = 1;
 }
 
-static bool fmt_execute_time_diff_sec(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute_flags flags)
+static bool fmt_execute_time_diff_sec(char *buff, size_t *p_cnt, void *p_arg, struct style *style, enum fmt_execute_flags flags)
 {
+    (void) style;
     uint32_t sdr = ARG_FETCH(flags & FMT_EXE_FLAG_PTR, p_arg, uint32_t, Uint32_dom_t);
     if (flags & FMT_EXE_FLAG_PHONY) return 1;
     size_t dig = 0;
     for (uint32_t i = sdr; !(i % 10); dig++, i /= 10);
-    return print_fmt(buff, p_cnt, ".000000%-ud%!-*", sdr, dig);    
+    return print_fmt(buff, p_cnt, ".000000%-ud%!-*", sdr, dig);
 }
 
 bool print_time_diff(char *buff, size_t *p_cnt, uint64_t start, uint64_t stop)
@@ -60,6 +61,7 @@ enum fmt_type {
     TYPE_INT,
     TYPE_CHAR,
     TYPE_STR,
+    TYPE_PATH,
     TYPE_FLT,
     TYPE_TIME_DIFF,
     TYPE_TIME_STAMP,
@@ -104,10 +106,11 @@ enum fmt_flags {
     FMT_CONDITIONAL = 1,
     FMT_OVERPRINT =  2,
     FMT_ENV_BEGIN = 4,
-    FMT_ENV_END = 8,
-    FMT_LEFT_JUSTIFY = 16,
-    FMT_ARG_PTR = 32,
-    FMT_LIST_PTR = 64
+    FMT_ENV_USER = 8,
+    FMT_ENV_END = 16,
+    FMT_LEFT_JUSTIFY = 32,
+    FMT_ARG_PTR = 64,
+    FMT_LIST_PTR = 128
 };
 
 enum fmt_arg_mode {
@@ -263,6 +266,9 @@ static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
         case '<':
             tmp = FMT_ENV_BEGIN;
             break;
+        case '~':
+            tmp = FMT_ENV_USER;
+            break;
         case '>':
             tmp = FMT_ENV_END;
             break;
@@ -291,6 +297,10 @@ static bool fmt_decode(struct fmt_res *res, const char *fmt, size_t *p_pos)
         break;
     case 's':
         res->type = TYPE_STR;
+        if (!fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, &pos)) return 0;
+        break;
+    case 'P':
+        res->type = TYPE_PATH;
         if (!fmt_decode_str(&res->str_arg.len, &res->str_arg.mode, fmt, &pos)) return 0;
         break;
     case 'A':
@@ -413,12 +423,12 @@ static void fmt_execute_str(size_t len, enum fmt_arg_mode mode, char *buff, size
     if (!(flags & FMT_EXE_FLAG_PHONY)) print(buff, p_cnt, str, mode == ARG_DEFAULT ? Strnlen(str, *p_cnt) : len, 1);
 }
 
-static bool fmt_execute_time_diff(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
+static bool fmt_execute_time_diff(char *buff, size_t *p_cnt, Va_list *p_arg, struct style *style, enum fmt_execute_flags flags)
 {
     bool ptr = flags & FMT_EXE_FLAG_PTR;
     uint64_t start = ARG_FETCH(ptr, p_arg, uint64_t, Uint64_dom_t), stop = ARG_FETCH(ptr, p_arg, uint64_t, Uint64_dom_t);
     if (flags & FMT_EXE_FLAG_PHONY) return 1;
-    return print_time_diff(buff, p_cnt, start, stop);
+    return print_time_diff(buff, p_cnt, start, stop, style);
 }
 
 static void fmt_execute_crt(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
@@ -454,7 +464,7 @@ static void fmt_execute_utf(uint32_t val, enum fmt_arg_mode mode, char *buff, si
     print(buff, p_cnt, (char *) str, len, 0);
 }
 
-static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, enum fmt_execute_flags flags)
+static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, struct style *style, enum fmt_execute_flags flags)
 {
     const void *p_arg_list = NULL;
     void *p_arg_sub = NULL;
@@ -604,8 +614,10 @@ bool print_fmt(char *buff, size_t *p_cnt, ...)
 }
 
 // Last argument may be 'NULL'
-bool log_init(struct log *restrict log, char *restrict path, size_t lim, enum log_flags flags, struct style style, struct log *restrict log_error)
+bool log_init(struct log *restrict log, char *restrict path, size_t lim, enum log_flags flags, struct style *style, struct log *restrict log_error)
 {
+    static const struct style def_style = { .type_str = ENV_INIT(UTF8_LDQUO, UTF8_RDQUO), .type_char = ENV_INIT(UTF8_LSQUO, UTF8_RSQUO) };
+
     FILE *f = path ? fopen(path, flags & LOG_APPEND ? "a" : "w") : stderr;
     if (path && !f) log_message_fopen(log_error, CODE_METRIC, MESSAGE_ERROR, path, errno);
     else
@@ -617,7 +629,7 @@ bool log_init(struct log *restrict log, char *restrict path, size_t lim, enum lo
         {
             if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
             else log->cnt = 0;
-            log->style = tty ? style : (struct style) { .pth = ENV_INIT(UTF8_LDQUO, UTF8_RDQUO), .str = ENV_INIT(UTF8_LDQUO, UTF8_RDQUO), .chr = ENV_INIT(UTF8_LSQUO, UTF8_RSQUO) };
+            log->style = tty ? style : &def_style;
             log->lim = lim;
             log->file = f;
             log->tot = 0;
@@ -651,7 +663,7 @@ void log_close(struct log *restrict log)
     free(log->buff);
 }
 
-bool log_multiple_init(struct log *restrict arr, size_t cnt, char *restrict path, size_t cap, enum log_flags flags, struct style style, struct log *restrict log_error)
+bool log_multiple_init(struct log *restrict arr, size_t cnt, char *restrict path, size_t cap, enum log_flags flags, struct style *style, struct log *restrict log_error)
 {
     size_t i = 0;
     for (; i < cnt && log_init(arr + i, path, cap, flags | LOG_APPEND, style, log_error); i++);
@@ -665,11 +677,11 @@ void log_multiple_close(struct log *restrict arr, size_t cnt)
     if (cnt) for (size_t i = cnt; --i; log_close(arr + i));
 }
 
-static bool log_prefix(char *buff, size_t *p_cnt, struct code_metric metric, enum message_type type, struct style style)
+static bool log_prefix(char *buff, size_t *p_cnt, struct code_metric metric, enum message_type type, struct style *style)
 {
     const struct strl ttl[] = { STRI("MESSAGE"), STRI("ERROR"), STRI("WARNING"), STRI("NOTE"), STRI("INFO"), STRI("DAMNATION") };
-    return print_fmt(buff, p_cnt, "%<[%D]%> %<>s* %<(" UTF8_LDQUO "%s*" UTF8_RDQUO " @ " UTF8_LDQUO "%s*" UTF8_RDQUO ":%uz):%> ",
-        style.inf, style.inf, style.ttl[type], STRL(ttl[type]), style.inf, STRL(metric.func), STRL(metric.path), metric.line, style.inf);
+    return print_fmt(buff, p_cnt, "%<~[%D]%~> %<~>s* %<~(" UTF8_LDQUO "%s*" UTF8_RDQUO " @ " UTF8_LDQUO "%s*" UTF8_RDQUO ":%uz):%~> ",
+        style->ttl.time_stamp, style->ttl.time_stamp, style->ttl.header[type], STRL(ttl[type]), style->ttl.code_metric, STRL(metric.func), STRL(metric.path), metric.line, style->ttl.code_metric);
 }
 
 static bool log_message_impl(struct log *restrict log, struct code_metric metric, enum message_type type, union message_callback handler, void *context, Va_list *p_arg)
@@ -732,10 +744,10 @@ bool log_message_crt(struct log *restrict log, struct code_metric code_metric, e
 
 bool log_message_fopen(struct log *restrict log, struct code_metric code_metric, enum message_type type, const char *restrict path, Errno_t err)
 {
-    return log_message_fmt(log, code_metric, type, "Unable to open the file %<>s: %C!\n", log->style.pth, path, err);
+    return log_message_fmt(log, code_metric, type, "Unable to open the file %<>P: %C!\n", path, err);
 }
 
 bool log_message_fseek(struct log *restrict log, struct code_metric code_metric, enum message_type type, int64_t offset, const char *restrict path)
 {
-    return log_message_fmt(log, code_metric, type, "Unable to seek into the position %<>uq of the file %<>s!\n", log->style.num, offset, log->style.pth, path);
+    return log_message_fmt(log, code_metric, type, "Unable to seek into the position %<>uq of the file %<>s!\n", offset, path);
 }

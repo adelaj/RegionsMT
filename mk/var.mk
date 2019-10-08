@@ -1,0 +1,23 @@
+# <VAR>:<TOOLCHAIN>
+$(call var,CC LD,gcc,gcc)
+$(call var,CC LD,gcc-%,gcc-%)
+$(call var,CXX,gcc,g++)
+$(call var,CXX,gcc-%,g++-%)
+$(call var,CC CXX LD,clang,clang)
+$(call var,CC CXX LD,clang-%,clang-%)
+$(call var,AR,gcc,gcc-ar)
+$(call var,AR,gcc-%,gcc-ar-%)
+$(call var,AR,clang,llvm-ar)
+$(call var,AR,clang-%,llvm-ar-%)
+
+# <VAR>:<TARGET>:<TOOLCHAIN>:<ARCH>:<CONFIG>
+$(call var,CFLAGS,%,gcc gcc-% clang clang-%,%,%,-std=c11 -Wall -mavx)
+$(call var,CFLAGS LDFLAGS,%,gcc gcc-% clang clang-%,i386 i686,%,-m32)
+$(call var,CFLAGS LDFLAGS,%,gcc gcc-% clang clang-%,x86_64,%,-m64)
+$(call var,CFLAGS LDFLAGS,%,gcc gcc-% clang clang-%,%,Release,-O3 -flto)
+$(call var,CFLAGS,%,gcc gcc-% clang clang-%,%,Debug,-D_DEBUG -g)
+$(call var,CFLAGS LDFLAGS,%,gcc gcc-%,%,Release,-fuse-linker-plugin)
+$(call var,CFLAGS LDFLAGS,%,gcc gcc-%,%,Debug,-Og)
+$(call var,CFLAGS LDFLAGS,%,clang clang-%,%,Debug,-O0)
+$(call var,LDFLAGS,%,gcc gcc-% clang clang-%,%,%,-mavx)
+$(call var,LDFLAGS,%,clang clang-%,%,Release,-fuse-ld=gold)
