@@ -74,11 +74,11 @@ __foreachl = $(eval __tmp := $(if $1,$(eval __tmp := $(argcnt))\
 $$(call __foreachl_base,$(call incx2,$(firstword $1)),__foreachl,$(call nofirstword,$1)$(call argmsku,1,$(__tmp))),\
 $$(call $(call argmsk,2,$(__tmp)))))$(__tmp)
 
-var = $(eval $(eval __tmp := $(argcnt))__tmp := $$(call foreachl,$(call range,1,$(__tmp)),var_base,$(call argmsk,1,$(__tmp))))
+var = $(eval $(eval __tmp := $(argcnt))\
+__tmp := $$(call foreachl,$(call rangel,1,$(__tmp)),var_base,$(call argmsk,1,$(__tmp))))
 var_vect = $(var)$(__tmp)
-var_base = $(eval $(eval __tmp := $(argcnt))\
-$(eval __tmp2 := $$$(call argmskd,1,$(call dec,$(__tmp)),$$$$(COL)$$))$(eval __tmp3 := $(__tmp2))\
-$(if $(filter undefined,$(flavor $(__tmp3))),$(__tmp2) := $($(__tmp)),$(__tmp2) += $($(__tmp))))$(__tmp3)
+var_base = $(eval $(eval __tmp := $(argcnt))$(eval __tmp2 := $(call argmskd,1,$(call dec,$(__tmp)),$$(COL)))\
+$(if $(filter undefined,$(flavor $(__tmp2))),$$(__tmp2) := $($(__tmp)),$$(__tmp2) += $($(__tmp))))$(__tmp2)
 
 find_var = $(strip $(foreach i,$2,$(if $(strip $(foreach j,$(join $(subst :, ,$i),$(addprefix :,$1)),$(call __find_var_ftr,$(subst :, ,$j)))),,$i)))
 __find_var_ftr = $(if $(filter $(words $1),2),$(filter-out $(firstword $1),$(lastword $1)),0)
