@@ -1,14 +1,12 @@
 # <VAR>:<TOOLCHAIN>
-$(call var,CC LD,gcc,gcc)
-$(call var,CC LD,gcc-%,gcc-%)
+$(call var,CC LD,gcc gcc-% clang clang-%,$$$$2)
 $(call var,CXX,gcc,g++)
-$(call var,CXX,gcc-%,g++-%)
-$(call var,CC CXX LD,clang,clang)
-$(call var,CC CXX LD,clang-%,clang-%)
+$(call var,CXX,gcc-%,$$$$(2:gcc-%=g++-%))
+$(call var,CXX,clang clang-%,$$$$2)
 $(call var,AR,gcc,gcc-ar)
-$(call var,AR,gcc-%,gcc-ar-%)
+$(call var,AR,gcc-%,$$$$(2:gcc-%=gcc-ar-%))
 $(call var,AR,clang,llvm-ar)
-$(call var,AR,clang-%,llvm-ar-%)
+$(call var,AR,clang-%,$$$$(2:clang-%=llvm-ar-%))
 
 # <VAR>:<TARGET>:<TOOLCHAIN>:<ARCH>:<CONFIG>
 $(call var,CFLAGS,%,gcc gcc-% clang clang-%,%,%,-std=c11 -Wall -mavx)

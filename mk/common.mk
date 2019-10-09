@@ -80,7 +80,13 @@ var_vect = $(var)$(__tmp)
 var_base = $(eval $(eval __tmp := $(argcnt))$(eval __tmp2 := $(call argmskd,1,$(call dec,$(__tmp)),$$(COL)))\
 $(if $(filter undefined,$(flavor $(__tmp2))),$$(__tmp2) := $($(__tmp)),$$(__tmp2) += $($(__tmp))))$(__tmp2)
 
-find_var = $(strip $(foreach i,$2,$(if $(strip $(foreach j,$(join $(subst :, ,$i),$(addprefix :,$1)),$(call __find_var_ftr,$(subst :, ,$j)))),,$i)))
+find_var = $(strip $(foreach i,$2,$(if $(strip $(foreach j,$(join $(subst :, ,$i),$(addprefix :,$(subst :, ,$1))),$(call __find_var_ftr,$(subst :, ,$j)))),,$i)))
 __find_var_ftr = $(if $(filter $(words $1),2),$(filter-out $(firstword $1),$(lastword $1)),0)
+
+# Do not remove whitespace before '$$2'
+apply_var = $(eval __tmp := $$(call foreachl,$(call inc,$(words $(subst :, ,$1))),__apply_var,$(subst :,$(COMMA),$(subst $(COMMA),$$(COMMA),$(subst $$,$$$$,$1))), $$2))$(__tmp)
+__apply_var = $(eval __tmp := $($($(argcnt))))$(__tmp)
+
+fetch_var = $(call apply_var,$1,$(call find_var,$1,$(.VARIABLES)))
 
 print(%):; @echo '$* = $($*)'

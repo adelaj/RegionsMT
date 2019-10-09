@@ -7,10 +7,10 @@ include mk/gather.mk
 include mk/build.mk
 
 TARGET := RegionsMT
-$(call var,REQUIRE,$(TARGET),%,%,%,gsl gslcblas)
 
-$(call var,LDFLAGS,$(TARGET),%,%,%,$(addprefix -l,m pthread))
-$(call var,REQUIRE,$(TARGET),gcc gcc-% clang clang-%,%,%,gsl:libgsl.a gsl:libgslcblas.a)
+$(call var,CFLAGS,$(TARGET),%,%,%,-I$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5)
+$(call var,LDFLAGS,$(TARGET),gcc gcc-% clang clang-% icc,%,%,$(addprefix -l,m pthread))
+$(call var,LDEXT,$(TARGET),gcc gcc-% clang clang-% icc,%,%,$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/libgsl.a $(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/libgslcblas.a)
 
 ALL := $(call var_vect,$(TARGET),$(call firstsep,:,$(TOOLCHAIN)),$(ARCH),$(CFG),$(PREFIX)/$$2/$$1/$$3/$$4)
 
@@ -18,8 +18,12 @@ ALL := $(call var_vect,$(TARGET),$(call firstsep,:,$(TOOLCHAIN)),$(ARCH),$(CFG),
 all: $(foreach i,$(ALL),$($i));
 
 $(call gather_dir)
+$(call gather_clean_dist_dir)
 $(call gather_clean_dir)
 $(call gather_clean_file)
 
+.PHONY: distclean
+distclean: | $(GATHER_CLEAN_DIST_DIR);
+
 .PHONY: clean
-clean: | $(call foreachl,2,id,clean-$$(DIR/$$2),$(TOOLCHAIN)) $(call foreachl,2 3 4,id,clean-$$(DIR-$$2/$$3/$$4),$(TARGET),$(TOOLCHAIN),$(ARCH));
+clean: | $(GATHER_CLEAN_DIR) $(GATHER_CLEAN_FILE);
