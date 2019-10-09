@@ -1,20 +1,21 @@
-﻿define build_cc =
+﻿define build_cc_base =
 $(eval
 $(eval
+QUERY$$(COL)$1 := $(call transform,$$1:$$(lastword $$(subst :, ,$$(filter $$2%,$$(TOOLCHAIN)))):$$3:$$4,$1)
 GATHER_TARGET$$(COL)$1 :=
 GATHER_OBJ$$(COL)$1 :=)
 $(call gather,TARGET:$1,$($1))
-$(call foreachl,3,proxycall,gather,OBJ:$1$(COMMA)$$3,$(addprefix $(DIR-$1$2)/,$(patsubst $(PREFIX)/src/%,$(dir $($1))/obj/%.o,$(call rwildcard,$(PREFIX)/src/,*.c))))
+$(call foreachl,3,proxycall,gather,OBJ:$1$(COMMA)$$3,$(patsubst $(PREFIX)/src/%,$(dir $($1))/obj/%.o,$(call rwildcard,$(PREFIX)/src/,*.c)))
 
 .SECONDEXPANSION:
-$$(GATHER_OBJ$$(COL)$1): $(dir $($1))/obj/%.c.o: $(PREFIX)/src/%.c | $$$$(PARENT$$$$(COL)$$$$@)
-    $(BUILD_CC$2) $(BUILD_CC_OPT$2) $(addprefix -I,$(BUILD_CC_INC$2)) -o $$@ -c $$^
+$$(GATHER_OBJ$$(COL)$$1): $(dir $($1))/obj/%.c.o: $(PREFIX)/src/%.c | $$$$(PARENT$$$$(COL)$$$$@) 
+    $(call fetch_var,CC:$(QUERY:$1)) $(call fetch_var,CFLAGS:$(QUERY:$1)) -o $$@ -c $$^
 
 .SECONDEXPANSION:
-$$(GATHER_TARGET-$1$2): $(GATHER_OBJ-$1$2) | $$$$(PARENT-$$$$@)
-    $(BUILD_LD$2) $(BUILD_LD_OPT$2) -o $$@ $$^ $(addprefix -L,$(BUILD_LD_INC$2)) $(addprefix -l,$(BUILD_LD_LIB$2))
+$$(GATHER_TARGET$$(COL)$$1): $$(GATHER_OBJ$$(COL)$$1) $$(LDREQ$$(COL)$$1) | $$$$(PARENT$$$$(COL)$$$$@)
+    $(call fetch_var,LD:$(QUERY:$1)) $(call fetch_var,LDFLAGS:$(QUERY:$1)) -o $$@ $$^
 
-GATHER_CLEAN_FILE += $(GATHER_CLEAN_OBJ:$1) $(GATHER_CLEAN_TARGET-$1$2))
+GATHER_CLEAN_FILE += $(GATHER_CLEAN_OBJ:$1) $(GATHER_CLEAN_TARGET:$1))
 endef
 
 define build_cc =

@@ -10,7 +10,7 @@ TARGET := RegionsMT
 
 $(call var,CFLAGS,$(TARGET),%,%,%,-I$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5)
 $(call var,LDFLAGS,$(TARGET),gcc gcc-% clang clang-% icc,%,%,$(addprefix -l,m pthread))
-$(call var,LDEXT,$(TARGET),gcc gcc-% clang clang-% icc,%,%,$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/libgsl.a $(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/libgslcblas.a)
+$(call var,LDREQ,$(TARGET),gcc gcc-% clang clang-% icc,%,%,$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/libgsl.a $(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/libgslcblas.a)
 
 ALL := $(call var_vect,$(TARGET),$(call firstsep,:,$(TOOLCHAIN)),$(ARCH),$(CFG),$(PREFIX)/$$2/$$1/$$3/$$4)
 

@@ -5,6 +5,8 @@ COL := :
 
 feval = $(eval $1)
 id = $(eval __tmp := $1)$(__tmp)
+deref = $(foreach i,$1,$($i))
+escape_comma = $(subst $(COMMA),$$(COMMA),$(subst $$,$$$$,$1))
 proxycall = $(eval $$(call $1,$2))
 nofirstword = $(wordlist 2,$(words $1),$1)
 nolastword = $(wordlist 2,$(words $1),0 $1)
@@ -83,10 +85,12 @@ $(if $(filter undefined,$(flavor $(__tmp2))),$$(__tmp2) := $($(__tmp)),$$(__tmp2
 find_var = $(strip $(foreach i,$2,$(if $(strip $(foreach j,$(join $(subst :, ,$i),$(addprefix :,$(subst :, ,$1))),$(call __find_var_ftr,$(subst :, ,$j)))),,$i)))
 __find_var_ftr = $(if $(filter $(words $1),2),$(filter-out $(firstword $1),$(lastword $1)),0)
 
-# Do not remove whitespace before '$$2'
-apply_var = $(eval __tmp := $$(call foreachl,$(call inc,$(words $(subst :, ,$1))),__apply_var,$(subst :,$(COMMA),$(subst $(COMMA),$$(COMMA),$(subst $$,$$$$,$1))), $$2))$(__tmp)
-__apply_var = $(eval __tmp := $($($(argcnt))))$(__tmp)
+apply_var = $(eval __tmp := $$(call foreachl,$(call inc,$(words $(subst :, ,$1))),__apply_var,$(subst :,$(COMMA),$(call escape_comma,$1)),$$2,0))$(__tmp)
+__apply_var = $(eval __tmp := $($($(call dec,$(argcnt)))))$(__tmp)
 
 fetch_var = $(call apply_var,$1,$(call find_var,$1,$(.VARIABLES)))
+
+transform = $(eval __tmp := $$(call __transform,$(subst :,$(COMMA),$(call escape_comma,$2)),$$1))$(__tmp)
+__transform = $(eval __tmp := $($(argcnt)))$(__tmp)
 
 print(%):; @echo '$* = $($*)'
