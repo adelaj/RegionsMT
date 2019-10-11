@@ -1,31 +1,24 @@
-﻿define build_cc_base =
-$(eval
-$(eval
-QUERY$$(COL)$1 := $(call transform,$$1:$$(lastword $$(subst :, ,$$(filter $$2%,$$(TOOLCHAIN)))):$$3:$$4,$1)
-GATHER_TARGET$$(COL)$1 :=
-GATHER_OBJ$$(COL)$1 :=)
-$(call gather,TARGET:$1,$($1))
-$(call foreachl,3,proxycall,gather,OBJ:$1$(COMMA)$$3,$(patsubst $(PREFIX)/src/%,$(dir $($1))/obj/%.o,$(call rwildcard,$(PREFIX)/src/,*.c)))
+﻿BUILD_CC_TOOLCHAIN := gcc gcc-% clang clang-% icc
+
+define build_cc_base =
+$(call var_base,BUILD_CC_QUERY,$1,$(call transform,$$1:$$(lastword $$(subst :, ,$$(filter $$2%,$$(TOOLCHAIN)))):$$3:$$4,$1),0)\
+$(call var_base,BUILD_CC_TOOLCHAIN,$1,$$(word 2,$$(subst :, ,$$(BUILD_CC_QUERY:$$2))),0)\
+$(if $(filter $(BUILD_CC_TOOLCHAIN),$(BUILD_CC_TOOLCHAIN:$1)),$(eval
+$(call var_base,BUILD_CC_BASE,$1,$$(PREFIX)/$$(firstword $$(subst :, ,$$2))/,0)
+
+$(call gather,BUILD_CC_TARGET:$1,$($1))
+$(call foreachl,2,gather,BUILD_CC_DEP:$1,$(patsubst $(BUILD_CC_BASE:$1)src/%,$(dir $($1))obj/%.d,$(call fetch_var,CSRC:$(BUILD_CC_QUERY:$1))))
+$(call foreachl,2,gather,BUILD_CC_OBJ:$1,$(patsubst %.d,%.o,$(GATHER_BUILD_CC_DEP:$1)))
 
 .SECONDEXPANSION:
-$$(GATHER_OBJ$$(COL)$$1): $(dir $($1))/obj/%.c.o: $(PREFIX)/src/%.c | $$$$(PARENT$$$$(COL)$$$$@) 
-    $(call fetch_var,CC:$(QUERY:$1)) $(call fetch_var,CFLAGS:$(QUERY:$1)) -o $$@ -c $$^
+$$(GATHER_BUILD_CC_OBJ$$(COL)$$1): $$(dir $$($$1))obj/%.c.o: $$(BUILD_CC_BASE$$(COL)$$1)src/%.c $$(dir $$($$1))obj/%.c.d | $$$$(PARENT$$$$(COL)$$$$@) $$(call fetch_var2,CINC:$$(BUILD_CC_QUERY$$(COL)$$1),CINC:$$1)
+    $$(strip $$(call fetch_var,CC:$(BUILD_CC_TOOLCHAIN:$1)) -MMD -MP -MF$$(word 2,$$^) $(call fetch_var,CFLAGS:$(BUILD_CC_QUERY:$1)) $$(addprefix -I,$$(word 2,$$|)) -o $$@ -c $$<)
 
-.SECONDEXPANSION:
-$$(GATHER_TARGET$$(COL)$$1): $$(GATHER_OBJ$$(COL)$$1) $$(LDREQ$$(COL)$$1) | $$$$(PARENT$$$$(COL)$$$$@)
-    $(call fetch_var,LD:$(QUERY:$1)) $(call fetch_var,LDFLAGS:$(QUERY:$1)) -o $$@ $$^
+$$(GATHER_BUILD_CC_DEP$$(COL)$$1):;
 
-GATHER_CLEAN_FILE += $(GATHER_CLEAN_OBJ:$1) $(GATHER_CLEAN_TARGET:$1))
+$(call var_base,GATHER_INC,$(GATHER_BUILD_CC_DEP:$1),0)
+$(call var_base,GATHER_FILE,$(GATHER_BUILD_CC_OBJ:$1),0)
+$(call var_base,GATHER_CLEAN_FILE,$(GATHER_CLEAN_BUILD_CC_TARGET:$1) $(GATHER_CLEAN_BUILD_CC_OBJ:$1) $(GATHER_CLEAN_BUILD_CC_DEP:$1),0)))
 endef
 
-define build_cc =
-$(eval DIR-$1/$2/$3/$4 := $(DIR-$1/$2/$3)/$4) \
-$(eval $1/$2/$3/$4 := $$(DIR-$1/$2/$3/$4)/$1) \
-$(call build_cc_impl,$1,/$2/$3/$4)
-endef
-
-define build_cc_cfg =
-$(eval DIR-$1/$2/$3 := $(DIR/$2)/$1-$3) \
-$(call gather,DIR,$(DIR-$1/$2/$3)) \
-$(call foreachl,4,build_cc,$1,$2,$3,$4)
-endef
+build_cc = $(call foreachl,1,build_cc_base,$1)
