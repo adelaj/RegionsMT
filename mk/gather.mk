@@ -1,45 +1,41 @@
 define gather =
-$(call var_base,GATHER_$1,,0)
-$(if $(filter $2,$(GATHER_$1)),,
-$(call var_base,CLEAN,$2,,0)
-$(call var_base,GATHER_$1,$2,0)
-$(call var_base,GATHER_CLEAN_$1,clean($2),0)
-$(call var_base,PARENT,$2,$(addprefix $(PREFIX)/,$(filter-out .,$(patsubst %/,%,$(dir $(patsubst $(PREFIX)/%,%,$2))))),0)
+$(call var_base,$1,,.)
+$(if $(filter $2,$($1)),,
+$(call var_base,CLEAN,$2,,.)
+$(call var_base,$1,$2,.)
+$(call var_base,PARENT,$2,$(addprefix $(PREFIX)/,$(filter-out .,$(patsubst %/,%,$(dir $(patsubst $(PREFIX)/%,%,$2))))),.)
 $(if $(PARENT:$2),
-$(call var_base,CLEAN,$(PARENT:$2),clean($2),0)
-$(call gather,DIR,$(PARENT:$2))))
+$(call var_base,CLEAN,$(PARENT:$2),clean($2),.)
+$(call gather,GATHER_DIR,$(PARENT:$2))))
 endef
 
-define gather_dir =
-$(call var_base,GATHER_DIR,,0)\
+define gather_mkdir =
 $(eval
 .SECONDEXPANSION:
-$$(GATHER_DIR): | $$$$(PARENT$$$$(COL)$$$$@); mkdir $$@)
+$$1: | $$$$(PARENT$$$$(COL)$$$$@)
+    mkdir $$@)
 endef
 
-define gather_clean_dist_dir =
-$(call var_base,GATHER_CLEAN_DIST_DIR,,0)\
+define gather_rm_r =
 $(eval
-.PHONY: $$(GATHER_CLEAN_DIST_DIR)
+.PHONY: $$1
 .SECONDEXPANSION:
-$$(GATHER_CLEAN_DIST_DIR): clean(%): | $$$$(CLEAN$$$$(COL)%)
+$$1: clean(%): | $$$$(CLEAN$$$$(COL)%)
     $$(if $$(wildcard $$*),rm -r $$*))
 endef
 
-define gather_clean_dir =
-$(call var_base,GATHER_CLEAN_DIR,,0)\
+define gather_rmdir =
 $(eval
-.PHONY: $$(GATHER_CLEAN_DIR)
+.PHONY: $$1
 .SECONDEXPANSION:
-$$(GATHER_CLEAN_DIR): clean(%): | $$$$(CLEAN$$$$(COL)%)
+$$1: clean(%): | $$$$(CLEAN$$$$(COL)%)
     $$(if $$(wildcard $$*),$$(if $$(wildcard $$*/*),,rmdir $$*)))
 endef
 
-define gather_clean_file =
-$(call var_base,GATHER_CLEAN_FILE,,0)\
+define gather_rm =
 $(eval
-.PHONY: $$(GATHER_CLEAN_FILE)
+.PHONY: $$1
 .SECONDEXPANSION:
-$$(GATHER_CLEAN_FILE): clean(%): | $$$$(CLEAN$$$$(COL)%)
+$$1: clean(%): | $$$$(CLEAN$$$$(COL)%)
     $$(if $$(wildcard $$*),rm $$*))
 endef
