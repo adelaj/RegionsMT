@@ -1,16 +1,4 @@
-﻿.DEFAULT_GOAL = all
-
-VALID_LIBRARY := gsl
-VALID_ARCH := x86_64 i386 i686
-VALID_CONFIG := Debug Release
-VALID_TOOLCHAIN := Xcode msvc gcc gcc-% clang clang-% icc
-
-include common.mk
-include env.mk
-include var.mk
-include gather.mk
-
-LIBRARY ?= $(VALID_LIBRARY)
+﻿LIBRARY ?= $(VALID_LIBRARY)
 LIBRARY := $(call uniq,$(filter $(VALID_LIBRARY),$(LIBRARY)))
 
 TARGET := $(LIBRARY)
@@ -31,8 +19,6 @@ $(GATHER_PROJ-$1$2$3) : | download-$1
     -D CMAKE_C_ARCHIVE_CREATE="<CMAKE_AR> qcs <TARGET> <OBJECTS>" \
     -D CMAKE_C_ARCHIVE_FINISH="" \
     "$1" \
-    &>$log
-
 
 GATHER_PROJ += $(GATHER_PROJ-$1$2))
 endef

@@ -6,7 +6,7 @@
 //  Warning! This file should be included prior to any standard library header!
 //
 
-#if defined _MSC_BUILD
+#if defined _MSC_BUILD || defined __MINGW32__
 #   define _CRT_SECURE_NO_WARNINGS
 
 #   define _CRTDBG_MAP_ALLOC

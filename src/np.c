@@ -4,7 +4,7 @@
 #include <string.h>
 #include <immintrin.h>
 
-#if defined _MSC_BUILD
+#if defined _MSC_BUILD || defined __MINGW32__
 
 void *Aligned_alloc(size_t al, size_t sz)
 {
