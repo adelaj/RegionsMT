@@ -17,25 +17,28 @@ $$1: | $$$$(PARENT$$$$(COL)$$$$@)
 endef
 
 define gather_rm_r =
+$(call var_base,$2,$(1:%=clean$(LP)%$(RP)),.)\
 $(eval
-.PHONY: $$1
+.PHONY: $(1:%=clean$(LP)%$(RP))
 .SECONDEXPANSION:
-$$1: clean(%): | $$$$(CLEAN$$$$(COL)%)
-    $$(if $$(wildcard $$*),rm -r $$*))
+$$(1:$$(PERC)=clean$$(LP)$$(PERC)$$(RP)): | $$$$(CLEAN$$$$(COL)$$$$%)
+    $$(if $$(wildcard $$%),rm -r $$%))
 endef
 
 define gather_rmdir =
+$(call var_base,$2,$(1:%=clean$(LP)%$(RP)),.)\
 $(eval
-.PHONY: $$1
+.PHONY: $(1:%=clean$(LP)%$(RP))
 .SECONDEXPANSION:
-$$1: clean(%): | $$$$(CLEAN$$$$(COL)%)
-    $$(if $$(wildcard $$*),$$(if $$(wildcard $$*/*),,rmdir $$*)))
+$$(1:$$(PERC)=clean$$(LP)$$(PERC)$$(RP)): | $$$$(CLEAN$$$$(COL)$$$$%)
+    $$(if $$(wildcard $$%),$$(if $$(wildcard $$%/*),,rmdir $$%)))
 endef
 
 define gather_rm =
+$(call var_base,$2,$(1:%=clean$(LP)%$(RP)),.)\
 $(eval
-.PHONY: $$1
+.PHONY: $(1:%=clean$(LP)%$(RP))
 .SECONDEXPANSION:
-$$1: clean(%): | $$$$(CLEAN$$$$(COL)%)
-    $$(if $$(wildcard $$*),rm $$*))
+$$(1:$$(PERC)=clean$$(LP)$$(PERC)$$(RP)): | $$$$(CLEAN$$$$(COL)$$$$%)
+    $$(if $$(wildcard $$%),rm $$%))
 endef
