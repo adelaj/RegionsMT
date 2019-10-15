@@ -35,9 +35,11 @@ $$($$1): | $$$$(PARENT$$$$(COL)$$$$@) configure($$$$@);
 
 .PHONY: $(patsubst %,configure(%),$($1))
 $$(patsubst $$(PERC),configure($$(PERC)),$$($$1)): | $$(PREFIX)/$$(firstword $$(subst :, ,$$1))
+    $(if $(wildcard 
     cmake \
     -G "Unix Makefiles" \
     -B "$$%" \
+    -D CMAKE_MAKE_PROGRAM="$(MAKE)" \
     -D CMAKE_C_COMPILER="$(call fetch_var,CC:$(BUILD_CMAKE_TOOLCHAIN:$1))" \
     -D CMAKE_CXX_COMPILER="$(call fetch_var,CXX:$(BUILD_CMAKE_TOOLCHAIN:$1))" \
     -D CMAKE_AR="$(shell which $(call fetch_var,AR:$(BUILD_CMAKE_TOOLCHAIN:$1)))" \
