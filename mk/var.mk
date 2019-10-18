@@ -7,6 +7,10 @@ $(call var,AR,gcc,gcc-ar)
 $(call var,AR,gcc-%,$$$$(2:gcc-%=gcc-ar-%))
 $(call var,AR,clang,llvm-ar)
 $(call var,AR,clang-%,$$$$(2:clang-%=llvm-ar-%))
+$(call var,RANLIB,gcc,gcc-ranlib)
+$(call var,RANLIB,gcc-%,$$$$(2:gcc-%=gcc-ranlib-%))
+$(call var,RANLIB,clang,llvm-ranlib)
+$(call var,RANLIB,clang-%,$$$$(2:clang-%=llvm-ranlib-%))
 
 # <VAR>:<TARGET>:<TOOLCHAIN>:<ARCH>:<CONFIG>
 $(call var,CFLAGS,%,gcc gcc-% clang clang-%,%,%,-std=c11 -Wall -mavx)

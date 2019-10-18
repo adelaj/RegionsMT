@@ -10,25 +10,30 @@ include mk/contrib.mk
 TARGET := RegionsMT
 
 $(call var,LDFLAGS,$(TARGET),$(CC_TOOLCHAIN),%,%,$(addprefix -l,m pthread))
-$(call var,CREQ,$(TARGET),%,%,%,copy-headers($$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5))
-$(call var,LDREQ,$(TARGET),%,%,%,gsl($$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5) gslcblas($$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5))
+$(call var,CREQ,$(TARGET),$(CC_TOOLCHAIN),%,%,$$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/copy-headers.log)
+#$(call var,LDREQ,$(TARGET),$(CC_TOOLCHAIN),%,%,$$$$(addprefix $$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/,libgsl.a libgslcblas.a))
 
-$(call cc,$(TARGET),$(call firstsep,:,$(TOOLCHAIN)),$(ARCH),$(CFG))
+$(call cc,$(TARGET),$(TOOLCHAIN),$(ARCH),$(CFG))
 
-$(call foreachl,1,var_base,GATHER_DIR GATHER_DIST GATHER_FILE GATHER_INC GATHER_DIST_CLEAN GATHER_CLEAN,,.)
+$(call foreachl,1,var_base,GATHER_DIR GATHER_DIST GATHER_CONTRIB GATHER_FILE GATHER_INC,,+=)
 
 .PHONY: all
 all: $(GATHER_FILE);
 
 .PHONY: distclean
-distclean: | $(GATHER_DIST_CLEAN);
+distclean: $(call clean,$(GATHER_DIST) $(GATHER_CONTRIB));
+
+.PHONY: mostlyclean
+mostlyclean: $(call clean,$(GATHER_DIST));
 
 .PHONY: clean
-clean: | $(GATHER_CLEAN);
+clean: | $(call clean,$(GATHER_FILE) $(GATHER_DIR));
 
 include $(wildcard $(GATHER_INC))
 
+.SECONDEXPANSION:
+$(call gather_file,$(GATHER_FILE) $(GATHER_DIST))
 $(call gather_mkdir,$(GATHER_DIR))
-$(call gather_rm_r,$(GATHER_DIST),GATHER_DIST_CLEAN)
-$(call gather_rmdir,$(GATHER_DIR),GATHER_CLEAN)
-$(call gather_rm,$(GATHER_FILE),GATHER_CLEAN)
+$(call gather_rm_r,$(GATHER_DIST) $(GATHER_CONTRIB))
+$(call gather_rmdir,$(GATHER_DIR))
+$(call gather_rm,$(GATHER_FILE))

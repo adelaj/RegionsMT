@@ -3,13 +3,11 @@ CFG ?= Release
 TOOLCHAIN ?= gcc
 PREFIX ?= ..
 
+toolchain_add = $(call __toolchain_add,$1,$(subst :, :,$2))
+__toolchain_add = $(call __toolchain_def,$1,$(firstword $2),$(call nofirstword,$2))
+__toolchain_def = $(call var_base,$1,$2,$(if $3,$(patsubst :%,%,$(call compress,,$3)),$2),:=)$2
+
 override ARCH := $(call uniq,$(ARCH))
 override CFG := $(call uniq,$(CFG))
-override TOOLCHAIN := $(foreach i,$(TOOLCHAIN),$(call rremsuffix,:,$(call compress,,$(wordlist 1,3,$(subst :, : ,$i)))))
-override TOOLCHAIN := $(foreach i,$(call uniq,$(call firstsep,:,$(TOOLCHAIN))),$(patsubst %:,%,$(lastword $(filter $i:%,$(addsuffix :,$(TOOLCHAIN))))))
+override TOOLCHAIN := $(call foreachl,2,toolchain_add,TOOLCHAIN,$(TOOLCHAIN))
 override PREFIX := $(lastword $(PREFIX))
-
-$(foreachl,5,var_base,TOOLCHAIN,$$(firstword $$(subst :, ,$$5)),$$(lastword $$(subst :, ,$$5)),.,$(TOOLCHAIN))
-
-map_toolchain = $(strip $(foreach i,$(TOOLCHAIN),$(call __map_toolchain,$1,$(subst :, ,$i))))
-__map_toolchain = $(if $(filter $1,$(firstword $2)),$(lastword $2))
