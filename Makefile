@@ -17,17 +17,13 @@ $(call cc,$(TARGET),$(TOOLCHAIN),$(ARCH),$(CFG))
 
 $(call foreachl,1,var_base,GATHER_DIR GATHER_DIST GATHER_CONTRIB GATHER_FILE GATHER_INC,,+=)
 
+$(call var_base,CLEAN,GATHER_FILE)
+
 .PHONY: all
 all: $(GATHER_FILE);
 
-.PHONY: distclean
-distclean: $(call clean,$(GATHER_DIST) $(GATHER_CONTRIB));
-
-.PHONY: mostlyclean
-mostlyclean: $(call clean,$(GATHER_DIST));
-
 .PHONY: clean
-clean: | $(call clean,$(GATHER_FILE) $(GATHER_DIR));
+clean: | $(call decorate,clean,$(GATHER_FILE) $(GATHER_DIR));
 
 include $(wildcard $(GATHER_INC))
 
