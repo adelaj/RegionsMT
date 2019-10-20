@@ -1,51 +1,43 @@
-define gather =
-$(call var_base,$1,,+=)
-$(if $(filter-out $($1),$2),
-$(call var_base,$1,$2,+=)
-$(call var_base,PARENT,$2,$(addprefix $(PREFIX)/,$(filter-out .,$(patsubst %/,%,$(dir $(patsubst $(PREFIX)/%,%,$2))))),:=)
-$(if $(and $(PARENT:$2),$(filter-out $(CLEAN:$2) $2)),
-$(call var_base,CLEAN,$(PARENT:$2),$2,+=)
-$(call gather,GATHER_DIR,$(PARENT:$2))))
-endef
+gather = $(call __gather,$2)$(call __clean,$1,$2)$2
 
-define clean =
-$(if $(or $(filter undefined,$(flavor CLEAN:$1:$(PARENT:$2))),$(filter-out,$(CLEAN:$1:$(PARENT:$2)),$2)),
-$(call var_base,CLEAN,$1,$(PARENT:$2),$2,+=)
+__gather = $(if $(filter undefined,$(flavor PARENT:$1)),\
+$(eval PARENT$$(COL)$1 := $(addprefix $(PREFIX)/,$(filter-out .,$(patsubst %/,%,$(dir $(patsubst $(PREFIX)/%,%,$1))))))\
+$(call gather,$1,$(PARENT:$1)))
+
+__clean = $(if $(or $(filter undefined,$(flavor CLEAN:$1:$(PARENT:$2))),$(filter-out,$(CLEAN:$1:$(PARENT:$2)),$2)),\
+$(call var_base,CLEAN,$1,$(PARENT:$2),$2,+=)\
 $(call clean,$1,$(PARENT:$2)))
-endef
 
-define gather_file =
+
+define clean_dir_opaq =
 $(eval
-$$1: | $$$$(PARENT$$$$(COL)$$$$@))
+.PHONY: $$(1:$$(PERC)=clean$$(LP)$$(PERC)$$(RP))
+$$(1:$$(PERC)=clean$$(LP)$$(PERC)$$(RP)):
+    $$(if $$(shell [ -d "$$%" ] && echo $$%),rm -r $$%))
 endef
 
-define gather_mkdir =
+# 'wildcard' is not reliable and should not be used inside 'if' clause
+define clean_dir =
+$(eval
+.PHONY: $$(1:$$(PERC)=clean$$(LP)$$(PERC)$$(RP))
+$$(1:$$(PERC)=clean$$(LP)$$(PERC)$$(RP)):
+    $$(if $$(shell [ -d "$$%" ] && [ -z "`ls -A $$%`" ] && echo $$%),rmdir $$%))
+endef
+
+define clean_file =
+$(eval
+.PHONY: $$(1:$$(PERC)=clean$$(LP)$$(PERC)$$(RP))
+$$(1:$$(PERC)=clean$$(LP)$$(PERC)$$(RP)):
+    $$(if $$(shell [ -f "$$%" ] && echo $$%),rm $$%))
+endef
+
+define gather_dir =
 $(eval
 $$1: | $$$$(PARENT$$$$(COL)$$$$@)
     mkdir $$@)
 endef
 
-decorate = $(1:%=$2$(LP)%$(RP))
-clean2 = $$(1:$$(PERC)=clean$$(LP)$$(PERC)$$(RP))
-
-define gather_rm_r =
+define clean_prereq =
 $(eval
-.PHONY: $(clean2)
-$(clean2): | $$$$(CLEAN$$$$(COL)$$$$%)
-    $$(if $$(shell [ -d "$$%" ] && echo $$%),rm -r $$%))
-endef
-
-# 'wildcard' is not reliable and should not be used
-define gather_rmdir =
-$(eval
-.PHONY: $(clean2)
-$(clean2): | $$$$(CLEAN$$$$(COL)$$$$%)
-    $$(if $$(shell [ -d "$$%" ] && [ -z "`ls -qAL $$%`" ] && echo $$%),rmdir $$%))
-endef
-
-define gather_rm =
-$(eval
-.PHONY: $(clean2)
-$(clean2): | $$$$(CLEAN$$$$(COL)$$$$%)
-    $$(if $$(shell [ -f "$$%" ] && echo $$%),rm $$%))
+$$(1:$$(PERC)=clean$$(LP)$$(PERC)$$(RP)): | $$$$(for i,$$$$(CLEAN),$$$$(if $$$$(filter-out undefined,$$$$(flavor CLEAN$$$$(COL)$$$$i$$$$(COL)$$$$%)),$$$$(CLEAN$$$$(COL)$$$$i$$$$(COL)$$$$%:$$$$(PERC)=clean$$$$(LP)$$$$(PERC)$$$$(RP)))))
 endef

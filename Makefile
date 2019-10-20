@@ -27,9 +27,10 @@ clean: | $(call decorate,clean,$(GATHER_FILE) $(GATHER_DIR));
 
 include $(wildcard $(GATHER_INC))
 
+$(call clean_dir_opaq,$(GATHER_DIR_OPAQ))
+$(call clean_dir,$(GATHER_DIR))
+$(call clean_file,$(GATHER_FILE))
+
 .SECONDEXPANSION:
-$(call gather_file,$(GATHER_FILE) $(GATHER_DIST))
-$(call gather_mkdir,$(GATHER_DIR))
-$(call gather_rm_r,$(GATHER_DIST) $(GATHER_CONTRIB))
-$(call gather_rmdir,$(GATHER_DIR))
-$(call gather_rm,$(GATHER_FILE))
+$(call gather_dir,$(GATHER_DIR))
+$(call clean_prereq,$(GATHER_FILE) $(GATHER_DIR) $(GATHER_DIR_OPAQ))
