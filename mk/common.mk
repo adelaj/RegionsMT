@@ -5,6 +5,7 @@ COL := :
 LP := (
 RP := )
 
+safe_var = $(if $(filter-out undefined,$(flavor $1)),$($1))
 escape_comma = $(subst $(COMMA),$$(COMMA),$(subst $$,$$$$,$1))
 nofirstword = $(wordlist 2,$(words $1),$1)
 nolastword = $(wordlist 2,$(words $1),0 $1)
@@ -63,29 +64,31 @@ argmskd = $$($1)$(call argmskdu,$1,$2,$3)
 argmsku = $(call argmskdu,$1,$2,$(COMMA))
 argmsk = $$($1)$(call argmsku,$1,$2)
 
-# There is no reliable way to track trailing empty arguments: unused arguments are not being undefined in the nested function calls
+# Warning! There is no reliable way to track trailing empty arguments: unused arguments are not being undefined in the nested function calls
 argcnt = $(eval __tmp := 0)$(__argcnt_asc)$(__argcnt_dsc)$(__tmp)
 __argcnt_asc = $(if $(filter simple,$(flavor $(call inc,$(__tmp)))),$(eval __tmp := $(call inc,$(__tmp)))$(eval $(value __argcnt_asc)))
 __argcnt_dsc = $(if $($(__tmp)),,$(eval __tmp := $(call dec,$(__tmp)))$(eval $(value __argcnt_dsc)))
 
-foreachl = $(eval __tmp := $$(call __foreachl,$(foreach i,$1,$(call incx2,$i))$(call argmsku,1,$(argcnt))))$(__tmp)
-__foreachl_base = $(foreach i,$($1),$(eval __tmp := $$(call $(call argmsk,2,$(call dec,$1)),$$i$(call argmsku,$1,$(argcnt))))$(__tmp))
-__foreachl = $(eval __tmp := $(if $1,$(eval __tmp := $(argcnt))\
-$$(call __foreachl_base,$(call incx2,$(firstword $1)),__foreachl,$(call nofirstword,$1)$(call argmsku,1,$(__tmp))),\
-$$(call $(call argmsk,2,$(__tmp)))))$(__tmp)
+vect = $(eval __tmp := $(eval __tmp := $(argcnt))$(if $1,\
+$$(call __vect_base,$(call inc,$(firstword $1)),$(call nofirstword,$1)$(call argmsku,1,$(__tmp)),vect),\
+$$(call $$($(__tmp))$(call argmsku,1,$(call dec,$(__tmp))))))$(__tmp)
 
-var = $(eval $(eval __tmp := $(argcnt))\
-__tmp := $$(call foreachl,$(call rangel,1,$(__tmp)),var_base_decl,$(call argmsk,1,$(__tmp)),+=))
+__vect_base = $(foreach i,$(call inc,$1),$(foreach j,$($i),$(eval __tmp := $(eval __tmp := $(argcnt))\
+$$(call $$($(__tmp))$(call argmsku,1,$1),$$j$(call argmsku,$i,$(call dec,$(__tmp)))))$(__tmp)))
+
+var = $(eval __tmp := $(eval __tmp := $(argcnt))\
+$$(call vect,$(call rangeu,2,$(__tmp)),$(call argmsk,1,$(__tmp)),var_base_decl))
 var_decl = $(var)$(__tmp)
-var_base = $(eval $(eval __tmp := $(argcnt))$(eval __tmp1 := $(call dec,$(__tmp)))$(eval __tmp2 := $(call argmskd,1,$(call dec,$(__tmp1)),$$(COL)))\
-$(if $(filter undefined,$(flavor $(__tmp2))),$$(__tmp2) := $($(__tmp1)),$$(__tmp2) $($(__tmp)) $($(__tmp1))))
-var_base_decl = $(var_base)$(__tmp2)
+
+var_base = $(eval __tmp := $(call argmskd,3,$(argcnt),$(COL)))\
+$(if $(filter undefined,$(flavor $(__tmp))),$(eval __tmp1 := $1)$(eval $$(__tmp) := $$(__tmp1)),$(eval __tmp1 := $2)$(eval $$(__tmp) += $$(__tmp1)))
+var_base_decl = $(strip $(var_base)$(__tmp1))
 
 find_var = $(strip $(foreach i,$2,$(if $(strip $(foreach j,$(join $1,$(subst :, :,:$i)),$(call __find_var_ftr,$(subst :, ,$j)))),,$i)))
 __find_var_ftr = $(if $(filter $(words $1),2),$(filter-out $(lastword $1),$(firstword $1)),.)
 
-apply_var = $(eval __tmp := $$(call foreachl,$(call inc,$(words $1)),__apply_var,$(call compress,$(COMMA),$(call escape_comma,$1)),$$2,.))$(__tmp)
-__apply_var = $(eval __tmp := $($($(call dec,$(argcnt)))))$(__tmp)
+apply_var = $(eval __tmp := $$(call vect,$(call inc,$(words $1)),$(call compress,$(COMMA),$(call escape_comma,$1)),$$2,__apply_var))$(__tmp)
+__apply_var = $(eval __tmp := $($($(argcnt))))$(__tmp)
 
 fetch_var2 = $(call apply_var,$2,$(call find_var,$1,$(.VARIABLES)))
 fetch_var = $(call fetch_var2,$1,$1)
