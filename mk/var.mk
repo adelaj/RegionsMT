@@ -14,8 +14,8 @@ $(call var,$$$$(2:clang-%=llvm-ranlib-%),,RANLIB:clang-%)
 
 # <VAR>:<TARGET>:<TOOLCHAIN>:<ARCH>:<CONFIG>
 $(call var,-std=c11 -Wall -mavx,$$1,CFLAGS:%,gcc gcc-% clang clang-%,%:%)
-$(call var,-m32,CFLAGS LDFLAGS,$$1,%,gcc gcc-% clang clang-%,i386 i686,%)
-$(call var,-m64,CFLAGS LDFLAGS,$$1,%,gcc gcc-% clang clang-%,x86_64:%)
+$(call var,-m32,$$1,CFLAGS LDFLAGS,%,gcc gcc-% clang clang-%,i386 i686,%)
+$(call var,-m64,$$1,CFLAGS LDFLAGS,%,gcc gcc-% clang clang-%,x86_64:%)
 $(call var,-O3 -flto,$$1,CFLAGS LDFLAGS,%,gcc gcc-% clang clang-%,%:Release)
 $(call var,-D_DEBUG -g,$$1,CFLAGS:%,gcc gcc-% clang clang-%,%:Debug)
 $(call var,-fuse-linker-plugin,$$1,CFLAGS LDFLAGS,%,gcc gcc-%,%:Release)

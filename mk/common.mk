@@ -69,8 +69,10 @@ argcnt = $(eval __tmp := 0)$(__argcnt_asc)$(__argcnt_dsc)$(__tmp)
 __argcnt_asc = $(if $(filter simple,$(flavor $(call inc,$(__tmp)))),$(eval __tmp := $(call inc,$(__tmp)))$(eval $(value __argcnt_asc)))
 __argcnt_dsc = $(if $($(__tmp)),,$(eval __tmp := $(call dec,$(__tmp)))$(eval $(value __argcnt_dsc)))
 
-vect = $(eval __tmp := $(eval __tmp := $(argcnt))$(if $1,\
-$$(call __vect_base,$(call inc,$(firstword $1)),$(call nofirstword,$1)$(call argmsku,1,$(__tmp)),vect),\
+vect = $(eval __tmp := $$(call __vect,$(strip $(foreach i,$1,$(if $(filter-out 1,$(words $($(call inc,$i)))),$i)))$(call argmsku,1,$(argcnt))))$(strip $(__tmp))
+
+__vect = $(eval __tmp := $(eval __tmp := $(argcnt))$(if $1,\
+$$(call __vect_base,$(call inc,$(firstword $1)),$(call nofirstword,$1)$(call argmsku,1,$(__tmp)),__vect),\
 $$(call $$($(__tmp))$(call argmsku,1,$(call dec,$(__tmp))))))$(__tmp)
 
 __vect_base = $(foreach i,$(call inc,$1),$(foreach j,$($i),$(eval __tmp := $(eval __tmp := $(argcnt))\
@@ -92,5 +94,14 @@ __apply_var = $(eval __tmp := $($($(argcnt))))$(__tmp)
 
 fetch_var2 = $(call apply_var,$2,$(call find_var,$1,$(.VARIABLES)))
 fetch_var = $(call fetch_var2,$1,$1)
+
+A-Z := A B C D E F G H I J K L M N O P Q R S T U V W X Y Z
+a-z := a b c d e f g h i j k l m n o p q r s t u v w x y z
+a.A-z.Z := $(join $(a-z),$(addprefix .,$(A-Z)))
+A.a-Z.z := $(join $(A-Z),$(addprefix .,$(a-z)))
+
+tr = $(if $1,$(call tr,$(call nofirstword,$1),$(subst $(basename $(firstword $1)),$(subst .,,$(suffix $(firstword $1))),$2)),$2)
+uc = $(call tr,$(a.A-z.Z),$1)
+lc = $(call tr,$(A.a-Z.z),$1)
 
 print(%):; @echo '$* = $($*)'

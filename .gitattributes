@@ -3,5 +3,7 @@
 *.sh text eol=lf
 *.ps1 text eol=crlf
 *.c text eol=lf
+*.h text eol=lf
 *.txt text eol=lf
+*.cmake text eol=lf
 makefile text eol=lf
