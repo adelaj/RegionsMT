@@ -21,7 +21,7 @@
 
 # Use CMake 3.4 for target property WINDOWS_EXPORT_ALL_SYMBOLS.
 # Ref: https://blog.kitware.com/create-dlls-on-windows-without-declspec-using-new-cmake-export-all-feature/
-cmake_minimum_required(VERSION 3.4)
+cmake_minimum_required(VERSION 3.14)
 
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
@@ -687,10 +687,12 @@ if (MSVC)
     FILE(GLOB_RECURSE SOURCES RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" "fp-win.c")
     if (SOURCES)
         list(GET SOURCES 0 SOURCES)
+        message(STATUS "Adding ${SOURCES} to the source tree")
         get_filename_component(dir ${SOURCES} DIRECTORY)
         get_filename_component(SOURCES ${SOURCES} NAME)
         assign_source_group("Source Files/ieee-utils" "${dir}" SOURCES)
         set(GSL_SOURCES ${GSL_SOURCES} ${SOURCES})
+        message(STATUS "Removing ieee-utils/fp.c from the source tree")
         list(REMOVE_ITEM GSL_SOURCES "${CMAKE_CURRENT_SOURCE_DIR}/ieee-utils/fp.c")
     endif ()
 endif ()
@@ -700,7 +702,8 @@ file(MAKE_DIRECTORY gsl)
 set(GSL_HEADERS_API)
 foreach (path ${GSL_HEADER_PATHS})
     get_filename_component(filename ${path} NAME)
-    if ((MSVC) AND (filename STREQUAL "gsl_inline.h"))
+    if (((MSVC) AND (HAVE_C99_INLINE)) AND (filename STREQUAL "gsl_inline.h"))
+        message(STATUS "Replacing \"inline\" with \"static inline\" in ${filename}")
         file(READ ${path} gsl_inline)
         string(REGEX REPLACE "(#[ ]*define[ ]*INLINE_[^ ]+[ ]*)(inline)" "\\1static \\2" gsl_inline "${gsl_inline}")
         file(WRITE ${GSL_BINARY_DIR}/gsl/${filename} ${gsl_inline})
