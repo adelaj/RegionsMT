@@ -9,13 +9,16 @@ include mk/contrib.mk
 
 TARGET := RegionsMT
 
-$(call var,$(addprefix -l,m pthread),$$1,LDFLAGS,$(TARGET),$(CC_TOOLCHAIN),%:%)
-$(call var,$$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5.log,$$1,CREQ,$(TARGET),$(CC_TOOLCHAIN),%:%)
-$(call var,$$$$(addprefix $$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/,libgsl.a libgslcblas.a),$$1,LDREQ,$(TARGET),$(CC_TOOLCHAIN),%:%)
+$(call var_reg,$(addprefix -l,m pthread),$$1,LDFLAGS,$(TARGET),$(CC_TOOLCHAIN),%:%)
+$(call var_reg,$$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5.log,$$1,CREQ,$(TARGET),$(CC_TOOLCHAIN),%:%)
+$(call var_reg,$$$$(addprefix $$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/,libgsl.a libgslcblas.a),$$1,LDREQ,$(TARGET),$(CC_TOOLCHAIN),%:%)
 
-$(call var,/W4,$$1,CFLAGS,$(TARGET),msvc:%:%)
+$(call var_reg,/W4,$$1,CFLAGS,$(TARGET),msvc:%:%)
 
 .PHONY: all
 all: $(call build,cc,$(TARGET),$(CC_MATRIX))
 
-include $(wildcard $(call safe_var,INCLUDE,))
+.PHONY: clean
+clean: | $(call do_clean)
+
+include $(wildcard $(call coalesce,INCLUDE,))

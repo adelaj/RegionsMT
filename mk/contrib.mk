@@ -41,7 +41,7 @@ endef
 $(call var_base,git://github.com/BrianGladman/gsl.git,,URL:gsl)
 
 # Fixing bug with 'long double' under MinGW gcc
-$(call var,-D__USE_MINGW_ANSI_STDIO,$$1,CFLAGS:gsl,gcc gcc-%,%:%)
+$(call var_reg,-D__USE_MINGW_ANSI_STDIO,$$1,CFLAGS:gsl,gcc gcc-%,%:%)
 
 .PHONY: git(gsl) cmakelists(gsl) cmake(gsl) cmake(gsl) gsl
 git(gsl): $(call git,gsl)

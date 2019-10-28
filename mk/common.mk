@@ -8,7 +8,7 @@ RP := )
 feval = $(eval $1)
 print = $(eval __tmp := $1)$(__tmp)
 print2 = $(eval __tmp := $$(eval __tmp := $1)$$(__tmp))$(__tmp)
-safe_var = $(if $(filter-out undefined,$(flavor $1)),$($1),$2)
+coalesce = $(if $(filter-out undefined,$(flavor $1)),$($1),$2)
 escape_comma = $(subst $(COMMA),$$(COMMA),$(subst $$,$$$$,$1))
 nofirstword = $(wordlist 2,$(words $1),$1)
 nolastword = $(wordlist 2,$(words $1),0 $1)
@@ -85,8 +85,14 @@ var = $(eval __tmp := $(eval __tmp := $(argcnt))\
 $$(call vect,$(call rangeu,2,$(__tmp)),$(call argmsk,1,$(__tmp)),var_base_decl))
 var_decl = $(var)$(__tmp)
 
+__VAR :=
+__var :=
+var_reg = $(eval __var := __VAR)$(var)$(eval __var :=)
+
 var_base = $(eval __tmp := $(call argmskd,3,$(argcnt),$(COL)))\
-$(if $(filter undefined,$(flavor $(__tmp))),$(eval __tmp1 := $1)$(eval $$(__tmp) := $$(__tmp1)),$(eval __tmp1 := $2)$(eval $$(__tmp) += $$(__tmp1)))
+$(if $(filter undefined,$(flavor $(__tmp))),\
+$(if $(__var),$(eval $(__var) += $$(__tmp)))$(eval __tmp1 := $1)$(eval $$(__tmp) := $$(__tmp1)),\
+$(eval __tmp1 := $2)$(eval $$(__tmp) += $$(__tmp1)))
 var_base_decl = $(strip $(var_base)$(__tmp1))
 
 find_mask = $(strip $(foreach i,$2,$(if $(strip $(foreach j,$(join $1,$(subst :, :,:$i)),$(call __find_mask_ftr,$(subst :, ,$j)))),,$i)))
@@ -95,7 +101,7 @@ __find_mask_ftr = $(if $(filter $(words $1),2),$(filter-out $(lastword $1),$(fir
 apply_mask = $(eval __tmp := $$(call vect,$(call inc,$(words $1)),$(call compress,$(COMMA),$(call escape_comma,$1)),$$2,__apply_mask))$(__tmp)
 __apply_mask = $(eval __tmp := $($($(argcnt))))$(__tmp)
 
-fetch_var2 = $(call apply_mask,$2,$(call find_mask,$1,$(.VARIABLES)))
+fetch_var2 = $(call apply_mask,$2,$(call find_mask,$1,$(__VAR)))
 fetch_var = $(call fetch_var2,$1,$1)
 
 A-Z := A B C D E F G H I J K L M N O P Q R S T U V W X Y Z

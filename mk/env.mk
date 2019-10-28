@@ -1,5 +1,3 @@
-SHELL = bash
-
 TOOLCHAIN ?=
 ARCH ?=
 CONFIG ?=

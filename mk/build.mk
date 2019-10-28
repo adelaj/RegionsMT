@@ -20,7 +20,7 @@ $(P2134)/bin/$1
 $(call var_base,$(patsubst $(PREFIX)/$1/src/%,$(P2134)/mk/%.mk,$(call rwildcard,$(PREFIX)/$1/src/,*.c)),,CC_DEP)
 $(call var_base,$(patsubst $(P2134)/mk/%.mk,$(P2134)/obj/%.o,$(CC_DEP)),,CC_OBJ)
 $(call vect,1,$(P2134)/bin/$1 $(CC_DEP) $(CC_OBJ),,gather)
-$(if $(filter 1,$(CLEAN_GROUP)),$(call vect,1,$(P2134)/$1 $(CC_DEP) $(CC_OBJ),remove_file,clean))
+$(if $(filter 1,$(CLEAN_GROUP)),$(call vect,1,$(P2134)/$1 $(CC_DEP) $(CC_OBJ),rm,clean))
 $(call var_base,$(CC_DEP),$$1,INCLUDE)
 $(eval
 $(EP2134)/bin/$$1: $(CC_OBJ) $$(call fetch_var2,LDREQ $(ER1234),. $$1 $$2 $$3 $$4)
@@ -37,8 +37,8 @@ define cc_cmake =
 $(P2134).log
 $(call gather,$(P2134).log,)
 $(if $(filter 2,$(CLEAN_GROUP)),
-$(call clean,$(P2134),remove_dir_opaq)
-$(call clean,$(P2134).log,remove_file))
+$(call clean,$(P2134),rm-r)
+$(call clean,$(P2134).log,rm))
 $(eval
 $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
     $(strip cmake \
@@ -65,8 +65,8 @@ define cmake_msvc =
 $(P213).log
 $(call gather,$(P213).log,)
 $(if $(filter 2,$(CLEAN_GROUP)),
-$(call clean,$(P213),remove_dir_opaq)
-$(call clean,$(P213).log,remove_file))
+$(call clean,$(P213),rm-r)
+$(call clean,$(P213).log,rm))
 $(eval
 $(EP213).log: $$(PREFIX)/$$1/CMakeLists.txt
     $(strip powershell "cmake \
@@ -90,8 +90,8 @@ define git =
 $(strip $(PREFIX)/$1.log
 $(call gather,$(PREFIX)/$1.log,)
 $(if $(filter 3,$(CLEAN_GROUP)),
-$(call clean,$(PREFIX)/$1,remove_dir_opaq_force)
-$(call clean,$(PREFIX)/$1.log,remove_file))
+$(call clean,$(PREFIX)/$1,rm-rf)
+$(call clean,$(PREFIX)/$1.log,rm))
 $(eval
 $$(PREFIX)/$$1.log:
     $$(if $$(wildcard $$(@:.log=)),\
