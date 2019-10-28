@@ -30,11 +30,11 @@ endef
 
 parent = $(addprefix $(PREFIX)/,$(filter-out .,$(patsubst %/,%,$(dir $(patsubst $(PREFIX)/%,%,$1)))))
 
-gather = $(if $(call var_base_decl,$1,$$(filter-out $$(GATHER),$$1),GATHER),$(info Gathered for BUILD: $1)$(if $2,$(call $2,$1))$(call gather_dir,$1,$(call parent,$1)))
-gather_dir = $(if $2,$(eval $1: | $2)$(call gather,$2,make_dir))
+gather = $(if $(call var_base_decl,$1,$$(filter-out $$(GATHER),$$1),GATHER),\
+$(info Gathered for BUILD: $1)$(if $2,$(call $2,$1))$(call gather_dir,$1,$(call parent,$1)))
 
-#clean = $(if $(call var_base_decl,$1,$$(filter-out $$(CLEAN),$$1),CLEAN),$(info Gathered for CLEAN: $1)$(eval clean: | clean($1))$(if $2,$(call $2,clean($1)))$(call clean_dir,$1,$(call parent,$1)))
-#clean_dir = $(if $2,$(eval clean($2): | clean($1))$(call clean,$2,rmdir))
+gather_dir = $(if $2,\
+$(eval $1: | $2)$(call gather,$2,make_dir))
 
 clean = $(if $(call var_base_decl,$1,$$(filter-out $$(CLEAN),$$1),CLEAN),\
 $(info Gathered for CLEAN: $1)\
