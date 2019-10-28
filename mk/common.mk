@@ -7,6 +7,7 @@ RP := )
 
 feval = $(eval $1)
 print = $(eval __tmp := $1)$(__tmp)
+print2 = $(eval __tmp := $$(eval __tmp := $1)$$(__tmp))$(__tmp)
 safe_var = $(if $(filter-out undefined,$(flavor $1)),$($1),$2)
 escape_comma = $(subst $(COMMA),$$(COMMA),$(subst $$,$$$$,$1))
 nofirstword = $(wordlist 2,$(words $1),$1)

@@ -1,37 +1,50 @@
-﻿cmake_copy = $(strip $(call vect,1,$1,cmake_copy_base))
-define cmake_copy_base =
-$$(PREFIX)/$1/CMakeLists.txt
+﻿define cmakelists =
+$(strip $$(PREFIX)/$1/CMakeLists.txt
 $(call gather,$(PREFIX)/$1/CMakeLists.txt,)
 $(eval
 $$(PREFIX)/$$1/CMakeLists.txt: $$(PREFIX)/$$1.log
-    cp contrib/$$(<F:.log=.cmake) $$@)
+    cp contrib/$$(<F:.log=.cmake) $$@
+))
 endef
 
-cmake_gsl = $(strip $(call vect,2 3 4,gsl,$1,$2,$3,cmake_gsl_base))
-define cmake_gsl_base =
-$(if $(call is_cc,$2,$3,$4),$(addprefix $(P2134)/,libgslcblas.a libgsl.a all.log test.log)$(eval
+build_gsl = $(call build,$1,gsl,$2)
+
+define cc_cmake_gsl =
+$(addprefix $(P2134)/,libgslcblas.a libgsl.a all.log test.log)
+$(eval
 $(EP2134)/lib%.a $(EP2134)/%.log: $(EP2134).log
-    cmake --build $$(<:.log=) --target $$* -- -j -O VERBOSE=1 COLOR="" > $$(basename $$@).log || $(call on_error,$$(basename $$@).log)
+    $(strip cmake \
+    --build $$(<:.log=) \
+    --target $$* \
+    -- -j -O VERBOSE=1 COLOR="" $$(if $$(filter test,$$*),ARGS="--output-on-failure") \
+    > $$(basename $$@).log \
+    || $(call on_error,$$(basename $$@).log))
 $(EP2134)/libgsl.a: $(EP2134)/libgslcblas.a
 $(EP2134)/all.log: $(EP2134)/libgsl.a
 $(EP2134)/test.log: $(EP2134)/all.log
-),
+)
+endef
+
+define msvc_cmake_gsl =
+$(addprefix $(P2134)/,gslcblas.lib gsl.lib ALL_BUILD.log RUN_TESTS.log)
 $(call gather,$(P2134)/gslcblas.lib,)
-$(if $(call is_msvc,$2,$3,$4),$(addprefix $(P2134)/,gslcblas.lib gsl.lib ALL_BUILD.log RUN_TESTS.log)$(eval
+$(eval
 $(EP2134)/%.lib $(EP2134)/%.log: $(EP213).log
     powershell "cmake --build $$(<:.log=) --target $$* --config $$(notdir $$(@D)) --verbose --parallel -- \
     $(call fetch_var,MSBUILDFLAGS $1 $(TOOLCHAIN:$2) $3 $4)" > $$(basename $$@).log || $(call on_error,$$(basename $$@).log)
 $(EP2134)/gsl.lib: $(EP2134)/gslcblas.lib
 $(EP2134)/ALL_BUILD.log: $(EP2134)/gsl.lib
 $(EP2134)/RUN_TESTS.log: $(EP2134)/ALL_BUILD.log
-)))
+)
 endef
 
 $(call var_base,git://github.com/BrianGladman/gsl.git,,URL:gsl)
 
-.PHONY: git(gsl) cmake_copy(gsl) cmake_cc(gsl) cmake_msvc(gsl) gsl
+# Fixing bug with 'long double' under MinGW gcc
+$(call var,-D__USE_MINGW_ANSI_STDIO,$$1,CFLAGS:gsl,gcc gcc-%,%:%)
+
+.PHONY: git(gsl) cmakelists(gsl) cmake(gsl) cmake(gsl) gsl
 git(gsl): $(call git,gsl)
-cmake_copy(gsl): $(call cmake_copy,gsl)
-cmake_cc(gsl): $(call cmake_cc,gsl,$(TOOLCHAIN),$(ARCH),$(CFG))
-cmake_msvc(gsl): $(call cmake_msvc,gsl,$(TOOLCHAIN),$(ARCH))
-gsl: $(call cmake_gsl,$(TOOLCHAIN),$(ARCH),$(CFG))
+cmakelists(gsl): $(call cmakelists,gsl)
+cmake(gsl): $(call build,cc_cmake,gsl,$(CC_MATRIX)) $(call build,msvc_cmake,gsl,$(call matrix_trunc,1 2,$(MSVC_MATRIX)))
+gsl: $(call build_gsl,cc_cmake_gsl,$(CC_MATRIX)) $(call build_gsl,msvc_cmake_gsl,$(MSVC_MATRIX))

@@ -16,6 +16,6 @@ $(call var,$$$$(addprefix $$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/,libgsl.a libgslcbl
 $(call var,/W4,$$1,CFLAGS,$(TARGET),msvc:%:%)
 
 .PHONY: all
-all: $(call cc,$(TARGET),$(TOOLCHAIN),$(ARCH),$(CFG))
+all: $(call build,cc,$(TARGET),$(CC_MATRIX))
 
 include $(wildcard $(call safe_var,INCLUDE,))
