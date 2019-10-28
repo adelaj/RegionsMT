@@ -11,6 +11,13 @@ $1:
     $$(if $$(shell [ -d "$$%" ] && echo .),rm -r $$%))
 endef
 
+define remove_dir_opaq_force =
+$(eval
+.PHONY: $1
+$1:
+    $$(if $$(shell [ -d "$$%" ] && echo .),rm -rf $$%))
+endef
+
 # Warning! Obvious usage of the function '$(wildcard $$%/*)' gives undesired result: removed files may be still listed!
 define remove_dir =
 $(eval

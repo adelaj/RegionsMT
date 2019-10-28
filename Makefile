@@ -18,4 +18,4 @@ $(call var,/W4,$$1,CFLAGS,$(TARGET),msvc:%:%)
 .PHONY: all
 all: $(call cc,$(TARGET),$(TOOLCHAIN),$(ARCH),$(CFG))
 
-include $(wildcard $(call safe_var,INCLUDE))
+include $(wildcard $(call safe_var,INCLUDE,))

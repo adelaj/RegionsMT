@@ -7,20 +7,23 @@ $$(PREFIX)/$$1/CMakeLists.txt: $$(PREFIX)/$$1.log
     cp contrib/$$(<F:.log=.cmake) $$@)
 endef
 
-cmake_cc_build_lib = cmake --build $$(<:.log=) --target $$* -- -j -O VERBOSE=1 COLOR="" | tee $$(@:.a=.log); $(call pipe_test,$$(@:.a=.log))
-cmake_msvc_build_lib =  powershell "cmake --build $$(<:.log=) --target $$* --config $$(notdir $$(@D)) --verbose --parallel -- $(call fetch_var,MSBUILDFLAGS $1 $(TOOLCHAIN:$2) $3 $4)" | tee $$(@:.lib=.log); $(call pipe_test,$$(@:.lib=.log))
-
 cmake_gsl = $(strip $(call vect,2 3 4,gsl,$1,$2,$3,cmake_gsl_base))
 define cmake_gsl_base =
-$(if $(call is_cc,$2,$3,$4),$(PREFIX)/$2/$1/$3/$4/libgsl.a $(PREFIX)/$2/$1/$3/$4/libgslcblas.a$(eval
-$$(PREFIX)/$$2/$$1/$$3/$$4/lib%.a: $$(PREFIX)/$$2/$$1/$$3/$$4.log
-    $(call cmake_cc_build_lib)
-$$(PREFIX)/$$2/$$1/$$3/$$4/libgsl.a: $$(PREFIX)/$$2/$$1/$$3/$$4/libgslcblas.a
+$(if $(call is_cc,$2,$3,$4),$(addprefix $(P2134)/,libgslcblas.a libgsl.a all.log test.log)$(eval
+$(EP2134)/lib%.a $(EP2134)/%.log: $(EP2134).log
+    cmake --build $$(<:.log=) --target $$* -- -j -O VERBOSE=1 COLOR="" > $$(basename $$@).log || $(call on_error,$$(basename $$@).log)
+$(EP2134)/libgsl.a: $(EP2134)/libgslcblas.a
+$(EP2134)/all.log: $(EP2134)/libgsl.a
+$(EP2134)/test.log: $(EP2134)/all.log
 ),
-$(if $(call is_msvc,$2,$3,$4),$(PREFIX)/$2/$1/$3/$4/gslcblas.lib $(PREFIX)/$2/$1/$3/$4/gsl.lib$(eval
-$$(PREFIX)/$$2/$$1/$$3/$$4/%.lib: $$(PREFIX)/$$2/$$1/$$3.log
-    $(call cmake_msvc_build_lib)
-$$(PREFIX)/$$2/$$1/$$3/$$4/gsl.lib: $$(PREFIX)/$$2/$$1/$$3/$$4/gslcblas.lib
+$(call gather,$(P2134)/gslcblas.lib,)
+$(if $(call is_msvc,$2,$3,$4),$(addprefix $(P2134)/,gslcblas.lib gsl.lib ALL_BUILD.log RUN_TESTS.log)$(eval
+$(EP2134)/%.lib $(EP2134)/%.log: $(EP213).log
+    powershell "cmake --build $$(<:.log=) --target $$* --config $$(notdir $$(@D)) --verbose --parallel -- \
+    $(call fetch_var,MSBUILDFLAGS $1 $(TOOLCHAIN:$2) $3 $4)" > $$(basename $$@).log || $(call on_error,$$(basename $$@).log)
+$(EP2134)/gsl.lib: $(EP2134)/gslcblas.lib
+$(EP2134)/ALL_BUILD.log: $(EP2134)/gsl.lib
+$(EP2134)/RUN_TESTS.log: $(EP2134)/ALL_BUILD.log
 )))
 endef
 
