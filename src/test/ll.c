@@ -158,7 +158,7 @@ void test_ll_perf(struct log *log)
         }
     }
     printf("Sum: %d\n", cnt);
-    log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Branched comparison took %<>T.\n", log->style.tmd, start, get_time());
+    log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Branched comparison took %~T.\n", start, get_time());
 
     cnt = 0;
     start = get_time();
@@ -171,7 +171,7 @@ void test_ll_perf(struct log *log)
         }
     }
     printf("Sum: %d\n", cnt);
-    log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "SIMD comparison took %<>T.\n", log->style.tmd, start, get_time());
+    log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "SIMD comparison took %~T.\n", start, get_time());
 }
 
 #if 0

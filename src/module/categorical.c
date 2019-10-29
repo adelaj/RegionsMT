@@ -221,7 +221,7 @@ bool categorical_run_adj(const char *path_phen, const char *path_gen, const char
     {
         size_t left = top_hit[i].left - 1, right = top_hit[i].right - 1;
         if (left > right || right >= snp_cnt)
-            log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Wrong interval: %zu:%zu!\n", left, right);
+            log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Wrong interval: %~zu:%~zu!\n", left, right);
         else
         {
             size_t tmp = right - left + 1;
@@ -251,7 +251,7 @@ bool categorical_run_adj(const char *path_phen, const char *path_gen, const char
         //    left + 1, right + 1, i + 1,
         //    "CD", x.nlpv[0], x.rpl[0], "R", x.nlpv[1], x.rpl[1], "D", x.nlpv[2], x.rpl[2], "A", x.nlpv[3], x.rpl[3]);
         uint64_t t1 = get_time();
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation took %<>T.\n", log->style.tmd, t0, t1);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation took %~T.\n", t0, t1);
 
         int64_t diff = t1 - t0, mdq = diff / 60000000, mdr = diff % 60000000;
         double sec = 1.e-6 * (double) mdr;

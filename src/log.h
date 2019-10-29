@@ -17,13 +17,6 @@ enum fmt_execute_flags {
     FMT_EXE_FLAG_PTR = 4
 };
 
-typedef bool (*fmt_callback)(char *, size_t *, void *, enum fmt_execute_flags);
-
-void print(char *, size_t *, const char *, size_t, bool);
-bool print_fmt(char *, size_t *, ...);
-bool print_time_diff(char *, size_t *, uint64_t, uint64_t);
-void print_time_stamp(char *, size_t *);
-
 #define ANSI "\x1b"
 #define CSI "["
 #define SGR(C) C "m"
@@ -55,6 +48,7 @@ struct env {
     struct strl begin, end;
 };
 
+
 enum message_type {
     MESSAGE_DEFAULT = 0,
     MESSAGE_ERROR,
@@ -66,15 +60,24 @@ enum message_type {
 };
 
 struct style {
-    struct {
-        struct env time_stamp, header[MESSAGE_CNT], code_metric;
-    } ttl;
     struct env type_int, type_char, type_path, type_str, type_flt, type_time_diff, type_time_stamp, type_utf;
 };
+
+struct ttl_style {
+    struct env time_stamp, header[MESSAGE_CNT], code_metric;
+};
+
+typedef bool (*fmt_callback)(char *, size_t *, void *, struct env, enum fmt_execute_flags);
+
+void print(char *, size_t *, const char *, size_t, bool);
+bool print_fmt(char *, size_t *, struct style *, ...);
+bool print_time_diff(char *, size_t *, uint64_t, uint64_t, struct env);
+void print_time_stamp(char *, size_t *);
 
 struct log {
     FILE *file;
     char *buff;
+    struct ttl_style *ttl_style;
     struct style *style;
     size_t cnt, cap, lim;
     uint64_t tot; // File size is 64-bit always!
@@ -98,12 +101,13 @@ struct code_metric {
 
 enum log_flags {
     LOG_APPEND = 1,
-    LOG_NO_BOM = 2
+    LOG_NO_BOM = 2,
+    LOG_FORCE_TTY = 4
 };
 
-bool log_init(struct log *restrict, char *restrict, size_t, enum log_flags, struct style *, struct log *restrict);
+bool log_init(struct log *restrict, char *restrict, size_t, enum log_flags, struct ttl_style *restrict, struct style *restrict, struct log *restrict);
 void log_close(struct log *restrict);
-bool log_multiple_init(struct log *restrict, size_t, char *restrict, size_t, enum log_flags, struct style *, struct log *restrict);
+bool log_multiple_init(struct log *restrict, size_t, char *restrict, size_t, enum log_flags, struct ttl_style *restrict, struct style *restrict, struct log *restrict);
 void log_multiple_close(struct log *restrict, size_t);
 bool log_flush(struct log *restrict);
 bool log_message(struct log *restrict, struct code_metric, enum message_type, message_callback, void *);

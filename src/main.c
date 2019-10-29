@@ -398,18 +398,24 @@ static int Main(int argc, char **argv)
     //lm_test();
 
     bool succ = 1;
+    struct ttl_style ttl_style = {
+        .time_stamp = ENV_INIT_COL(FG_BR_BLACK),
+        .header = { ENV_INIT_COL(FG_GREEN), ENV_INIT_COL(FG_RED), ENV_INIT_COL(FG_YELLOW), ENV_INIT_COL(FG_MAGENTA), ENV_INIT_COL(FG_CYAN) },
+        .code_metric = ENV_INIT_COL(FG_BR_BLACK)
+    };
+
     struct style style = {
-        .ttl = { ENV_INIT_COL(FG_GREEN), ENV_INIT_COL(FG_RED), ENV_INIT_COL(FG_YELLOW), ENV_INIT_COL(FG_MAGENTA), ENV_INIT_COL(FG_CYAN) },
-        .inf = ENV_INIT_COL(FG_BR_BLACK),
-        .tmd = ENV_INIT_COL(FG_BR_YELLOW),
-        .pth = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_BLUE, UTF8_RDQUO),
-        .str = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_MAGENTA, UTF8_RDQUO),
-        .chr = ENV_INIT_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO),
-        .num = ENV_INIT_COL(FG_BR_CYAN),        
+        .type_int = ENV_INIT_COL(FG_BR_CYAN),
+        .type_char = ENV_INIT_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO),
+        .type_path = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_BLUE, UTF8_RDQUO),
+        .type_str = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_MAGENTA, UTF8_RDQUO),
+        .type_flt = ENV_INIT_COL(FG_BR_CYAN),
+        .type_time_diff = ENV_INIT_COL(FG_BR_YELLOW),
+        .type_utf = ENV_INIT_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO)      
     };
 
     struct log log;
-    if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, style, NULL))
+    if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, NULL))
     {
         log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%#*%#*.\n", 0x393, 920);
         

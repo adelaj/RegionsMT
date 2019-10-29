@@ -69,6 +69,7 @@
 #define MATCY(DIMX, ...) (__VA_ARGS__), DIMX, dimyof(DIMX, (__VA_ARGS__)), countof((__VA_ARGS__))
 
 // In the case of compound literal extra parentheses should be added
+#define CLIC(...) ARRC((__VA_ARGS__))
 #define CLII(...) ARRI((__VA_ARGS__))
 
 // Common value for the size of temporary buffer used for file writing

@@ -138,7 +138,7 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
             if (!STREQ(context->buff->str, context->len, "categorical", Strnicmp))
             {
                 if (!STREQ(context->buff->str, context->len, "numeric", Strnicmp) &&
-                    !STREQ(context->buff->str, context->len, "ordinal", Strnicmp)) log_message_error_xml_generic(log, CODE_METRIC, context->metric, "Unexpected covariate type %<>s*", log->style.str, context->buff->str, context->len);
+                    !STREQ(context->buff->str, context->len, "ordinal", Strnicmp)) log_message_error_xml_generic(log, CODE_METRIC, context->metric, "Unexpected covariate type %~s*", context->buff->str, context->len);
                 else arg->ent[arg->ent_cnt - 1].deg = 1;
                 break;
             }
@@ -157,7 +157,7 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
         if (!utf8.val) break;
         if (!utf8_is_whitespace_len(utf8.val, utf8.len)) return 1;
         if (strchr("^*+(", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
-        else if (utf8.val == ')') log_message_error_xml_generic(log, CODE_METRIC, metric, "Covariate name expected before %<>c", log->style.chr, ')');
+        else if (utf8.val == ')') log_message_error_xml_generic(log, CODE_METRIC, metric, "Covariate name expected before %~c", ')');
         else if (!buff_append(context->buff, utf8.chr, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
@@ -192,7 +192,7 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
         case '\0':
             return 1;
         case '^':
-            if (!arg->ent[arg->ent_cnt - 1].deg) log_message_error_xml_generic(log, CODE_METRIC, metric, "Operation %<>c cannot be applied to the covariate of the categorical type", log->style.chr, '^');
+            if (!arg->ent[arg->ent_cnt - 1].deg) log_message_error_xml_generic(log, CODE_METRIC, metric, "Operation %~c cannot be applied to the covariate of the categorical type", '^');
             else
             {
                 context->st = LMF_EXPR_NUM_INIT;

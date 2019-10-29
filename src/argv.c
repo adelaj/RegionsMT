@@ -12,7 +12,7 @@ static bool log_message_warning_generic(struct log *restrict log, struct code_me
 {
     Va_list arg;
     Va_start(arg, ind);
-    bool res = log_message_fmt(log, code_metric, MESSAGE_WARNING, "%@$ the command-line argument no. %<>uz!\n", &arg, log->style.num, ind);
+    bool res = log_message_fmt(log, code_metric, MESSAGE_WARNING, "%@$ the command-line argument no. %~uz!\n", &arg, ind);
     Va_end(arg);
     return res;
 }
@@ -25,10 +25,10 @@ enum argv_name_val_status {
 static bool log_message_warning_argv_name_val(struct log *restrict log, struct code_metric code_metric, size_t ind, enum argv_name_val_status status, bool shrt, const char *name_str, size_t name_len, const char *val_str, size_t val_len)
 {
     static const char *fmt[] = { 
-        "Unable to handle the value %<>s* of the parameter %<>s* near",
-        "Redundant value %<>s* for the option %<>s* within"
+        "Unable to handle the value %~s* of the parameter %~~s* near",
+        "Redundant value %~s* for the option %~~s* within"
     };
-    return log_message_warning_generic(log, code_metric, ind, fmt[status], log->style.str, val_str, val_len, shrt ? log->style.chr : log->style.str, name_str, name_len);
+    return log_message_warning_generic(log, code_metric, ind, fmt[status], val_str, val_len, shrt ? log->style->type_char : log->style->type_str, name_str, name_len);
 }
 
 enum argv_name_status {
@@ -40,16 +40,16 @@ enum argv_name_status {
 static bool log_message_warning_argv_name(struct log *restrict log, struct code_metric code_metric, size_t ind, enum argv_name_status status, bool shrt, const char *name_str, size_t name_len)
 {
     static const char *fmt[] = {
-        "Unable to handle the option %<>s* within",
-        "Invalid identifier %<>s* within",
-        "Expected a value for the parameter %<>s* within"
+        "Unable to handle the option %~~s* within",
+        "Invalid identifier %~~s* within",
+        "Expected a value for the parameter %~~s* within"
     };
-    return log_message_warning_generic(log, code_metric, ind, fmt[status], shrt ? log->style.chr : log->style.str, name_str, name_len);
+    return log_message_warning_generic(log, code_metric, ind, fmt[status], shrt ? log->style->type_char : log->style->type_str, name_str, name_len);
 }
 
 static bool log_message_warning_argv_utf(struct log *restrict log, struct code_metric code_metric, size_t ind, size_t pos)
 {
-    return log_message_warning_generic(log, code_metric, ind, "Unexpected UTF-8 continuation byte at the position %<>uz within", log->style.num, pos + 1);
+    return log_message_warning_generic(log, code_metric, ind, "Unexpected UTF-8 continuation byte at the position %~uz within", pos + 1);
 }
 
 static bool utf8_decode_len(const char *str, size_t tot, size_t *p_len)
