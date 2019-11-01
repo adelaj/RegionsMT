@@ -734,7 +734,11 @@ set_target_properties(gsl
     PROPERTIES
         COMPILE_DEFINITIONS DLL_EXPORT
         WINDOWS_EXPORT_ALL_SYMBOLS ON )
-target_link_libraries(gsl gslcblas)
+
+if (BUILD_SHARED_LIBS)
+    target_link_libraries(gsl gslcblas)
+endif ()
+
 target_include_directories(gslcblas
     PUBLIC 
         $<BUILD_INTERFACE:${GSL_BINARY_DIR}>

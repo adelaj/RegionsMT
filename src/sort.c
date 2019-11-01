@@ -553,11 +553,3 @@ unsigned hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, 
     return res;
 }
 
-size_t str_x33_hash(const void *Key, void *context)
-{
-    (void) context;
-    const char *key = Key;
-    size_t hash = 5381;
-    for (char ch = *key++; ch; ch = *key++) hash = (hash << 5) + hash + ch;
-    return hash;
-}

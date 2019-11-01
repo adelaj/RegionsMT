@@ -48,7 +48,6 @@ struct env {
     struct strl begin, end;
 };
 
-
 enum message_type {
     MESSAGE_DEFAULT = 0,
     MESSAGE_ERROR,
@@ -67,11 +66,11 @@ struct ttl_style {
     struct env time_stamp, header[MESSAGE_CNT], code_metric;
 };
 
-typedef bool (*fmt_callback)(char *, size_t *, void *, struct env, enum fmt_execute_flags);
+typedef bool (*fmt_callback)(char *, size_t *, void *, struct env *, enum fmt_execute_flags);
 
 void print(char *, size_t *, const char *, size_t, bool);
 bool print_fmt(char *, size_t *, struct style *, ...);
-bool print_time_diff(char *, size_t *, uint64_t, uint64_t, struct env);
+bool print_time_diff(char *, size_t *, uint64_t, uint64_t, struct env *);
 void print_time_stamp(char *, size_t *);
 
 struct log {

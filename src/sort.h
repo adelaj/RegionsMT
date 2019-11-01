@@ -59,5 +59,3 @@ void *hash_table_fetch_key(struct hash_table *, size_t, size_t);
 void *hash_table_fetch_val(struct hash_table *, size_t, size_t);
 unsigned hash_table_alloc(struct hash_table *, size_t *, const void *, size_t, size_t, hash_callback, cmp_callback, void *);
 void hash_table_dealloc(struct hash_table *, size_t);
-
-size_t str_x33_hash(const void *Key, void *context);

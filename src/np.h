@@ -7,7 +7,9 @@
 //
 
 #if defined _MSC_BUILD || defined __MINGW32__
-#   define _CRT_SECURE_NO_WARNINGS
+#   ifndef _CRT_SECURE_NO_WARNINGS
+#       define _CRT_SECURE_NO_WARNINGS
+#   endif
 
 #   define _CRTDBG_MAP_ALLOC
 #   include <crtdbg.h>

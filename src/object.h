@@ -43,7 +43,7 @@ struct xml_att {
 
 struct base_context {
     struct buff *buff;
-    struct str_pool *tbl;
+    //struct str_pool *pool;
     struct text_metric metric; // metric snapshot
     unsigned st; // state
     size_t len;

@@ -28,7 +28,7 @@ static bool log_message_warning_argv_name_val(struct log *restrict log, struct c
         "Unable to handle the value %~s* of the parameter %~~s* near",
         "Redundant value %~s* for the option %~~s* within"
     };
-    return log_message_warning_generic(log, code_metric, ind, fmt[status], val_str, val_len, shrt ? log->style->type_char : log->style->type_str, name_str, name_len);
+    return log_message_warning_generic(log, code_metric, ind, fmt[status], val_str, val_len, shrt ? &log->style->type_char : &log->style->type_str, name_str, name_len);
 }
 
 enum argv_name_status {
@@ -44,7 +44,7 @@ static bool log_message_warning_argv_name(struct log *restrict log, struct code_
         "Invalid identifier %~~s* within",
         "Expected a value for the parameter %~~s* within"
     };
-    return log_message_warning_generic(log, code_metric, ind, fmt[status], shrt ? log->style->type_char : log->style->type_str, name_str, name_len);
+    return log_message_warning_generic(log, code_metric, ind, fmt[status], shrt ? &log->style->type_char : &log->style->type_str, name_str, name_len);
 }
 
 static bool log_message_warning_argv_utf(struct log *restrict log, struct code_metric code_metric, size_t ind, size_t pos)

@@ -5,13 +5,6 @@
 
 cmake_minimum_required(VERSION 3.14)
 
-macro(msvc_set_static_runtime)
-    set(_vars CMAKE_C_FLAGS_DEBUG CMAKE_C_FLAGS_MINSIZEREL CMAKE_C_FLAGS_RELEASE CMAKE_C_FLAGS_RELWITHDEBINFO)
-    foreach(_var IN ITEMS ${_vars})
-        string(REGEX REPLACE "/MD" "/MT" ${_var} "${${_var}}")
-    endforeach()
-endmacro()
-
 macro(pthread_init_tests dir)
     file(GLOB pthread_test_sources ${dir}/*.c)
     source_group("Source Files" FILES ${pthread_test_sources})
@@ -50,7 +43,6 @@ endif()
 project(${target} LANGUAGES C)
 option(PTHREAD_MONOLITHIC_SOURCE "All source files are aggregated into a single translation unit" ON)
 option(BUILD_SHARED_LIBS "Build shared library" OFF)
-option(MSVC_RUNTIME_DYNAMIC "Use dynamically-linked runtime" OFF) 
 
 enable_language(C)
 
@@ -83,11 +75,6 @@ else()
 endif()
 
 if(MSVC)
-    if(NOT MSVC_RUNTIME_DYNAMIC)
-        msvc_set_static_runtime()
-    else()
-        add_definitions(-D_DLL)
-    endif()
     add_definitions(-DPTW32_RC_MSC)
     if (NOT DEFINED PTHREAD_EXCEPTION_SCHEME)
         set(PTHREAD_EXCEPTION_SCHEME SE)

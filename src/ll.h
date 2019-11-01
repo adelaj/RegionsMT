@@ -24,6 +24,7 @@ _Static_assert((BIT_TEST2_MASK01 | BIT_TEST2_MASK10) == UINT8_MAX, "Wrong consta
 #define UINT8_CNT(BIT) TYPE_CNT(BIT, CHAR_BIT * sizeof(uint8_t))
 
 #define SIZE_BIT (sizeof(size_t) * CHAR_BIT)
+#define SIZE_CNT(BIT) TYPE_CNT(BIT, SIZE_BIT)
 #define UINT32_BIT (sizeof(uint32_t) * CHAR_BIT)
 #define UINT64_BIT (sizeof(uint64_t) * CHAR_BIT)
 

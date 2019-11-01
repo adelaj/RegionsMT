@@ -112,7 +112,7 @@ bool log_message_error_xml_generic(struct log *restrict log, struct code_metric 
 {
     Va_list arg;
     Va_start(arg, metric);
-    bool res = log_message_fmt(log, code_metric, MESSAGE_ERROR, "%@$ (file: %~P; line: %~uz; character: %~uz; byte: %~uq)!\n", &arg, metric.path.str, metric.path.len, metric.row + 1, metric.col + 1, metric.byte + 1);
+    bool res = log_message_fmt(log, code_metric, MESSAGE_ERROR, "%@$ (file: %~P*; line: %~uz; character: %~uz; byte: %~uq)!\n", &arg, metric.path.str, metric.path.len, metric.row + 1, metric.col + 1, metric.byte + 1);
     Va_end(arg);
     return res;
 }
@@ -120,10 +120,10 @@ bool log_message_error_xml_generic(struct log *restrict log, struct code_metric 
 bool log_message_error_xml_chr(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status_chr status, const uint8_t *buff, size_t len)
 {
     static const char *fmt[] = {
-        "Unexpected end of file %~~s*"
+        "Unexpected end of file %~~s*",
         "Unexpected character %~~s*"
     };
-    return log_message_error_xml_generic(log, code_metric, metric, fmt[status], log->style->type_char, buff, len);
+    return log_message_error_xml_generic(log, code_metric, metric, fmt[status], &log->style->type_char, (const char *) buff, len);
 }
 
 enum xml_status_str {

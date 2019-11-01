@@ -5,6 +5,8 @@
 #include "memory.h"
 #include "utf8.h"
 
+#include "lm.h"
+
 #include "module/categorical.h"
 #include "module/lde.h"
 
@@ -195,17 +197,18 @@ static int Main(int argc, char **argv)
     struct argv_par_sch argv_par_sch =
     {
         CLII((struct tag[]) { { STRI("fancy"), 7 }, { STRI("help"), 0 }, { STRI("log"), 1 }, { STRI("test"), 2 }, { STRI("threads"), 3 }}),
-        CLII((struct tag[]) { { STRI("C"), 4 }, { STRI("F"), 6 }, { STRI("L"), 5 }, { STRI("T"), 2 }, { STRI("h"), 0 }, { STRI("l"), 1 }, { STRI("t"), 3 } }),
+        CLII((struct tag[]) { { STRI("C"), 4 }, { STRI("F"), 6 }, { STRI("L"), 5 }, { STRI("T"), 2 }, { STRI("h"), 0 }, { STRI("l"), 1 }, { STRI("m"), 10 }, { STRI("t"), 3 } }),
         CLII((struct par_sch[])
         {
-            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_HELP }, empty_handler, PAR_OPTION },
-            { offsetof(struct main_args, log_path), NULL, p_str_handler, PAR_VALUED },
-            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_TEST }, empty_handler, PAR_OPTION },
-            { offsetof(struct main_args, thread_cnt), &(struct handler_context) { offsetof(struct main_args, bits) - offsetof(struct main_args, thread_cnt), MAIN_ARGS_BIT_POS_THREAD_CNT }, size_handler, PAR_VALUED },
-            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CAT }, empty_handler, PAR_OPTION },
-            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_LDE }, empty_handler, PAR_OPTION },
-            { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CHISQ }, empty_handler, PAR_OPTION },
-            { offsetof(struct main_args, bits), &(struct bool_handler_context) { MAIN_ARGS_BIT_POS_FANCY, &(struct handler_context) { 0, MAIN_ARGS_BIT_POS_FANCY_USER } }, bool_handler2, PAR_VALUED_OPTION },
+            [0] = { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_HELP }, empty_handler, PAR_OPTION },
+            [1] = { offsetof(struct main_args, log_path), NULL, p_str_handler, PAR_VALUED },
+            [2] = { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_TEST }, empty_handler, PAR_OPTION },
+            [3] = { offsetof(struct main_args, thread_cnt), &(struct handler_context) { offsetof(struct main_args, bits) - offsetof(struct main_args, thread_cnt), MAIN_ARGS_BIT_POS_THREAD_CNT }, size_handler, PAR_VALUED },
+            [4] = { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CAT }, empty_handler, PAR_OPTION },
+            [5] = { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_LDE }, empty_handler, PAR_OPTION },
+            [6] = { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CHISQ }, empty_handler, PAR_OPTION },
+            [7] = { offsetof(struct main_args, bits), &(struct bool_handler_context) { MAIN_ARGS_BIT_POS_FANCY, &(struct handler_context) { 0, MAIN_ARGS_BIT_POS_FANCY_USER } }, bool_handler2, PAR_VALUED_OPTION },
+            [10] = { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_LM}, empty_handler, PAR_OPTION },
         })
     };
 
@@ -407,7 +410,7 @@ static int Main(int argc, char **argv)
     struct style style = {
         .type_int = ENV_INIT_COL(FG_BR_CYAN),
         .type_char = ENV_INIT_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO),
-        .type_path = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_BLUE, UTF8_RDQUO),
+        .type_path = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_CYAN, UTF8_RDQUO),
         .type_str = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_MAGENTA, UTF8_RDQUO),
         .type_flt = ENV_INIT_COL(FG_BR_CYAN),
         .type_time_diff = ENV_INIT_COL(FG_BR_YELLOW),
@@ -417,7 +420,8 @@ static int Main(int argc, char **argv)
     struct log log;
     if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, NULL))
     {
-        log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%#*%#*.\n", 0x393, 920);
+        //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~~#*%~#*", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, 12041241241ull);
+        //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~#*%~#*.\n", 0x393, 920);
         
         size_t pos_cnt;
         char **pos_arr;
@@ -469,6 +473,13 @@ static int Main(int argc, char **argv)
                 if (pos_cnt >= 3)
                 {
                     categorical_run_chisq(pos_arr[0], pos_arr[1], pos_arr[2], &log);
+                }
+            }
+            else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LM))
+            {
+                if (pos_cnt >= 1)
+                {
+                    lmf_expr_test(pos_arr[0], &log);
                 }
             }
             else

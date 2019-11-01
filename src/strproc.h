@@ -94,7 +94,8 @@ struct buff {
 
 enum buff_flags {
     BUFFER_INIT = 1, // Zero characharacter at the beginning
-    BUFFER_TERM = 2 // Zero character at the ending
+    BUFFER_TERM = 2, // Zero character at the ending
+    BUFFER_DISCARD = 4 // Discards the contents of the buffer
 };
 
 unsigned buff_append(struct buff *, const char *, size_t, enum buff_flags);
@@ -105,6 +106,9 @@ struct str_pool {
 };
 
 bool str_pool_init(struct str_pool *, size_t, size_t);
+void str_pool_close(struct str_pool *);
 unsigned str_pool_insert(struct str_pool *, const char *, size_t, size_t *);
+bool str_pool_ord(struct str_pool *, size_t, size_t *);
 
+size_t str_x33_hash(const void *, void *);
 size_t str_off_x33_hash(const void *, void *);

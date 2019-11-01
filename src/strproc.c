@@ -178,11 +178,13 @@ bool str_tbl_handler(const char *str, size_t len, void *p_Off, void *Context)
 unsigned buff_append(struct buff *buff, const char *str, size_t len, enum buff_flags flags)
 {
     bool init = flags & BUFFER_INIT, term = flags & BUFFER_TERM;
-    unsigned res = array_test(&buff->str, &buff->cap, sizeof(*buff->str), 0, 0, len, buff->len, init + term);
+    size_t pos = flags & BUFFER_DISCARD ? 0 : buff->len;
+    unsigned res = array_test(&buff->str, &buff->cap, sizeof(*buff->str), 0, 0, len, pos, init + term);
     if (!res) return 0;
-    memcpy(buff->str + buff->len + init, str, len * sizeof(*buff->str));
-    buff->len += len + init;
-    if (term) buff->str[buff->len] = '\0';
+    memcpy(buff->str + pos + init, str, len * sizeof(*buff->str));
+    pos += len + init;
+    if (term) buff->str[pos] = '\0';
+    buff->len = pos;
     return res;
 }
 
@@ -190,12 +192,27 @@ bool str_pool_init(struct str_pool *pool, size_t cnt, size_t len)
 {
     if (array_init(&pool->buff.str, &pool->buff.cap, size_add_sat(len, 1), sizeof(*pool->buff.str), 0, 0))
     {
-        pool->buff.str[0] = '\0'; // Addind empty srting
+        pool->buff.str[0] = '\xff'; // Stub for the empty srting (any non-zero constant is valid)
         pool->buff.len = 0;
-        if (hash_table_init(&pool->tbl, cnt, sizeof(size_t), 0)) return 1;
+        if (hash_table_init(&pool->tbl, cnt, sizeof(size_t), sizeof(size_t))) return 1;
         free(pool->buff.str);
     }
     return 0;
+}
+
+void str_pool_close(struct str_pool *pool)
+{
+    free(pool->buff.str);
+    hash_table_close(&pool->tbl);
+}
+
+size_t str_x33_hash(const void *Key, void *context)
+{
+    (void) context;
+    const char *str = Key;
+    size_t hash = 5381;
+    for (char ch = *str++; ch; ch = *str++) hash = (hash << 5) + hash + ch;
+    return hash;
 }
 
 size_t str_off_x33_hash(const void *Off, void *Str)
@@ -210,15 +227,21 @@ enum {
     STR_POOL_PRESENT = HASH_PRESENT,
 };
 
+// Warning! Required string should be null-terminated
 unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, size_t *p_off)
 {
-    if (!len) // Empty strings handled separately
+    if (!len) // Empty strings are handled separately
     {
         *p_off = 0;
+        if (pool->buff.str[0])
+        {
+            pool->buff.str[0] = '\0';
+            return 1;
+        }
         return 1 | STR_POOL_PRESENT | STR_POOL_UNTOUCHED;
     }
     size_t h = str_x33_hash(str, NULL);
-    unsigned res = hash_table_alloc(&pool->tbl, &h, str, sizeof(size_t), 0, str_off_x33_hash, str_off_str_eq, pool->buff.str);
+    unsigned res = hash_table_alloc(&pool->tbl, &h, str, sizeof(size_t), sizeof(size_t), str_off_x33_hash, str_off_str_eq, pool->buff.str);
     if (!res) return 0;
     if (res & HASH_PRESENT)
     {
@@ -233,5 +256,25 @@ unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, siz
         return 0;
     }
     *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t)) = *p_off = off;
+    *(size_t *) hash_table_fetch_val(&pool->tbl, h, sizeof(size_t)) = pool->tbl.cnt; // Index zero is reserved for the null-string
     return res;
+}
+
+size_t str_pool_(struct str_pool *pool)
+{
+    return pool->tbl.cnt + !pool->buff.str[0];
+}
+
+bool str_pool_ord(struct str_pool *pool, size_t off, size_t *p_ind)
+{
+    if (!off)
+    {
+        if (pool->buff.str[0]) return 0;
+        *p_ind = 0;
+        return 1;
+    }
+    size_t h = str_x33_hash(pool->buff.str + off, NULL);
+    if (!hash_table_search(&pool->tbl, &h, pool->buff.str + off, sizeof(size_t), str_off_str_eq, pool->buff.str)) return 0;
+    *p_ind = *(size_t *) hash_table_fetch_val(&pool->tbl, h, sizeof(size_t));
+    return 1;
 }
