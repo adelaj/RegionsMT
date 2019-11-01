@@ -24,9 +24,9 @@ $(call var_reg,-O0,$$1,CFLAGS LDFLAGS,%,clang clang-%,%:Debug)
 $(call var_reg,-mavx,$$1,LDFLAGS:%,gcc gcc-% clang clang-%,%:%)
 $(call var_reg,-fuse-ld=gold,$$1,LDFLAGS:%,clang clang-%,%:Release)
 
-// Warning! Add "/D_DLL" if using "/MD" instead of "/MT"
+# Warning! Add "/D_DLL" if using "/MD" instead of "/MT"
 $(call var_reg,/MP /arch:AVX /volatile:ms /D_UNICODE /D_CRT_SECURE_NO_WARNINGS,$$1,CFLAGS:%:msvc:%:%)
-$(call var_reg,/MTd /Od /RTC1 /Zi /D_DEBUG,$$1,CFLAGS:%:msvc:%:Debug)
+$(call var_reg,/MTd /Od /RTC1 /Zi /FS /D_DEBUG,$$1,CFLAGS:%:msvc:%:Debug)
 $(call var_reg,/MT /GL /O2,$$1,CFLAGS:%:msvc:%:Release)
 $(call var_reg,/LTCG,$$1,LDFLAGS ARFLAGS,%:msvc:%:Release)
 $(call var_reg,/SUBSYSTEM:CONSOLE,$$1,LDFLAGS:%:msvc:%:%)

@@ -12,6 +12,7 @@ $(addprefix $(P2134)/,libgslcblas.a libgsl.a all.log test.log)
 $(eval
 $(EP2134)/lib%.a $(EP2134)/%.log: $(EP2134).log
     $(cc_cmake_build)
+$(EP2134)/libgsl.a: $(EP2134)/libgslcblas.a
 $(EP2134)/all.log: $(EP2134)/libgsl.a $(EP2134)/libgslcblas.a
 $(EP2134)/test.log: $(EP2134)/all.log
 )
@@ -24,6 +25,7 @@ $(call gather,$(P2134)/gsl.lib,)
 $(eval
 $(EP2134)/%.lib $(EP2134)/%.log: $(EP213).log
     $(msvc_cmake_build)
+$(EP2134)/gsl.lib: $(EP2134)/gslcblas.lib
 $(EP2134)/ALL_BUILD.log: $(EP2134)/gsl.lib $(EP2134)/gslcblas.lib
 $(EP2134)/RUN_TESTS.log: $(EP2134)/ALL_BUILD.log
 )

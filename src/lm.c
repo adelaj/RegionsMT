@@ -166,6 +166,7 @@ bool lmf_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metri
         if (strchr("^*+(", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
         else if (utf8.val == ')')
         {
+            context->buff->len = context->len;
             if (!buff_append(context->buff, 0, 0, BUFFER_TERM) ||
                 !str_pool_insert(&arg->pool, context->buff->str, context->len, &arg->ent[arg->ent_cnt - 1].off)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else

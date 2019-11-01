@@ -46,7 +46,7 @@ $(call var_base,$1,$1,CHILD:$2)\
 $(call clean,$2,rmdir))
 
 do_clean =\
-$(foreach i,$(CLEAN),clean($i)\
+$(foreach i,$(call coalesce,CLEAN,),clean($i)\
 $(if $(wildcard $i),\
 $(if $(call coalesce,CHILD:$i,),\
 $(eval clean($$i): | $$(patsubst %,clean(%),$$(CHILD:$$i)))\
