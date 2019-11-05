@@ -141,8 +141,8 @@ bool categorical_run_chisq(const char *path_phen, const char *path_gen, const ch
     size_t phen_skip = 0, phen_cnt = 0, phen_length = 0;
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
 
-    uintptr_t *phen_ptr = pointers_stable(phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str);
-    if (!phen_ptr) goto error;
+    uintptr_t *phen_ptr;
+    if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str)) goto error;
     size_t phen_ucnt = phen_cnt;
     ranks_unique_from_pointers_impl(phen, phen_ptr, (uintptr_t) phen, &phen_ucnt, sizeof(*phen), str_off_cmp, phen_context.handler_context.str);
     free(phen_ptr);
@@ -197,8 +197,8 @@ bool categorical_run_adj(const char *path_phen, const char *path_gen, const char
     size_t phen_skip = 0, phen_cnt = 0, phen_length = 0;
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
 
-    uintptr_t *phen_ptr = pointers_stable(phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str);
-    if (!phen_ptr) goto error;
+    uintptr_t *phen_ptr;
+    if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str)) goto error;
     size_t phen_ucnt = phen_cnt;
     ranks_unique_from_pointers_impl(phen, phen_ptr, (uintptr_t) phen, &phen_ucnt, sizeof(*phen), str_off_cmp, phen_context.handler_context.str);
     free(phen_ptr);

@@ -209,8 +209,8 @@ bool test_sort_b_1(void *In, struct log *log)
     bool succ = 0;
     struct test_sort_b *in = In;
     size_t ucnt = in->cnt;
-    uintptr_t *ord = orders_stable_unique(in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL);
-    if (!ord) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+    uintptr_t *ord;
+    if (!orders_stable_unique(&ord, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
     else
     {
         if (ucnt == in->ucnt)
@@ -229,8 +229,8 @@ bool test_sort_b_2(void *In, struct log *log)
     bool succ = 0;
     struct test_sort_b *in = In;
     size_t ucnt = in->cnt;
-    uintptr_t *ord = orders_stable_unique(in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL);
-    if (!ord) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+    uintptr_t *ord;
+    if (!orders_stable_unique(&ord, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
     else
     {
         double *arr;

@@ -66,24 +66,24 @@ struct ttl_style {
     struct env time_stamp, header[MESSAGE_CNT], code_metric;
 };
 
-typedef bool (*fmt_callback)(char *, size_t *, void *, struct env *, enum fmt_execute_flags);
+typedef bool (*fmt_callback)(char *, size_t *, void *, const struct env *, enum fmt_execute_flags);
 
 void print(char *, size_t *, const char *, size_t, bool);
-bool print_fmt(char *, size_t *, struct style *, ...);
-bool print_time_diff(char *, size_t *, uint64_t, uint64_t, struct env *);
+bool print_fmt(char *, size_t *, const struct style *, ...);
+bool print_time_diff(char *, size_t *, uint64_t, uint64_t, const struct env *);
 void print_time_stamp(char *, size_t *);
 
 struct log {
     FILE *file;
     char *buff;
-    struct ttl_style *ttl_style;
-    struct style *style;
+    const struct ttl_style *ttl_style;
+    const struct style *style;
     size_t cnt, cap, lim;
     uint64_t tot; // File size is 64-bit always!
 };
 
-typedef bool (*message_callback)(char *, size_t *, void *, struct style *);
-typedef bool (*message_callback_var)(char *, size_t *, void *, struct style *, Va_list);
+typedef bool (*message_callback)(char *, size_t *, void *, const struct style *);
+typedef bool (*message_callback_var)(char *, size_t *, void *, const struct style *, Va_list);
 
 union message_callback {
     message_callback ord;
@@ -104,9 +104,9 @@ enum log_flags {
     LOG_FORCE_TTY = 4
 };
 
-bool log_init(struct log *restrict, char *restrict, size_t, enum log_flags, struct ttl_style *restrict, struct style *restrict, struct log *restrict);
+bool log_init(struct log *restrict, char *restrict, size_t, enum log_flags, const struct ttl_style *restrict, const struct style *restrict, struct log *restrict);
 void log_close(struct log *restrict);
-bool log_multiple_init(struct log *restrict, size_t, char *restrict, size_t, enum log_flags, struct ttl_style *restrict, struct style *restrict, struct log *restrict);
+bool log_multiple_init(struct log *restrict, size_t, char *restrict, size_t, enum log_flags, const struct ttl_style *restrict, const struct style *restrict, struct log *restrict);
 void log_multiple_close(struct log *restrict, size_t);
 bool log_flush(struct log *restrict);
 bool log_message(struct log *restrict, struct code_metric, enum message_type, message_callback, void *);

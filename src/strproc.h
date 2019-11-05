@@ -93,7 +93,7 @@ struct buff {
 };
 
 enum buff_flags {
-    BUFFER_INIT = 1, // Zero characharacter at the beginning
+    BUFFER_INIT = 1, // Preserve null terminator at the end of the buffer (if it is present)
     BUFFER_TERM = 2, // Zero character at the ending
     BUFFER_DISCARD = 4 // Discards the contents of the buffer
 };
@@ -105,10 +105,10 @@ struct str_pool {
     struct hash_table tbl;
 };
 
-bool str_pool_init(struct str_pool *, size_t, size_t);
+bool str_pool_init(struct str_pool *, size_t, size_t, size_t);
 void str_pool_close(struct str_pool *);
-unsigned str_pool_insert(struct str_pool *, const char *, size_t, size_t *);
-bool str_pool_ord(struct str_pool *, size_t, size_t *);
+unsigned str_pool_insert(struct str_pool *, const char *, size_t, size_t *, size_t, void *);
+bool str_pool_fetch(struct str_pool *, const char *, size_t, void *);
 
 size_t str_x33_hash(const void *, void *);
 size_t str_off_x33_hash(const void *, void *);

@@ -477,9 +477,9 @@ static int Main(int argc, char **argv)
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LM))
             {
-                if (pos_cnt >= 1)
+                if (pos_cnt >= 4)
                 {
-                    lmf_expr_test(pos_arr[0], &log);
+                    lm_expr_test(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], pos_arr[4], &log);
                 }
             }
             else

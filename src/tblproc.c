@@ -29,10 +29,11 @@ struct row_read_context {
     enum row_read_status status;
 };
 
-static bool message_error_tbl_read(char *buff, size_t *p_buff_cnt, void *Context, struct style style)
+static bool message_error_tbl_read(char *buff, size_t *p_buff_cnt, void *Context, const struct style *style)
 {
+    (void) style;
     struct row_read_context *restrict context = Context;
-    const char *fmt[] = {
+    static const char *fmt[] = {
         "Unable to handle the value \"%.*s\"",
         "Incorrect order of quotes",
         "End of line expected",
@@ -324,9 +325,13 @@ bool tbl_read(const char *path, int64_t offset, tbl_selector_callback selector, 
                     {
                         if (cl.handler.read)
                         {
-                            temp_buff[len] = '\0';
-                            if (!cl.handler.read(temp_buff, len, cl.ptr, cl.context)) log_message_error_tbl_read(log, CODE_METRIC, path, metric, temp_buff, len, TBL_STATUS_UNHANDLED_VALUE);
-                            else succ = 1;
+                            if (!array_test(&temp_buff, &cap, sizeof(*temp_buff), 0, 0, len, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+                            else
+                            {
+                                temp_buff[len] = '\0';
+                                if (!cl.handler.read(temp_buff, len, cl.ptr, cl.context)) log_message_error_tbl_read(log, CODE_METRIC, path, metric, temp_buff, len, TBL_STATUS_UNHANDLED_VALUE);
+                                else succ = 1;
+                            }
                         }
                         else succ = 1;
 
@@ -371,9 +376,13 @@ bool tbl_read(const char *path, int64_t offset, tbl_selector_callback selector, 
                     {
                         if (cl.handler.read)
                         {
-                            temp_buff[len] = '\0';
-                            if (!cl.handler.read(temp_buff, len, cl.ptr, cl.context)) log_message_error_tbl_read(log, CODE_METRIC, path, metric, temp_buff, len, TBL_STATUS_UNHANDLED_VALUE);
-                            else succ = 1;
+                            if (!array_test(&temp_buff, &cap, sizeof(*temp_buff), 0, 0, len, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+                            else
+                            {
+                                temp_buff[len] = '\0';
+                                if (!cl.handler.read(temp_buff, len, cl.ptr, cl.context)) log_message_error_tbl_read(log, CODE_METRIC, path, metric, temp_buff, len, TBL_STATUS_UNHANDLED_VALUE);
+                                else succ = 1;
+                            }
                         }
                         else succ = 1;
 
@@ -408,7 +417,7 @@ bool tbl_read(const char *path, int64_t offset, tbl_selector_callback selector, 
                 }
                 break;
             }
-            if (!array_test(&temp_buff, &cap, sizeof(*temp_buff), 0, 0, len, 2)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            if (!array_test(&temp_buff, &cap, sizeof(*temp_buff), 0, 0, len, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 temp_buff[len++] = buff[ind];
@@ -421,6 +430,7 @@ bool tbl_read(const char *path, int64_t offset, tbl_selector_callback selector, 
         break;
     }
 
+    // TODO: Make the last line break optional.
     if (col) log_message_error_tbl_read(log, CODE_METRIC, path, metric, NULL, 0, TBL_STATUS_UNEXPECTED_EOF);
     else if (row_cnt && row < row_cnt) log_message_error_tbl_read(log, CODE_METRIC, path, metric, NULL, 0, TBL_STATUS_EXPECTED_MORE_ROWS);
     else succ = 1;

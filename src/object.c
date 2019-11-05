@@ -108,11 +108,11 @@ struct message_xml_context {
     enum xml_status status;
 };
 
-bool log_message_error_xml_generic(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, ...)
+bool log_message_xml_generic(struct log *restrict log, struct code_metric code_metric, enum message_type type, struct text_metric metric, ...)
 {
     Va_list arg;
     Va_start(arg, metric);
-    bool res = log_message_fmt(log, code_metric, MESSAGE_ERROR, "%@$ (file: %~P*; line: %~uz; character: %~uz; byte: %~uq)!\n", &arg, metric.path.str, metric.path.len, metric.row + 1, metric.col + 1, metric.byte + 1);
+    bool res = log_message_fmt(log, code_metric, type, "%@$ (file: %~P*; line: %~uz; character: %~uz; byte: %~uq)!\n", &arg, STRL(metric.path), metric.row + 1, metric.col + 1, metric.byte + 1);
     Va_end(arg);
     return res;
 }
@@ -123,7 +123,7 @@ bool log_message_error_xml_chr(struct log *restrict log, struct code_metric code
         "Unexpected end of file %~~s*",
         "Unexpected character %~~s*"
     };
-    return log_message_error_xml_generic(log, code_metric, metric, fmt[status], &log->style->type_char, (const char *) buff, len);
+    return log_message_xml_generic(log, code_metric, MESSAGE_ERROR, metric, fmt[status], &log->style->type_char, (const char *) buff, len);
 }
 
 enum xml_status_str {
@@ -147,12 +147,12 @@ bool log_message_error_xml_str(struct log *restrict log, struct code_metric code
         STRI("Invalid control sequence"),
         STRI("Invalid processing instruction")
     };
-    return log_message_error_xml_generic(log, code_metric, metric, "%s* %~s*", STRL(fmt[status]), str, len);
+    return log_message_xml_generic(log, code_metric, MESSAGE_ERROR, metric, "%s* %~s*", STRL(fmt[status]), str, len);
 }
 
 bool log_message_error_xml_val(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, uint32_t val)
 {
-    return log_message_error_xml_generic(log, code_metric, metric, "Numeric value %~ud referencing to invalid character", val);
+    return log_message_xml_generic(log, code_metric, MESSAGE_ERROR, metric, "Numeric value %~ud referencing to invalid character", val);
 }
 
 bool log_message_error_xml(struct log *restrict log, struct code_metric code_metric, struct text_metric metric, enum xml_status status)
@@ -165,7 +165,7 @@ bool log_message_error_xml(struct log *restrict log, struct code_metric code_met
         "Numeric value is out of range",
         "Compiler malfunction"
     };
-    return log_message_error_xml_generic(log, code_metric, metric, fmt[status]);
+    return log_message_xml_generic(log, code_metric, MESSAGE_ERROR, metric, fmt[status]);
 }
 
 ///////////////////////////////////////////////////////////////////////////////

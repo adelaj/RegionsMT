@@ -25,8 +25,6 @@
 static DECLARE_BITS_INIT(uint8_t, gen)
 static DECLARE_BITS_INIT(size_t, phen)
 
-#define GEN_CNT 3
-
 static size_t gen_pop_cnt_alt_impl(size_t alt, uint8_t *bits, size_t pop_cnt)
 {
     switch (alt)
@@ -132,6 +130,8 @@ _Static_assert((GEN_CNT * sizeof(double)) / GEN_CNT == sizeof(double), "Multipli
 bool categorical_init(struct categorical_supp *supp, size_t phen_cnt, size_t phen_ucnt)
 {
     if (phen_ucnt > phen_cnt) return 0; // Wrong parameter    
+    
+    *supp = (struct categorical_supp) { 0 };
     if (array_init(&supp->phen_val, NULL, phen_ucnt, sizeof(*supp->phen_val), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
         array_init(&supp->phen_mar, NULL, phen_ucnt, sizeof(*supp->phen_mar), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
         array_init(&supp->phen_bits, NULL, UINT8_CNT(phen_ucnt), sizeof(*supp->phen_bits), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
@@ -155,7 +155,9 @@ void categorical_close(struct categorical_supp *supp)
 
 bool maver_adj_init(struct maver_adj_supp *supp, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt)
 {
-    if (phen_ucnt > phen_cnt) return 0; // Wrong parameter    
+    if (phen_ucnt > phen_cnt) return 0; // Wrong parameter
+
+    *supp = (struct maver_adj_supp) { 0 };
     if (array_init(&supp->phen_perm, NULL, phen_cnt, sizeof(*supp->phen_perm), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
         array_init(&supp->phen_mar, NULL, phen_cnt, sizeof(*supp->phen_mar), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
         array_init(&supp->phen_bits, NULL, UINT8_CNT(phen_ucnt), sizeof(*supp->phen_bits), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
@@ -179,7 +181,7 @@ void maver_adj_close(struct maver_adj_supp *supp)
     free(supp->tbl);
 }
 
-static size_t filter_init(size_t *filter, uint8_t *gen, size_t phen_cnt)
+size_t filter_init(size_t *filter, uint8_t *gen, size_t phen_cnt)
 {
     size_t cnt = 0;
     for (size_t i = 0; i < phen_cnt; i++) if (gen[i] < GEN_CNT) filter[cnt++] = i;
@@ -424,10 +426,11 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
             mar_init(supp->tbl, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, supp->snp_data[i].mar + j, gen_pop_cnt, phen_pop_cnt);
             outer_chisq_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
             density[j] += stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt);
-            density_cnt[j]++;
+            density_cnt[j]++;            
         }
-    }
+    }     
 
+    // Naive P-value for density = gsl_sf_gamma_inc_Q((double) density_cnt[i], density[i] / M_LOG10E)
     bool alt[ALT_CNT];
     for (size_t i = 0; i < ALT_CNT; i++, flags >>= 1) alt[i] = (flags & 1) && isfinite(density[i] /= (double) density_cnt[i]);
 

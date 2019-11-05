@@ -21,6 +21,7 @@ struct array_init_status {
 
 // 'p_cap' -- pointer to initial capacity
 // 'cnt' -- desired capacity
+// On error 'p_Src' and 'p_cap' are untouched
 unsigned array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, size_t diff, enum array_flags flags)
 {
     void **restrict p_src = p_Src, *src = *p_src;
@@ -32,11 +33,10 @@ unsigned array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, 
             if (!(flags & ARRAY_REDUCE)) return 1 | ARRAY_UNTOUCHED;
             size_t tot = cnt * sz + diff; // No checks for overflows
             void *res = realloc(src, tot); // Array shrinking
-            if (!res) return !tot;
+            if (tot && !res) return 0;
+            *p_cap = cnt;
             *p_src = res;
-            bool succ = !tot || res;
-            if (succ) *p_cap = cnt;
-            return succ;
+            return 1;
         }
         else if (!tmp) return 1 | ARRAY_UNTOUCHED; // cnt == cap            
     }
@@ -67,10 +67,10 @@ unsigned array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, 
         }
     }
     else res = flags & ARRAY_CLEAR ? calloc(tot, 1) : malloc(tot);
+    if (tot && !res) return 0;
     *p_src = res;
-    bool succ = !tot || res;
-    if (succ && p_cap) *p_cap = cnt;
-    return succ;
+    if (p_cap) *p_cap = cnt;
+    return 1;
 }
 
 unsigned array_test_impl(void *p_Arr, size_t *restrict p_cap, size_t sz, size_t diff, enum array_flags flags, size_t *restrict arg, size_t cnt)

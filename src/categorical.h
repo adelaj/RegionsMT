@@ -5,6 +5,7 @@
 #include <gsl/gsl_rng.h>
 
 #define ALT_CNT 4
+#define GEN_CNT 3
 
 enum categorical_flags {
     TEST_TYPE_CODOMINANT = 1,
@@ -32,6 +33,8 @@ struct maver_adj_res {
     double nlpv[ALT_CNT];
     size_t rpl[ALT_CNT];
 };
+
+size_t filter_init(size_t *, uint8_t *, size_t);
 
 void mar_init(size_t *, size_t *, size_t *, size_t *, size_t, size_t);
 void ymar_init(size_t *, size_t *, size_t, size_t);

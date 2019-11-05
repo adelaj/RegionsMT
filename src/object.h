@@ -68,7 +68,7 @@ enum xml_status {
     XML_ERROR_COMPILER
 };
 
-bool log_message_error_xml_generic(struct log *restrict, struct code_metric, struct text_metric, ...);
+bool log_message_xml_generic(struct log *restrict, struct code_metric, enum message_type, struct text_metric, ...);
 bool log_message_error_xml_chr(struct log *restrict, struct code_metric, struct text_metric, enum xml_status_chr, const uint8_t *, size_t);
 bool log_message_error_xml(struct log *restrict, struct code_metric, struct text_metric, enum xml_status);
 
