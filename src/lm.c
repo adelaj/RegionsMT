@@ -16,6 +16,16 @@
 
 #include <gsl/gsl_multifit.h>
 #include <gsl/gsl_cdf.h>
+#include <gsl/gsl_blas.h>
+
+enum cov_sort {
+    COV_SORT_NUM = 0,
+    COV_SORT_STRCMP_ASC,
+    COV_SORT_STRCMP_DSC,
+    COV_SORT_STRCMPNAT_ASC,
+    COV_SORT_STRCMPNAT_DSC,
+    COV_SORT_CNT
+};
 
 // 'deg == 0' corresponds to categorical covariate
 // 'deg > 0' corresponds to numeric/ordinal covariate
@@ -79,15 +89,36 @@ void tensor_prod(size_t cnt, double *restrict vect, size_t *restrict vect_len, d
     }
 }
 
-/*
-bool check_matrix_rank(double *matrix, size_t dimx, size_t dimy)
+// Perform Gram-Schmidt ortogonalization for small matrices
+// All rows are assumed to contain non-zero values
+bool check_matrix_full_rank(double *matrix, double *dot, double *norm, size_t dimx, size_t dimy0, size_t dimy, double tol)
 {
-    for (size_t i = 0; i < dimx; i++)
+    size_t rk = 1, rkmax = MIN(dimx, dimy0);
+    if (rk >= rkmax) return 1;
+    for (size_t i = 1; i < dimx; i++)
     {
-
+        gsl_vector_view a = gsl_vector_view_array(matrix + i * dimy, dimy0);
+        for (size_t j = 0; j < i - 1; j++)
+        {
+            gsl_vector_view b = gsl_vector_view_array(matrix + j * dimy, dimy0);
+            gsl_blas_ddot(&a.vector, &b.vector, dot + j);
+        }
+        gsl_vector_view b = gsl_vector_view_array(matrix + (i - 1) * dimy, dimy0);
+        gsl_blas_ddot(&a.vector, &b.vector, dot + i - 1);
+        gsl_blas_ddot(&b.vector, &b.vector, norm + i - 1);
+        
+        double proj = 0.;
+        for (size_t k = 0; k < dimy0; k++)
+        {
+            double ort = matrix[k + i * dimy];
+            for (size_t j = 0; j < i; j++) ort -= matrix[k + j * dimy] * dot[j] / norm[j];
+            proj += ort * ort;
+        }
+        if (proj * proj > tol) rk++;
+        if (rk >= rkmax) return 1;
     }
+    return 0;
 }
-*/
 
 // 'phen' is actually a double pointer
 struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_ord, size_t phen_ind, size_t *cov_level, size_t phen_cnt, size_t reg_cnt, struct lm_term *term, size_t *term_len, size_t term_len_cnt, enum categorical_flags flags)
@@ -103,7 +134,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_or
     //
     // BASELINE MODEL
     //
-    double chisq_bs;
+    double S_h;
     {
         size_t dimx = cnt, dimy = 1 + reg_cnt;
         // Setting up the matrix of regressors:
@@ -156,7 +187,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_or
         gsl_matrix *C = gsl_matrix_alloc(dimy, dimy);
 
         size_t rk;
-        gsl_multifit_linear_tsvd(&R.matrix, &O.vector, 1e-5, P, C, &chisq_bs, &rk, W);
+        gsl_multifit_linear_tsvd(&R.matrix, &O.vector, 1e-5, P, C, &S_h, &rk, W);
 
         gsl_matrix_free(C);
         gsl_vector_free(P);
@@ -275,7 +306,9 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_or
             gsl_multifit_linear_free(W);            
         }
         size_t df_h = 1 + (i == 1);
-        res.nlpv[i] = gsl_cdf_fdist_Q(((chisq_bs - ss_e) * (double) df_e) / (ss_e * (double) df_h), (double) df_h, (double) df_e);
+        double s_h = S_h;
+        if (i == 3) s_h += s_h;
+        res.nlpv[i] = gsl_cdf_fdist_Q(((s_h - ss_e) * (double) df_e) / (ss_e * (double) df_h), (double) df_h, (double) df_e);
 
         //
         // MODEL FOR QAS
@@ -298,7 +331,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_or
                 {
                     uint8_t g = gen[supp->filter[j]];
                     supp->reg[k] = (double) g;
-                    supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
+                    //supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
                 }
                 off++;
                 break;
@@ -307,7 +340,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_or
                 {
                     uint8_t g = gen[supp->filter[j]];
                     supp->reg[k] = (double) (g == 2);
-                    supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
+                    //supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
                 }
                 off++;
                 break;
@@ -316,7 +349,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_or
                 {
                     uint8_t g = gen[supp->filter[j]];
                     supp->reg[k] = (double) ((g == 1) || (g == 2));
-                    supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
+                    //supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
                 }
                 off++;
                 break;
@@ -326,7 +359,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_or
                     uint8_t g = gen[supp->filter[j]];
                     supp->reg[k] = (double) (g == 2);
                     supp->reg[k + cnt * dimy] = (double) ((g == 1) || (g == 2));
-                    supp->obs[j + cnt] = supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
+                    //supp->obs[j + cnt] = supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
                 }
                 off++;
             }
@@ -367,7 +400,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_or
                 if (i == 3) memcpy(supp->reg + zz + dimy * cnt, supp->reg + zz, sizeof(*supp->reg) * (dimy - dimy0)); // Allelic mode 
             }
 
-            // 3) Fit model for 'TEST'
+            // 3) Fit model for 'QAS'
             gsl_vector *P = gsl_vector_alloc(dimy);
             gsl_matrix_view R = gsl_matrix_view_array(supp->reg, dimx, dimy);
             gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx);
@@ -387,15 +420,6 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_or
     }
     return res;
 }
-
-enum cov_sort {
-    COV_SORT_NUM = 0,
-    COV_SORT_STRCMP_ASC,
-    COV_SORT_STRCMP_DSC,
-    COV_SORT_STRCMPNAT_ASC,
-    COV_SORT_STRCMPNAT_DSC,
-    COV_SORT_CNT
-};
 
 // 'cov_cnt' is the number of used covariates wrt their types 
 struct lm_expr_arg {
@@ -688,7 +712,7 @@ bool cov_init(struct cov *cov, const char *path, struct log *log)
     size_t skip = 0, cnt = 0, length = 0;
     struct tbl_cov_context context = { .cov = cov, .cap = 0 };
     
-    if (str_pool_init(&cov->pool, 0, 0, sizeof(size_t)))
+    if (str_pool_init(&cov->pool, 200, 0, sizeof(size_t)))
     {
         if (tbl_read(path, 0, tbl_cov_selector, NULL, &context, NULL, &skip, &cnt, &length, ',', log))
         {            
@@ -767,6 +791,7 @@ bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t
 
 bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen, const char *path_gen, const char *path_out, struct log *log)
 {
+    
     struct cov cov;
     if (!cov_init(&cov, path_phen, log)) return 0;
     
@@ -897,6 +922,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     
     for (size_t i = 0; i < snp_cnt; i++)
     {
+        uint64_t t = get_time();
         struct categorical_res x = lm_impl(&supp, gen + i * cov.dim, cov.ord, phen.off, cov.level, cov.dim, reg_cnt, arg.term, arg.term_len, arg.term_len_cnt, 15);
         fprintf(f,
             "%zu,%.15e,%.15e\n"
@@ -908,6 +934,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             4 * i + 3, x.nlpv[2], x.qas[2],
             4 * i + 4, x.nlpv[3], x.qas[3]);
         fflush(f);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Computation of linear model for snp no. %~uz took %~T.\n", i, t, get_time());
     }
     fclose(f);
 

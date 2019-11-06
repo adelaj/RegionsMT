@@ -519,12 +519,13 @@ static bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, s
         {
             size_t h = hash((char *) tbl->key + i * szk, context) & msk;
             for (size_t j = 0; uint8_bit_fetch_set_burst2(flags, h, FLAG_NOT_EMPTY); h = (h + ++j) & msk);
+            if (i == h) break;
             if (h >= cap || uint8_bit_fetch_burst2(tbl->flags, h) != FLAG_NOT_EMPTY)
             {
                 memcpy((char *) tbl->key + h * szk, (char *) tbl->key + i * szk, szk);
                 memcpy((char *) tbl->val + h * szv, (char *) tbl->val + i * szv, szv);
                 break;
-            }
+            }            
             uint8_bit_set_burst2(tbl->flags, h, FLAG_REMOVED);
             swap((char *) tbl->key + i * szk, (char *) tbl->key + h * szk, key, szk);
             swap((char *) tbl->val + i * szv, (char *) tbl->val + h * szv, val, szv);
@@ -570,8 +571,8 @@ unsigned hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, 
         }
     }
     else res |= HASH_UNTOUCHED;
-    size_t msk = cap - 1, h = *p_h & msk, pos = cap, tmp = cap;
-    for (size_t i = 0, j = h;;)
+    size_t msk = cap - 1, h = *p_h & msk;
+    for (size_t i = 0, j = h, tmp = cap;;)
     {
         uint8_t flags = uint8_bit_fetch_burst2(tbl->flags, h);
         if (!(flags & FLAG_NOT_EMPTY)) break;
@@ -583,10 +584,9 @@ unsigned hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, 
         }
         h = (h + ++i) & msk;
         if (h != j) continue;
-        pos = tmp;
+        if (tmp != cap) h = tmp;        
         break;
     }
-    if (pos == cap) pos = tmp == cap ? h : tmp;
     if (!uint8_bit_fetch_reset_burst2(tbl->flags, h, FLAG_REMOVED)) tbl->tot++;
     uint8_bit_set_burst2(tbl->flags, h, FLAG_NOT_EMPTY);
     tbl->cnt++;

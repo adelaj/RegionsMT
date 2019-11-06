@@ -594,7 +594,7 @@ bool size_mul_add_test(size_t *p_res, size_t m, size_t a)
 #define DECLARE_BIT_FETCH_BURST(TYPE, PREFIX, STRIDE) \
     TYPE PREFIX ## _bit_fetch_burst ## STRIDE(TYPE *arr, size_t pos) \
     { \
-        return (arr[pos / (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1))] >> (pos % (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1)) << ((STRIDE) - 1))) & ((TYPE) 1 << ((STRIDE) - 1)); \
+        return (arr[pos / (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1))] >> (pos % (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1)) << ((STRIDE) - 1))) & (((TYPE) 1 << (STRIDE)) - 1); \
     }
 
 #define DECLARE_BIT_FETCH_SET_BURST(TYPE, PREFIX, STRIDE) \
