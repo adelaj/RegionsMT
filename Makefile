@@ -20,7 +20,7 @@ endef
 
 TARGET := RegionsMT
 
-$(call var_reg,$(addprefix -l,m pthread),$$1,LDFLAGS,$(TARGET),$(CC_TOOLCHAIN),%:%)
+$(call var_reg,$(addprefix -l,m pthread),$$1,LDLIB,$(TARGET),$(CC_TOOLCHAIN),%:%)
 $(call var_reg,$$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5.log,$$1,CREQ,$(TARGET),$(CC_TOOLCHAIN),%:%)
 $(call var_reg,$$$$(addprefix $$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/,libgsl.a libgslcblas.a),$$1,LDREQ,$(TARGET),$(CC_TOOLCHAIN),%:%)
 
@@ -30,8 +30,6 @@ $(call var_reg,$(addprefix $$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/,gsl.lib gslcblas.
 
 # Remember to add /D_DLL if we are using dynamic instance of 'pthread-win32' 
 $(call var_reg,/W4 /DFORCE_POSIX_THREADS /DPTW32_STATIC_LIB,$$1,CFLAGS,$(TARGET),msvc:%:%)
-
-A := 1
 
 .PHONY: all $(patsubst %,cmake(%),$(TARGET))
 $(patsubst %,cmake(%),$(TARGET)): $(call build,msvc_cmake,$(TARGET),$(call matrix_trunc,1 2,$(MSVC_MATRIX)))

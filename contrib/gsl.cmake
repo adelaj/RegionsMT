@@ -381,59 +381,6 @@ if (NOT HAVE_UNISTD_H)
     check_include_files(io.h HAVE_IO_H)
 endif ()
 
-# Check for IEEE arithmetic interface type.
-if (CMAKE_SYSTEM_NAME MATCHES Linux)
-    if (CMAKE_SYSTEM_PROCESSOR MATCHES sparc)
-        set(HAVE_GNUSPARC_IEEE_INTERFACE 1)
-    elseif (CMAKE_SYSTEM_PROCESSOR MATCHES powerpc)
-        set(HAVE_GNUPPC_IEEE_INTERFACE 1)
-    elseif (CMAKE_SYSTEM_PROCESSOR MATCHES 86)
-        set(HAVE_GNUX86_IEEE_INTERFACE 1)
-    endif ()
-elseif (CMAKE_SYSTEM_NAME MATCHES SunOS)
-    set(HAVE_SUNOS4_IEEE_INTERFACE 1)
-elseif (CMAKE_SYSTEM_NAME MATCHES Solaris)
-    set(HAVE_SOLARIS_IEEE_INTERFACE 1)
-elseif (CMAKE_SYSTEM_NAME MATCHES hpux)
-    set(HAVE_HPUX_IEEE_INTERFACE 1)
-elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
-    if (CMAKE_SYSTEM_PROCESSOR MATCHES powerpc)
-        set(HAVE_DARWIN_IEEE_INTERFACE 1)
-    elseif (CMAKE_SYSTEM_PROCESSOR MATCHES 86)
-        set(HAVE_DARWIN86_IEEE_INTERFACE 1)
-    endif ()
-elseif (CMAKE_SYSTEM_NAME MATCHES NetBSD)
-    set(HAVE_NETBSD_IEEE_INTERFACE 1)
-elseif (CMAKE_SYSTEM_NAME MATCHES OpenBSD)
-    set(HAVE_OPENBSD_IEEE_INTERFACE 1)
-elseif (CMAKE_SYSTEM_NAME MATCHES FreeBSD)
-    set(HAVE_FREEBSD_IEEE_INTERFACE 1)
-endif ()
-
-# Check for FPU_SETCW.
-if (HAVE_GNUX86_IEEE_INTERFACE)
-    check_c_source_compiles("
-        #include <fpu_control.h>
-        #ifndef _FPU_SETCW
-        #include <i386/fpu_control.h>
-        #define _FPU_SETCW(cw) __setfpucw(cw)
-        #endif
-        int main() { unsigned short mode = 0 ; _FPU_SETCW(mode); }"
-        HAVE_FPU_SETCW)
-    if (NOT HAVE_FPU_SETCW)
-        set(HAVE_GNUX86_IEEE_INTERFACE 0)
-    endif ()
-endif ()
-
-# Check for SSE extensions.
-if (HAVE_GNUX86_IEEE_INTERFACE)
-    check_c_source_compiles("
-        #include <stdlib.h>
-        #define _FPU_SETMXCSR(cw) asm volatile (\"ldmxcsr %0\" : : \"m\" (*&cw))
-        int main() { unsigned int mode = 0x1f80 ; _FPU_SETMXCSR(mode); exit(0); }"
-        HAVE_FPU_X86_SSE)
-endif ()
-
 # Compiles the source code, runs the program and sets ${VAR} to 1 if the
 # return value is equal to ${RESULT}.
 macro(check_run_result SRC RESULT VAR)
@@ -535,6 +482,61 @@ check_symbol_exists(strtol stdlib.h HAVE_STRTOL)
 check_symbol_exists(strtoul stdlib.h HAVE_STRTOUL)
 check_symbol_exists(vprintf stdio.h HAVE_VPRINTF)
 
+# Check for IEEE arithmetic interface type if C99 rounding exceptions are unavailable
+if (NOT (HAVE_DECL_FEENABLEEXCEPT OR HAVE_DECL_FESETTRAPENABLE))
+    if (CMAKE_SYSTEM_NAME MATCHES Linux)
+        if (CMAKE_SYSTEM_PROCESSOR MATCHES sparc)
+            set(HAVE_GNUSPARC_IEEE_INTERFACE 1)
+        elseif (CMAKE_SYSTEM_PROCESSOR MATCHES powerpc)
+            set(HAVE_GNUPPC_IEEE_INTERFACE 1)
+        elseif (CMAKE_SYSTEM_PROCESSOR MATCHES 86)
+            set(HAVE_GNUX86_IEEE_INTERFACE 1)
+        endif ()
+    elseif (CMAKE_SYSTEM_NAME MATCHES SunOS)
+        set(HAVE_SUNOS4_IEEE_INTERFACE 1)
+    elseif (CMAKE_SYSTEM_NAME MATCHES Solaris)
+        set(HAVE_SOLARIS_IEEE_INTERFACE 1)
+    elseif (CMAKE_SYSTEM_NAME MATCHES hpux)
+        set(HAVE_HPUX_IEEE_INTERFACE 1)
+    elseif (CMAKE_SYSTEM_NAME MATCHES Darwin)
+        if (CMAKE_SYSTEM_PROCESSOR MATCHES powerpc)
+            set(HAVE_DARWIN_IEEE_INTERFACE 1)
+        elseif (CMAKE_SYSTEM_PROCESSOR MATCHES 86)
+            set(HAVE_DARWIN86_IEEE_INTERFACE 1)
+        endif ()
+    elseif (CMAKE_SYSTEM_NAME MATCHES NetBSD)
+        set(HAVE_NETBSD_IEEE_INTERFACE 1)
+    elseif (CMAKE_SYSTEM_NAME MATCHES OpenBSD)
+        set(HAVE_OPENBSD_IEEE_INTERFACE 1)
+    elseif (CMAKE_SYSTEM_NAME MATCHES FreeBSD)
+        set(HAVE_FREEBSD_IEEE_INTERFACE 1)
+    endif ()
+
+    # Check for FPU_SETCW.
+    if (HAVE_GNUX86_IEEE_INTERFACE)
+        check_c_source_compiles("
+            #include <fpu_control.h>
+            #ifndef _FPU_SETCW
+            #include <i386/fpu_control.h>
+            #define _FPU_SETCW(cw) __setfpucw(cw)
+            #endif
+            int main() { unsigned short mode = 0 ; _FPU_SETCW(mode); }"
+            HAVE_FPU_SETCW)
+        if (NOT HAVE_FPU_SETCW)
+            set(HAVE_GNUX86_IEEE_INTERFACE 0)
+        endif ()
+    endif ()
+
+    # Check for SSE extensions.
+    if (HAVE_GNUX86_IEEE_INTERFACE)
+        check_c_source_compiles("
+            #include <stdlib.h>
+            #define _FPU_SETMXCSR(cw) asm volatile (\"ldmxcsr %0\" : : \"m\" (*&cw))
+            int main() { unsigned int mode = 0x1f80 ; _FPU_SETMXCSR(mode); exit(0); }"
+            HAVE_FPU_X86_SSE)
+    endif ()
+endif ()
+
 # Process config.h using autoconf rules.
 #file(STRINGS ${GSL_SOURCE_DIR}/config.h.in CONFIG)
 list(LENGTH CONFIG length)
@@ -617,7 +619,7 @@ function(add_gsl_test exename)
     endif ()
     add_executable(${exename} ${ARGN})
     set_target_properties(${exename} PROPERTIES FOLDER Tests)
-    target_link_libraries(${exename} gsl)
+    target_link_libraries(${exename} ${CMAKE_REQUIRED_LIBRARIES} gsl gslcblas)
     add_test(${exename} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${exename})
 endfunction()
 
@@ -730,10 +732,12 @@ if (BUILD_SHARED_LIBS)
 endif ()
 
 add_library(gsl ${GSL_SOURCES})
-set_target_properties(gsl
-    PROPERTIES
-        COMPILE_DEFINITIONS DLL_EXPORT
-        WINDOWS_EXPORT_ALL_SYMBOLS ON )
+if (BUILD_SHARED_LIBS)
+    set_target_properties(gsl
+        PROPERTIES
+            COMPILE_DEFINITIONS DLL_EXPORT
+            WINDOWS_EXPORT_ALL_SYMBOLS ON )
+endif ()
 
 if (BUILD_SHARED_LIBS)
     target_link_libraries(gsl gslcblas)
@@ -744,7 +748,9 @@ target_include_directories(gslcblas
         $<BUILD_INTERFACE:${GSL_BINARY_DIR}>
         $<BUILD_INTERFACE:${GSL_SOURCE_DIR}> )
 target_include_directories(gsl 
-    PUBLIC $<BUILD_INTERFACE:${GSL_BINARY_DIR}>  )
+    PUBLIC 
+        $<BUILD_INTERFACE:${GSL_BINARY_DIR}>
+        $<BUILD_INTERFACE:${GSL_SOURCE_DIR}> )
 
 if (GSL_INSTALL OR NOT DEFINED GSL_INSTALL)
     if (MSVC AND GSL_INSTALL_MULTI_CONFIG)   

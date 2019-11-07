@@ -21,17 +21,18 @@ $(eval CC_DEP := $(patsubst $(PREFIX)/$1/src/%,$(P2134)/mk/%.mk,$(call rwildcard
 $(eval CC_OBJ := $(patsubst $(P2134)/mk/%.mk,$(P2134)/obj/%.o,$(CC_DEP)))
 $(call vect,1,$(P2134)/$1 $(CC_DEP) $(CC_OBJ),,gather)
 $(if $(filter 1,$(CLEAN_GROUP)),$(call vect,1,$(P2134)/$1 $(CC_DEP) $(CC_OBJ),rm,clean))
+$(eval CC_CREQ := $$(call fetch_var2,CREQ $(ER1234),. $$1 $$2 $$3 $$4))
 $(call var_base,$(CC_DEP),$$1,INCLUDE)
 $(eval
 $(EP2134)/$$1: $(CC_OBJ) $$(call fetch_var2,LDREQ $(ER1234),. $$1 $$2 $$3 $$4)
-    $$(strip $(call fetch_var,LD $(TOOLCHAIN:$2)) $(call fetch_var,LDFLAGS $(R1234)) -o $$@ $$^)
+    $$(strip $(call fetch_var,LD $(TOOLCHAIN:$2)) $(call fetch_var,LDFLAGS $(R1234)) -o $$@ $$^ $(call fetch_var,LDLIB $(R1234)))
 
-$(EP2134)/obj/%.o: $$(PREFIX)/$$1/src/% $(EP2134)/mk/%.mk $$(call fetch_var2,CREQ $(ER1234),. $$1 $$2 $$3 $$4)
-    $$(strip $(call fetch_var,CC $(TOOLCHAIN:$2)) -MMD -MP -MF$$(word 2,$$^) $(call fetch_var,CFLAGS $(R1234)) $$(addprefix -I,$$(wordlist 3,$$(words $$^),$$(^:.log=))) -o $$@ -c $$<)
+$(EP2134)/obj/%.o: $$(PREFIX)/$$1/src/% $(EP2134)/mk/%.mk $(CC_CREQ)
+    $$(strip $(call fetch_var,CC $(TOOLCHAIN:$2)) -MMD -MP -MF$$(word 2,$$^) $(call fetch_var,CFLAGS $(R1234)) $(addprefix -I,$(CC_CREQ:.log=)) -o $$@ -c $$<)
 )
 endef
 
-on_error = ([ -f "$1" ] && (cat "$1"; rm "$1"; false))
+on_error = ([ -f "$1" ] && (cat "$1"; mv "$1" "$(1:.log=.err)"; false))
 
 define cc_cmake =
 $(P2134).log
@@ -56,7 +57,7 @@ $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
     $(call fetch_var,CMAKEFLAGS $(R1234)) \
     -S $$(<D) \
     -B $$(@:.log=) \
-    > $$@ \
+    &> $$@ \
     || $(call on_error,$$@))
 )
 endef
@@ -66,7 +67,7 @@ $(strip cmake \
 --build $$(<:.log=) \
 --target $$* \
 -- -j -O VERBOSE=1 COLOR="" $$(if $$(filter test,$$*),ARGS="--output-on-failure") \
-> $$(basename $$@).log \
+&> $$(basename $$@).log \
 || $(call on_error,$$(basename $$@).log))
 
 define msvc_cmake =
@@ -92,7 +93,7 @@ $(EP213).log: $$(PREFIX)/$$1/CMakeLists.txt $$(call fetch_var2,CREQ $(ER123),. $
     $(call fetch_var,CMAKEFLAGS $(R123)) \
     -S $$(<D) \
     -B $$(@:.log=)" \
-    > $$@ \
+    &> $$@ \
     || $(call on_error,$$@))
 )
 endef
@@ -105,7 +106,7 @@ powershell "cmake \
 --verbose \
 --parallel \
 -- $(call fetch_var,MSBUILDFLAGS $1 $(TOOLCHAIN:$2) $3 $4)" \
-> $$(basename $$@).log \
+&> $$(basename $$@).log \
 || $(call on_error,$$(basename $$@).log)
 
 define git = 
@@ -117,7 +118,7 @@ $(call clean,$(PREFIX)/$1.log,rm))
 $(eval
 $$(PREFIX)/$$1.log:
     $$(if $$(wildcard $$(@:.log=)),\
-    git -C $$(@:.log=) pull --depth 1 > $$@,\
-    git clone --depth 1 $$(URL:$$(@F:.log=)) $$(@:.log=) > $$@) || $(call on_error,$$@)
+    git -C $$(@:.log=) pull --depth 1 &> $$@,\
+    git clone --depth 1 $$(URL:$$(@F:.log=)) $$(@:.log=) &> $$@) || $(call on_error,$$@)
 ))
 endef
