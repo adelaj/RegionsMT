@@ -3,29 +3,25 @@ make_dir = $(eval $1:; mkdir $$@)
 define rm-r =
 $(eval
 .PHONY: $1
-$1:
-    rm -r $$%)
+$1:; rm -r $$%)
 endef
 
 define rm-rf =
 $(eval
 .PHONY: $1
-$1:
-    rm -rf $$%)
+$1:; rm -rf $$%)
 endef
 
 define rmdir =
 $(eval
 .PHONY: $1
-$1:
-    rmdir $$%)
+$1:; rmdir $$%)
 endef
 
 define rm =
 $(eval
 .PHONY: $1
-$1:
-    rm $$%)
+$1:; rm $$%)
 endef
 
 parent = $(addprefix $(PREFIX)/,$(filter-out .,$(patsubst %/,%,$(dir $(patsubst $(PREFIX)/%,%,$1)))))
@@ -45,11 +41,14 @@ clean_dir = $(if $2,\
 $(call var_base,$1,$1,CHILD:$2)\
 $(call clean,$2,rmdir))
 
-do_clean =\
-$(foreach i,$(call coalesce,CLEAN,),clean($i)\
-$(if $(wildcard $i),\
-$(if $(call coalesce,CHILD:$i,),\
-$(eval clean($$i): | $$(patsubst %,clean(%),$$(CHILD:$$i)))\
-$(if $(filter-out $(CHILD:$i),$(wildcard $i/*)),$(eval clean($$i):;),$(if $(CLEAN:$i),$(call $(CLEAN:$i),clean($i)))),\
-$(if $(CLEAN:$i),$(call $(CLEAN:$i),clean($i)))),$(eval clean($$i):;)))
+clean_setup =\
+$(if $(call var_base_decl,$1,$$(filter-out $$(CLEAN_SETUP),$$1),CLEAN_SETUP),clean($1) \
+$(if $(wildcard $1),\
+$(if $(call coalesce,CHILD:$1,),\
+$(eval clean($$1): | $$(patsubst %,clean(%),$$(CHILD:$$1)))\
+$(call vect,1,$(CHILD:$1),clean_setup)\
+$(if $(or $(filter $(call coalesce,DIRTY,),$(CHILD:$1)),$(filter-out $(CHILD:$1),$(wildcard $1/*))),$(call var_base,$1,$1,DIRTY)$(eval clean($$1):;),$(call $(CLEAN:$1),clean($1))),\
+$(call $(CLEAN:$1),clean($1))),\
+$(eval clean($$1):;)))
 
+do_clean = $(call vect,1,$(call coalesce,CLEAN,),clean_setup)

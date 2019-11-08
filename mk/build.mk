@@ -58,7 +58,7 @@ $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
     -S $$(<D) \
     -B $$(@:.log=) \
     &> $$@ \
-    || $(call on_error,$$@))
+    || $$(call on_error,$$@))
 )
 endef
 
@@ -68,7 +68,7 @@ $(strip cmake \
 --target $$* \
 -- -j -O VERBOSE=1 COLOR="" $$(if $$(filter test,$$*),ARGS="--output-on-failure") \
 &> $$(basename $$@).log \
-|| $(call on_error,$$(basename $$@).log))
+|| $$(call on_error,$$(basename $$@).log))
 
 define msvc_cmake =
 $(P213).log
@@ -94,7 +94,7 @@ $(EP213).log: $$(PREFIX)/$$1/CMakeLists.txt $$(call fetch_var2,CREQ $(ER123),. $
     -S $$(<D) \
     -B $$(@:.log=)" \
     &> $$@ \
-    || $(call on_error,$$@))
+    || $$(call on_error,$$@))
 )
 endef
 
@@ -107,7 +107,7 @@ powershell "cmake \
 --parallel \
 -- $(call fetch_var,MSBUILDFLAGS $1 $(TOOLCHAIN:$2) $3 $4)" \
 &> $$(basename $$@).log \
-|| $(call on_error,$$(basename $$@).log)
+|| $$(call on_error,$$(basename $$@).log)
 
 define git = 
 $(strip $(PREFIX)/$1.log
@@ -119,6 +119,6 @@ $(eval
 $$(PREFIX)/$$1.log:
     $$(if $$(wildcard $$(@:.log=)),\
     git -C $$(@:.log=) pull --depth 1 &> $$@,\
-    git clone --depth 1 $$(URL:$$(@F:.log=)) $$(@:.log=) &> $$@) || $(call on_error,$$@)
+    git clone --depth 1 $$(URL:$$(@F:.log=)) $$(@:.log=) &> $$@) || $$(call on_error,$$@)
 ))
 endef
