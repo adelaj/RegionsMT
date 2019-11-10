@@ -69,7 +69,6 @@ set(PACKAGE_TARNAME ${PACKAGE})
 set(PACKAGE_BUGREPORT "")
 set(PACKAGE_URL "")
 set(LT_OBJDIR ".libs/")
-set(CMAKE_RUNTIME_OUTPUT_DIRECTORY ${PROJECT_BINARY_DIR}/bin)
 
 # The following part of config.h is hard to derive from configure.ac.
 string(REGEX MATCHALL "[^\n]*\n" CONFIG
@@ -614,13 +613,10 @@ enable_testing()
 # Adds a GSL test. Usage:
 #   add_gsl_test(<exename> <source> ...)
 function(add_gsl_test exename)
-    if (GSL_DISABLE_TESTS)
-        return()
-    endif ()
     add_executable(${exename} ${ARGN})
     set_target_properties(${exename} PROPERTIES FOLDER Tests)
     target_link_libraries(${exename} ${CMAKE_REQUIRED_LIBRARIES} gsl gslcblas)
-    add_test(${exename} ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/${exename})
+    add_test(NAME ${exename} COMMAND $<TARGET_FILE:${exename}> WORKING_DIRECTORY $<TARGET_FILE_DIR:${exename}>)
 endfunction()
 
 macro(get_sources dir line source_var header_var)
@@ -664,9 +660,7 @@ foreach (dir "." ${dirs})
             if (dir STREQUAL cblas)
                 assign_source_group("Source Files" "${dir}" SOURCES)
                 assign_source_group("Header Files" "${dir}" HEADERS)
-                add_library(gslcblas ${SOURCES} ${HEADERS})
-                target_link_libraries(gslcblas ${CMAKE_REQUIRED_LIBRARIES})
-                set_target_properties(gslcblas PROPERTIES WINDOWS_EXPORT_ALL_SYMBOLS ON)
+                set(GSLCBLAS_SOURCES ${SOURCES} ${HEADERS})                
             else ()
                 assign_source_group("Source Files/${dir}" "${dir}" SOURCES)
                 assign_source_group("Header Files/${dir}" "${dir}" HEADERS)
@@ -731,15 +725,18 @@ if (BUILD_SHARED_LIBS)
     endif()
 endif ()
 
+add_library(gslcblas ${GSLCBLAS_SOURCES})
 add_library(gsl ${GSL_SOURCES})
+
 if (BUILD_SHARED_LIBS)
+    set_target_properties(gslcblas 
+        PROPERTIES 
+            WINDOWS_EXPORT_ALL_SYMBOLS ON)
     set_target_properties(gsl
         PROPERTIES
             COMPILE_DEFINITIONS DLL_EXPORT
-            WINDOWS_EXPORT_ALL_SYMBOLS ON )
-endif ()
-
-if (BUILD_SHARED_LIBS)
+            WINDOWS_EXPORT_ALL_SYMBOLS ON)
+    target_link_libraries(gslcblas ${CMAKE_REQUIRED_LIBRARIES})
     target_link_libraries(gsl gslcblas)
 endif ()
 

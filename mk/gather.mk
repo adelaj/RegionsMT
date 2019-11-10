@@ -26,20 +26,24 @@ endef
 
 parent = $(addprefix $(PREFIX)/,$(filter-out .,$(patsubst %/,%,$(dir $(patsubst $(PREFIX)/%,%,$1)))))
 
-gather = $(if $(call var_base_decl,$1,$$(filter-out $$(GATHER),$$1),GATHER),\
+gather = $(call vect,1,$1,$2,gather_base)
+
+gather_base = $(if $(call var_base_decl,$1,$$(filter-out $$(GATHER),$$1),GATHER),\
 $(info Gathered for BUILD: $1)$(if $2,$(call $2,$1))$(call gather_dir,$1,$(call parent,$1)))
 
 gather_dir = $(if $2,\
-$(eval $1: | $2)$(call gather,$2,make_dir))
+$(eval $1: | $2)$(call gather_base,$2,make_dir))
 
-clean = $(if $(call var_base_decl,$1,$$(filter-out $$(CLEAN),$$1),CLEAN),\
+clean = $(call vect,1,$1,$2,clean_base)
+
+clean_base = $(if $(call var_base_decl,$1,$$(filter-out $$(CLEAN),$$1),CLEAN),\
 $(info Gathered for CLEAN: $1)\
 $(call var_base,$2,,CLEAN:$1)\
 $(call clean_dir,$1,$(call parent,$1)))
 
 clean_dir = $(if $2,\
 $(call var_base,$1,$1,CHILD:$2)\
-$(call clean,$2,rmdir))
+$(call clean_base,$2,rmdir))
 
 clean_setup =\
 $(if $(call var_base_decl,$1,$$(filter-out $$(CLEAN_SETUP),$$1),CLEAN_SETUP),clean($1) \

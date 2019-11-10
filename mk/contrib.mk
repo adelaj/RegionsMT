@@ -7,25 +7,24 @@ $$(PREFIX)/$$1/CMakeLists.txt: $$(PREFIX)/$$1.log
 ))
 endef
 
+# $(EP2134)/libgsl.a: $(EP2134)/libgslcblas.a
 define cc_cmake_gsl =
 $(addprefix $(P2134)/,libgslcblas.a libgsl.a all.log test.log)
 $(eval
 $(EP2134)/lib%.a $(EP2134)/%.log: $(EP2134).log
     $(cc_cmake_build)
-$(EP2134)/libgsl.a: $(EP2134)/libgslcblas.a
 $(EP2134)/all.log: $(EP2134)/libgsl.a $(EP2134)/libgslcblas.a
 $(EP2134)/test.log: $(EP2134)/all.log
 )
 endef
 
+# $(EP2134)/gsl.lib: $(EP2134)/gslcblas.lib
 define msvc_cmake_gsl =
 $(addprefix $(P2134)/,gslcblas.lib gsl.lib ALL_BUILD.log RUN_TESTS.log)
-$(call gather,$(P2134)/gslcblas.lib,)
-$(call gather,$(P2134)/gsl.lib,)
+$(call gather,$(addprefix $(P2134)/,gslcblas.lib gsl.lib),)
 $(eval
 $(EP2134)/%.lib $(EP2134)/%.log: $(EP213).log
     $(msvc_cmake_build)
-$(EP2134)/gsl.lib: $(EP2134)/gslcblas.lib
 $(EP2134)/ALL_BUILD.log: $(EP2134)/gsl.lib $(EP2134)/gslcblas.lib
 $(EP2134)/RUN_TESTS.log: $(EP2134)/ALL_BUILD.log
 )

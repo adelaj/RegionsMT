@@ -22,8 +22,6 @@ endfunction (assign_source_group)
 
 set(target RegionsMT)
 set(src_dir src)
-set(libraries gsl)
-set(library_files_gsl gsl gslcblas)
 
 set(MSVC OFF)
 set(XCODE OFF)
@@ -43,9 +41,9 @@ check_ipo_supported()
 
 enable_language(C)
 
-file(GLOB_RECURSE source_list RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/${src_dir}/" *.c)
+file(GLOB_RECURSE source_list RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/${src_dir}" "${src_dir}/*.c")
 assign_source_group("Source Files" ${src_dir} source_list)
-file(GLOB_RECURSE header_list RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/${src_dir}/" *.h)
+file(GLOB_RECURSE header_list RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}/${src_dir}" "${src_dir}/*.h")
 assign_source_group("Header Files" ${src_dir} header_list)
 
 add_executable(${target} ${source_list} ${header_list})
