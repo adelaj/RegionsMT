@@ -19,17 +19,12 @@
 #include <gsl/gsl_blas.h>
 
 enum cov_sort {
-    COV_SORT_NUM = 0,
-    COV_SORT_STRCMP_ASC,
-    COV_SORT_STRCMP_DSC,
-    COV_SORT_STRCMPNAT_ASC,
-    COV_SORT_STRCMPNAT_DSC,
-    COV_SORT_CNT
+    COV_SORT_FLAG_STR = 1, // Covariate is not numeric, if not set other flags are ignored
+    COV_SORT_FLAG_NAT = 2, // Use natural order instead of lexicographical
+    COV_SORT_FLAG_DSC = 4, // Use descending order
+    COV_SORT_FLAG_ORD = 8 // Covariate is ordinal, otherwise categorical
 };
 
-// 'deg == 0' corresponds to categorical covariate
-// 'deg > 0' corresponds to numeric/ordinal covariate
-// For covariate of numeric type the 'sort' should be set to 'COV_NUM' 
 struct lm_term {
     size_t off, deg;
     enum cov_sort sort;
@@ -437,6 +432,9 @@ enum {
     LM_EXPR_TYPE_INIT,
     LM_EXPR_NUM_INIT,
     LM_EXPR_NUM,
+    LM_EXPR_FLAG_INIT,
+    LM_EXPR_FLAG,
+    LM_EXPR_LP
 };
 
 void lm_expr_arg_close(void *Arg)
@@ -464,8 +462,9 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
         {
             arg->term_len[arg->term_len_cnt++]++;
             arg->term_cnt++;
-            if (strchr("^*+()", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
-            else if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            //if (strchr("^:+()", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
+            //else 
+            if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 context->metric = metric;
@@ -477,30 +476,22 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
         break;
     case LM_EXPR_TYPE:
         if (!utf8.val) break;
-        if (strchr("^*+)", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
-        else if (utf8.val == '(')
+        //if (strchr("^:+)", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
+        //else 
+        if (utf8.val == '(' || utf8.val == '<')
         {
-            if (!STREQ(context->buff->str, context->len, "categorical", Strnicmp))
+            size_t ind = 0;
+            static const char *type[] = { "categorical", "ordinal", "numeric" };
+            for (; ind < countof(type) && !STREQ(context->buff->str, context->len, type[ind], Strnicmp); ind++);
+            if (ind == countof(type)) log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, context->metric, "Unexpected covariate type %~s*", context->buff->str, context->len);
+            else
             {
-                if (!STREQ(context->buff->str, context->len, "numeric", Strnicmp))
-                {
-                    if (!STREQ(context->buff->str, context->len, "ordinal", Strnicmp)) 
-                        log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, context->metric, "Unexpected covariate type %~s*", context->buff->str, context->len);
-                    else
-                    {
-                        arg->term[arg->term_cnt - 1] = (struct lm_term) { .sort = COV_SORT_STRCMP_ASC, .deg = 1 };
-                        context->st++;
-                        return 1;                        
-                    }
-                    break;
-                }
-                arg->term[arg->term_cnt - 1].deg = 1;
-                context->st++;
+                arg->term[arg->term_cnt - 1].sort = (enum cov_sort []) { COV_SORT_FLAG_STR, COV_SORT_FLAG_STR | COV_SORT_FLAG_ORD, 0 }[ind];
+                if (utf8.val == '(') context->st++;
+                else context->st = LM_EXPR_FLAG;
                 return 1;
             }
-            arg->term[arg->term_cnt - 1].sort = COV_SORT_STRCMP_ASC;
-            context->st++;
-            return 1;
+            break;
             // TODO : Add custom sorting
         }
         else if (!buff_append(context->buff, utf8.chr, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
@@ -513,8 +504,9 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
     case LM_EXPR_VAR_INIT:
         if (!utf8.val) break;
         if (utf8_is_whitespace_len(utf8.val, utf8.len)) return 1;
-        if (strchr("^*+(", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
-        else if (utf8.val == ')') log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, metric, "Covariate name expected before %~c", ')');
+        //if (strchr("^:+(", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
+        //else 
+        if (utf8.val == ')') log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, metric, "Covariate name expected before %~c", ')');
         else if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
@@ -526,8 +518,9 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
         break;
     case LM_EXPR_VAR:
         if (!utf8.val) break;
-        if (strchr("^*+(", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
-        else if (utf8.val == ')')
+        //if (strchr("^:+(", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
+        //else 
+        if (utf8.val == ')')
         {
             context->buff->len = context->len;
             if (!buff_append(context->buff, 0, 0, BUFFER_TERM) ||
@@ -551,14 +544,10 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
         case '\0':
             return 1;
         case '^':
-            if (!arg->term[arg->term_cnt - 1].deg) log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, metric, "Operation %~c cannot be applied to the covariate of categorical type", '^');
-            else
-            {
-                context->st = LM_EXPR_NUM_INIT;
-                return 1;
-            }
-            break;
-        case '*':
+            //if (!arg->term[arg->term_cnt - 1].deg) log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, metric, "Operation %~c cannot be applied to the covariate of categorical type", '^');
+            context->st = LM_EXPR_NUM_INIT;
+            return 1;            
+        case ':':
             context->st = LM_EXPR_TYPE_INIT;
             arg->term_len[arg->term_len_cnt - 1]++;
             return 1;
@@ -586,8 +575,9 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
         {
             //arg->len[arg->len_cnt - 1]++;
             arg->term_cnt++;
-            if (strchr("^*+()", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
-            else if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            //if (strchr("^*+()", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
+            //else 
+            if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 context->metric = metric;
@@ -604,7 +594,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
         else
         {
             context->metric = metric;
-            arg->term[arg->term_cnt - 1].deg = utf8.val - '0';
+            context->val.uz = (size_t) (utf8.val - '0');
             context->st++;
             context->len = 0;
             return 1;
@@ -615,11 +605,13 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
         {
         case '\0':
             return 1;
-        case '*':
+        case ':':
             context->st = LM_EXPR_TYPE_INIT;
+            arg->term[arg->term_len_cnt - 1].deg = context->val.uz;
             arg->term_len[arg->term_len_cnt - 1]++;
             return 1;
         case '+':
+            arg->term[arg->term_len_cnt - 1].deg = context->val.uz;
             if (!array_test(&arg->term_len, &arg->term_len_cap, sizeof(*arg->term_len), 0, ARRAY_CLEAR, arg->term_len_cnt, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
@@ -636,8 +628,53 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
                 return 1;
             }
             else if (context->len || utf8.val < '0' || utf8.val > '9') log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
-            else if (!size_mul_add_test(&arg->term[arg->term_cnt - 1].deg, 10, utf8.val - '0')) log_message_error_xml(log, CODE_METRIC, context->metric, XML_OUT_OF_RANGE);
+            else if (!size_mul_add_test(&context->val.uz, 10, (size_t) (utf8.val - '0'))) log_message_error_xml(log, CODE_METRIC, context->metric, XML_OUT_OF_RANGE);
             else return 1;
+        }
+        break;
+    case LM_EXPR_FLAG_INIT:
+        if (!utf8.val) break;
+        if (utf8_is_whitespace_len(utf8.val, utf8.len)) return 1;
+        if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else
+        {
+            context->metric = metric;
+            context->len = utf8.len;
+            context->st++;
+            return 1;
+        }
+        break;
+    case LM_EXPR_FLAG:
+        if (!utf8.val) break;
+        if (utf8.val == '>' || utf8.val == '|')
+        {
+            size_t ind = 0;
+            static const char *type[] = { "descending", "natural", };
+            for (; ind < countof(type) && !STREQ(context->buff->str, context->len, type[ind], Strnicmp); ind++);
+            if (ind == countof(type)) log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, context->metric, "Unexpected covariate flag %~s*", context->buff->str, context->len);
+            else
+            {
+                arg->term[arg->term_len_cnt - 1].sort |= (enum cov_sort[]) { COV_SORT_FLAG_DSC, COV_SORT_FLAG_NAT }[ind];
+                if (utf8.val == '>') context->st++;
+                else context->st = LM_EXPR_FLAG_INIT;
+                return 1;
+            }
+            break;
+        }
+        else if (!buff_append(context->buff, utf8.chr, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else
+        {
+            if (!utf8_is_whitespace_len(utf8.val, utf8.len)) context->len = context->buff->len;
+            return 1;
+        }
+        break;
+    case LM_EXPR_LP:
+        if (!utf8.val) break;
+        if (utf8_is_whitespace_len(utf8.val, utf8.len)) return 1;
+        if (utf8.val == '(')
+        {
+            context->st = LM_EXPR_VAR_INIT;
+            return 1;
         }
         break;
     }

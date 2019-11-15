@@ -15,6 +15,12 @@ typedef volatile int spinlock_handle;
 typedef volatile long spinlock_handle;
 #endif
 
+// Rounding down/up to the nearest power of 2 for the inline usage 
+#define RP2_SUPP(X, Y) ((X) | ((X) >> (Y)))
+#define RP2_64(X) RP2_SUPP(RP2_SUPP(RP2_SUPP(RP2_SUPP(RP2_SUPP(RP2_SUPP(0ull | (X), 1), 2), 4), 8), 16), 32)
+#define RDP2(X) ((X) && ((X) & ((X) - 1)) ? (RP2_64(X) >> 1) + 1 : (X))
+#define RUP2(X) ((X) && ((X) & ((X) - 1)) ? RP2_64(X) + 1 : (X))
+
 #define BIT_TEST2_MASK01 (0x5555555555555555ull & UINT8_MAX)
 #define BIT_TEST2_MASK10 (BIT_TEST2_MASK01 << 1)
 _Static_assert((BIT_TEST2_MASK01 | BIT_TEST2_MASK10) == UINT8_MAX, "Wrong constant provided!");
