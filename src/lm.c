@@ -974,7 +974,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
 
     uintptr_t *ord;
     size_t ucnt = arg.term_len_cnt;
-    if (!orders_stable_unique(&ord, data, &ucnt, blk, term_cmp, &(struct term_cmp_thunk) { .blk = blk, .blk0 = blk0 })) return 0;
+    if (!orders_stable_unique(&ord, data, &ucnt, blk * sizeof(*data), term_cmp, &(struct term_cmp_thunk) { .blk = blk, .blk0 = blk0 })) return 0;
 
     size_t dimx = 0;
     for (size_t i = 0; i < ucnt; i++)
