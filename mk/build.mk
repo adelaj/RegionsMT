@@ -18,7 +18,7 @@ ER1234 := $(ER123) $$(CONFIG:$$4)
 
 define cc =
 $(P2134)/$1
-$(eval CC_DEP := $(patsubst $(PREFIX)/$1/src/%,$(P2134)/mk/%.mk,$(call rwildcard,$(PREFIX)/$1/src/,*.c)))
+$(eval CC_DEP := $(patsubst $(SRC:$1)/%,$(P2134)/mk/%.mk,$(call rwildcard,$(addsuffix /,$(SRC:$1)),*.c)))
 $(eval CC_OBJ := $(patsubst $(P2134)/mk/%.mk,$(P2134)/obj/%.o,$(CC_DEP)))
 $(call gather,$(P2134)/$1 $(CC_DEP) $(CC_OBJ),)
 $(if $(filter 1,$(CLEAN_GROUP)),$(call clean,$(P2134)/$1 $(CC_DEP) $(CC_OBJ),rm))
@@ -28,7 +28,7 @@ $(eval
 $(EP2134)/$$1: $(CC_OBJ) $$(call fetch_var2,LDREQ $(ER1234),. $$1 $$2 $$3 $$4)
     $$(strip $(call fetch_var,LD $(TOOLCHAIN:$2)) $(call fetch_var,LDFLAGS $(R1234)) -o $$@ $$^ $(call fetch_var,LDLIB $(R1234)))
 
-$(EP2134)/obj/%.o: $$(PREFIX)/$$1/src/% $(EP2134)/mk/%.mk $(CC_CREQ)
+$(EP2134)/obj/%.o: $(SRC:$1)/% $(EP2134)/mk/%.mk $(CC_CREQ)
     $$(strip $(call fetch_var,CC $(TOOLCHAIN:$2)) -MMD -MP -MF$$(word 2,$$^) $(call fetch_var,CFLAGS $(R1234)) $(addprefix -I,$(CC_CREQ:.log=)) -o $$@ -c $$<)
 )
 endef

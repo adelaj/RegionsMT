@@ -1,11 +1,13 @@
 .DEFAULT_GOAL = all
 
-include mk/common.mk
-include mk/env.mk
-include mk/var.mk
-include mk/gather.mk
-include mk/build.mk
-include mk/contrib.mk
+ROOT := $(patsubst %/,%,$(dir $(firstword $(MAKEFILE_LIST))))
+
+include $(ROOT)/mk/common.mk
+include $(ROOT)/mk/env.mk
+include $(ROOT)/mk/var.mk
+include $(ROOT)/mk/gather.mk
+include $(ROOT)/mk/build.mk
+include $(ROOT)/mk/contrib.mk
 
 define msvc_cmake_target =
 $(addprefix $(P2134)/,$1.exe ALL_BUILD.log RUN_TESTS.log)
@@ -20,6 +22,7 @@ endef
 
 TARGET := RegionsMT
 
+$(call var,$(ROOT)/src,,SRC,$(TARGET))
 $(call var_reg,$(addprefix -l,m pthread),$$1,LDLIB,$(TARGET),$(CC_TOOLCHAIN),%:%)
 $(call var_reg,$$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5.log,$$1,CREQ,$(TARGET),$(CC_TOOLCHAIN),%:%)
 $(call var_reg,$$$$(addprefix $$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/,libgsl.a libgslcblas.a),$$1,LDREQ,$(TARGET),$(CC_TOOLCHAIN),%:%)

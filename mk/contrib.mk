@@ -3,7 +3,7 @@ $(strip $$(PREFIX)/$1/CMakeLists.txt
 $(call gather,$(PREFIX)/$1/CMakeLists.txt,)
 $(eval
 $$(PREFIX)/$$1/CMakeLists.txt: $$(PREFIX)/$$1.log
-    cp contrib/$$(<F:.log=.cmake) $$@
+    cp $$(ROOT)/contrib/$$(<F:.log=.cmake) $$@
 ))
 endef
 
@@ -48,14 +48,14 @@ $(call var_base,git://github.com/GerHobbelt/pthread-win32.git,,URL:pthread-win32
 # Fixing bug with 'long double' under MinGW gcc
 $(call var_reg,-D__USE_MINGW_ANSI_STDIO,$$1,CFLAGS:gsl,gcc gcc-%,%:%)
 
-.PHONY: git(gsl) cmakelists(gsl) cmake(gsl) gsl
+.PHONY: git(gsl) cmakelists(gsl) cmake(gsl) test(gsl)
 git(gsl): $(call git,gsl)
 cmakelists(gsl): $(call cmakelists,gsl)
 cmake(gsl): $(call build,cc_cmake,gsl,$(CC_MATRIX)) $(call build,msvc_cmake,gsl,$(call matrix_trunc,1 2,$(MSVC_MATRIX)))
-gsl: $(call build,cc_cmake_gsl,gsl,$(CC_MATRIX)) $(call build,msvc_cmake_gsl,gsl,$(MSVC_MATRIX))
+test(gsl): $(call build,cc_cmake_gsl,gsl,$(CC_MATRIX)) $(call build,msvc_cmake_gsl,gsl,$(MSVC_MATRIX))
 
-.PHONY: git(pthread-win32) cmakelists(pthread-win32) cmake(pthread-win32) pthread-win32
+.PHONY: git(pthread-win32) cmakelists(pthread-win32) cmake(pthread-win32) test(pthread-win32)
 git(pthread-win32): $(call git,pthread-win32)
 cmakelists(pthread-win32): $(call cmakelists,pthread-win32)
 cmake(pthread-win32): $(call build,msvc_cmake,pthread-win32,$(call matrix_trunc,1 2,$(MSVC_MATRIX)))
-pthread-win32: $(call build,msvc_cmake_pthread-win32,pthread-win32,$(MSVC_MATRIX))
+test(pthread-win32): $(call build,msvc_cmake_pthread-win32,pthread-win32,$(MSVC_MATRIX))
