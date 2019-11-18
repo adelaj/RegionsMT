@@ -57,5 +57,5 @@ double cdf_gamma_Q(double x, double a, double b)
 
 double cdf_chisq_Q(double x, double df)
 {
-    return cdf_gamma_Q(x, df / 2., 2.);
+    return cdf_gamma_Q(x, .5 * df, 2.);
 }

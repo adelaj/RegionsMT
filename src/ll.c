@@ -193,18 +193,18 @@ size_t size_sub(size_t *p_bor, size_t x, size_t y)
 size_t size_bit_scan_reverse(size_t x)
 {
     unsigned long res;
-    return _BitScanReverse64(&res, (unsigned __int64) x) ? res : SIZE_MAX;
+    return _BitScanReverse64(&res, (unsigned __int64) x) ? (size_t) res : SIZE_MAX;
 }
 
 size_t size_bit_scan_forward(size_t x)
 {
     unsigned long res;
-    return _BitScanForward64(&res, (unsigned __int64) x) ? res : SIZE_MAX;
+    return _BitScanForward64(&res, (unsigned __int64) x) ? (size_t) res : SIZE_MAX;
 }
 
 size_t size_pop_cnt(size_t x)
 {
-    return __popcnt64((__int64) x);
+    return (size_t) __popcnt64((__int64) x);
 }
 
 #   elif defined _M_IX86
@@ -289,13 +289,75 @@ size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
 DECLARE_UINT_LOG10(uint32_t, uint32, UINT32_MAX, TEN10(u))
 DECLARE_UINT_LOG10(uint64_t, uint64, UINT64_MAX, TEN20(u))
 
+// Copy-pasted from https://github.com/skeeto/hash-prospector
+uint32_t uint32_hash(uint32_t x)
+{
+    x ^= x >> 16;
+    x *= UINT32_C(0x7feb352d);
+    x ^= x >> 15;
+    x *= UINT32_C(0x846ca68b);
+    x ^= x >> 16;
+    return x;
+}
+
+uint32_t uint32_hash_inv(uint32_t x)
+{
+    x ^= x >> 16;
+    x *= UINT32_C(0x43021123);
+    x ^= x >> 15 ^ x >> 30;
+    x *= UINT32_C(0x1d69e2a5);
+    x ^= x >> 16;
+    return x;
+}
+
+// Copy-pasted from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
+uint64_t uint64_hash(uint64_t x) 
+{
+    x ^= x >> 30;
+    x *= UINT64_C(0xbf58476d1ce4e5b9);
+    x ^= x >> 27;
+    x *= UINT64_C(0x94d049bb133111eb);
+    x ^= x >> 31;
+    return x;
+}
+
+uint64_t uint64_hash_inv(uint64_t x)
+{
+    x ^= x >> 31 ^ x >> 62;
+    x *= UINT64_C(0x319642b2d24d8ec3);
+    x ^= x >> 27 ^ x >> 54;
+    x *= UINT64_C(0x96de1b173f119089);
+    x ^= x >> 30 ^ x >> 60;
+    return x;
+}
+
 #if defined _M_X64 || defined __x86_64__
 
 DECLARE_UINT_LOG10(size_t, size, SIZE_MAX, TEN20(u))
 
+size_t size_hash(size_t x)
+{
+    return (size_t) uint64_hash((uint64_t) x);
+}
+
+size_t size_hash_inv(size_t x)
+{
+    return (size_t) uint64_hash_inv((uint64_t) x);
+}
+
 #elif defined _M_IX86 || defined __i386__
 
 DECLARE_UINT_LOG10(size_t, size, SIZE_MAX, TEN10(u))
+
+size_t size_hash(size_t x)
+{
+    return (size_t) uint32_hash((uint32_t) x);
+}
+
+size_t size_hash_inv(size_t x)
+{
+    return (size_t) uint32_hash_inv((uint32_t) x);
+}
 
 size_t size_load_acquire(volatile size_t *src)
 {

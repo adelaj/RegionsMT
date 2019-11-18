@@ -62,6 +62,13 @@ uint64_t uint64_log10(uint64_t, bool);
 size_t size_log10(size_t, bool);
 size_t size_log2(size_t, bool);
 
+uint32_t uint32_hash(uint32_t);
+uint32_t uint32_hash_inv(uint32_t);
+uint64_t uint64_hash(uint64_t);
+uint64_t uint64_hash_inv(uint64_t);
+size_t size_hash(size_t);
+size_t size_hash_inv(size_t);
+
 size_t m128i_byte_scan_forward(__m128i a);
 
 #define SPINLOCK_INIT 0

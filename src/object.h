@@ -46,7 +46,7 @@ struct base_context {
     //struct str_pool *pool;
     struct text_metric metric; // metric snapshot
     unsigned st; // state
-    size_t len;
+    size_t len; // register for length
     union int_val val;
     void *context;
 };
