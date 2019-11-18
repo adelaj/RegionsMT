@@ -2,6 +2,8 @@
 
 ROOT := $(patsubst %/,%,$(dir $(firstword $(MAKEFILE_LIST))))
 
+$(warning $(ROOT))
+
 include $(ROOT)/mk/common.mk
 include $(ROOT)/mk/env.mk
 include $(ROOT)/mk/var.mk
