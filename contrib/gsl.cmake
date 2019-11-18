@@ -615,7 +615,7 @@ enable_testing()
 function(add_gsl_test exename)
     add_executable(${exename} ${ARGN})
     set_target_properties(${exename} PROPERTIES FOLDER Tests)
-    target_link_libraries(${exename} ${CMAKE_REQUIRED_LIBRARIES} gsl gslcblas)
+    target_link_libraries(${exename} gsl gslcblas ${CMAKE_REQUIRED_LIBRARIES})
     add_test(NAME ${exename} COMMAND $<TARGET_FILE:${exename}> WORKING_DIRECTORY $<TARGET_FILE_DIR:${exename}>)
 endfunction()
 

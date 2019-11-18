@@ -1,3 +1,4 @@
+CMAKE = cmake
 SHELL = bash
 
 TOOLCHAIN ?=

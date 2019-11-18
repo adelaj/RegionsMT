@@ -43,7 +43,7 @@ $(call clean,$(P2134),rm-r)
 $(call clean,$(addprefix $(P2134),.log .error),rm))
 $(eval
 $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
-    $(strip cmake \
+    $(strip $(CMAKE) \
     -G "Unix Makefiles" \
     -D CMAKE_MAKE_PROGRAM="$(MAKE)" \
     -D CMAKE_C_COMPILER="$(call fetch_var,CC $(TOOLCHAIN:$2))" \
@@ -64,7 +64,7 @@ $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
 endef
 
 cc_cmake_build =\
-$(strip cmake \
+$(strip $(CMAKE) \
 --build $$(<:.log=) \
 --target $$* \
 -- -j -O VERBOSE=1 COLOR="" $$(if $$(filter test,$$*),ARGS="--output-on-failure") \
@@ -82,7 +82,7 @@ $(eval MSVC_LDREQ_RELEASE := $(patsubst %,../../%,$(call fetch_var2,LDREQ $(R123
 $(eval MSVC_LDREQ_DEBUG := $(patsubst %,../../%,$(call fetch_var2,LDREQ $(R123) Debug,. $1 $2 $3 Debug)))
 $(eval
 $(EP213).log: $$(PREFIX)/$$1/CMakeLists.txt $$(call fetch_var2,CREQ $(ER123),. $$1 $$2 $$3)
-    $(strip powershell "cmake \
+    $(strip powershell "$(CMAKE) \
     -G \"Visual Studio 16 2019\" \
     -A \"$$(@F:.log=)\" \
     -D CMAKE_C_FLAGS_RELEASE=\"$(strip $(call fetch_var,CFLAGS $(R123) Release) $(MSVC_CREQ))\" \
@@ -100,7 +100,7 @@ $(EP213).log: $$(PREFIX)/$$1/CMakeLists.txt $$(call fetch_var2,CREQ $(ER123),. $
 endef
 
 msvc_cmake_build =\
-powershell "cmake \
+powershell "$(CMAKE) \
 --build $$(<:.log=) \
 --target $$* \
 --config $$(notdir $$(@D)) \
