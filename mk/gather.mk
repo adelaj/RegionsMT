@@ -45,8 +45,9 @@ clean_dir = $(if $2,\
 $(call var_base,$1,$1,CHILD:$2)\
 $(call clean_base,$2,rmdir))
 
-clean_setup =\
-$(if $(call var_base_decl,$1,$$(filter-out $$(CLEAN_SETUP),$$1),CLEAN_SETUP),clean($1) \
+do_clean_base =\
+$(if $(call var_base_decl,$1,$$(filter-out $$(CLEAN_SETUP),$$1),CLEAN_SETUP),\
+$(eval clean: | clean($$1))\
 $(if $(wildcard $1),\
 $(if $(call coalesce,CHILD:$1,),\
 $(eval clean($$1): | $$(patsubst %,clean(%),$$(CHILD:$$1)))\
@@ -55,4 +56,4 @@ $(if $(or $(filter $(call coalesce,DIRTY,),$(CHILD:$1)),$(filter-out $(CHILD:$1)
 $(call $(CLEAN:$1),clean($1))),\
 $(eval clean($$1):;)))
 
-do_clean = $(call vect,1,$(call coalesce,CLEAN,),clean_setup)
+do_clean = $(call vect,1,$(call coalesce,CLEAN,),do_clean_base)

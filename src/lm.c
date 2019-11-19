@@ -987,8 +987,8 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     {
         for (size_t i = 0, pos = 0; i < ucnt; i++)
         {
-            size_t ind = ord[i], off = 0, mul = 1;
-            for (size_t j = 0; j < blk0; j++) if (size_bit_test(data[ind] + blk0, j))
+            size_t ind = ord[i], off = 0, mul = 1, j = 0;
+            for (; j < blk0; j++) if (size_bit_test(data + blk * ind + blk0, j))
             {
                 size_t val = ((size_t *) cov.ord[j])[x];
                 if (!val) break;
@@ -996,7 +996,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
                 mul *= cov.level[j] - 1;
             }
             array_broadcast(reg + pos, par_term[ind], sizeof(*reg), &(double) { 0. });
-            if (mul < par_term[ind])           
+            if (j < blk0)
             {
                 pos += par_term[ind];
                 continue;
@@ -1005,7 +1005,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             for (size_t j = 0; j < blk0; j++)
             {
                 if (!data[j]) continue;
-                double val = j % COV_SORT_CNT ? ((double *) cov.ord[j])[x] : (double) ((size_t *) cov.ord[j])[x];
+                double val = j % COV_SORT_CNT ? (double) ((size_t *) cov.ord[j])[x] : ((double *) cov.ord[j])[x];
                 pr *= pow(val, data[j]);
             }
             reg[pos + off] = pr;
