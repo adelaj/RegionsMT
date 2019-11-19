@@ -1,5 +1,5 @@
 ﻿define cmakelists =
-$(strip $$(PREFIX)/$1/CMakeLists.txt
+$(strip $(PREFIX)/$1/CMakeLists.txt
 $(eval
 $$(PREFIX)/$$1/CMakeLists.txt: $$(PREFIX)/$$1.log
     cp $$(ROOT)/contrib/$$(<F:.log=.cmake) $$@
