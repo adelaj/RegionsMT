@@ -14,11 +14,6 @@ macro(pthread_init_tests dir)
     list(REMOVE_ITEM pthread_test_headers ${dir}/benchtest.h)
     add_library(benchlib STATIC ${dir}/benchlib.c ${dir}/benchtest.h ${pthread_test_headers} ${pthread_headers_api})
     set_target_properties(benchlib PROPERTIES COMPILE_PDB_OUTPUT_DIRECTORY ${CMAKE_CURRENT_BINARY_DIR} FOLDER Tests)
-    # Removing some tests
-    # loadfree.c: has incorrect dll name
-    # context2.c: test always fails with a segfault
-    # exception2.c: test produces undesirable exception
-    list(REMOVE_ITEM pthread_test_sources ${dir}/loadfree.c ${dir}/context2.c ${dir}/exception2.c)
     foreach(_test ${pthread_test_sources})
         get_filename_component(_tmp ${_test} NAME_WE)
         add_executable(${_tmp} ${_test} ${pthread_test_headers} ${pthread_headers_api})
