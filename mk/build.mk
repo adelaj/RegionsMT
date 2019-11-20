@@ -26,12 +26,12 @@ $(call var_base,$(CC_DEP),$$1,INCLUDE)\
 $(eval
 $(EP2134)/$$1: $(CC_OBJ) $$(call fetch_var2,LDREQ $(ER1234),. $$1 $$2 $$3 $$4)
     $$(strip $(call fetch_var,LD $(TOOLCHAIN:$2)) $(call fetch_var,LDFLAGS $(R1234)) -o $$@ $$^ $(call fetch_var,LDLIB $(R1234)))
-
 $(EP2134)/obj/%.o: $(SRC:$1)/% $(EP2134)/mk/%.mk $(CC_CREQ)
     $$(strip $(call fetch_var,CC $(TOOLCHAIN:$2)) -MMD -MP -MF$$(word 2,$$^) $(call fetch_var,CFLAGS $(R1234)) $(addprefix -I,$(CC_CREQ:.log=)) -o $$@ -c $$<)
-
 all($$1): $(EP2134)/$$1
-all: | all($$1))
+all: | all($$1)
+test($$1): $(EP2134)/$$1
+test: | test($$1))
 endef
 
 on_error = ([ -f "$1" ] && (cat "$1"; mv "$1" "$(1:.log=.error)"; false))
@@ -60,7 +60,6 @@ $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
     -B $$(@:.log=) \
     &> $$@ \
     || $$(call on_error,$$@))
-
 cmake($$1): $(EP2134).log)
 endef
 
@@ -96,7 +95,6 @@ $(EP213).log: $$(PREFIX)/$$1/CMakeLists.txt $$(call fetch_var2,CREQ $(ER123),. $
     -B $$(@:.log=)" \
     &> $$@ \
     || $$(call on_error,$$@))
-
 cmake($$1): $(EP213).log)
 endef
 
@@ -121,6 +119,5 @@ $$(PREFIX)/$$1.log:
     $$(if $$(wildcard $$(@:.log=)),\
     git -C $$(@:.log=) pull --depth 1 &> $$@,\
     git clone --depth 1 $$(URL:$$(@F:.log=)) $$(@:.log=) &> $$@) || $$(call on_error,$$@)
-
 git($$1): $$(PREFIX)/$$1.log)
 endef
