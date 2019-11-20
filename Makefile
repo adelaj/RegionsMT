@@ -19,6 +19,7 @@ all($$1): $(EP2134)/ALL_BUILD.log
 all: | all($$1)
 $(EP2134)/RUN_TESTS.log: $(EP2134)/ALL_BUILD.log
 test($$1): $(EP2134)/RUN_TESTS.log
+test: | test($$1)
 )
 endef
 
