@@ -1,5 +1,6 @@
 CMAKE ?= cmake
-SHELL ?= bash
+BASH ?= bash
+SHELL := $(BASH)
 
 TOOLCHAIN ?=
 ARCH ?=
