@@ -5,6 +5,8 @@ COL := :
 LP := (
 RP := )
 
+%% = $(lastword $(subst $(RP)$(LP), ,$%))
+
 feval = $(eval $1)
 print = $(eval __tmp := $1)$(__tmp)
 print2 = $(eval __tmp := $$(eval __tmp := $1)$$(__tmp))$(__tmp)

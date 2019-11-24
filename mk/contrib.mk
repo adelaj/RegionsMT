@@ -46,7 +46,8 @@ $(call var_base,git://github.com/GerHobbelt/pthread-win32.git,,URL:pthread-win32
 # Fixing bug with 'long double' under MinGW gcc
 $(call var_reg,-D__USE_MINGW_ANSI_STDIO,$$1,CFLAGS:gsl,gcc gcc-%,%:%)
 
-.PHONY: git(gsl) cmakelists(gsl) all(gsl) test(gsl)
+$(call noop,$(call vect,2 3,%,% clean(%),$(call vect,2 3,%,git(%) cmakelists(%) cmake(%) all(%) test(%),gsl pthread-win32,patsubst),patsubst))
+
 $(call git,gsl)
 $(call cmakelists,gsl)
 $(call build,cc_cmake,gsl,$(CC_MATRIX))
@@ -54,7 +55,6 @@ $(call build,msvc_cmake,gsl,$(call matrix_trunc,1 2,$(MSVC_MATRIX)))
 $(call build,cc_cmake_gsl,gsl,$(CC_MATRIX))
 $(call build,msvc_cmake_gsl,gsl,$(MSVC_MATRIX))
 
-.PHONY: git(pthread-win32) cmakelists(pthread-win32) all(pthread-win32) test(pthread-win32)
 $(call git,pthread-win32)
 $(call cmakelists,pthread-win32)
 $(call build,msvc_cmake,pthread-win32,$(call matrix_trunc,1 2,$(MSVC_MATRIX)))

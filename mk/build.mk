@@ -16,6 +16,7 @@ R1234 = $(R123) $(CONFIG:$4)
 ER123 := $$1 $$(TOOLCHAIN:$$2) $$(ARCH:$$3)
 ER1234 := $(ER123) $$(CONFIG:$$4)
 
+#cc_init = $(call noop,all($1) clean(all($1)) test($1) clean(test($1)))
 define cc =
 $(eval CC_DEP := $(patsubst $(SRC:$1)/%,$(P2134)/mk/%.mk,$(call rwildcard,$(addsuffix /,$(SRC:$1)),*.c)))\
 $(eval CC_OBJ := $(patsubst $(P2134)/mk/%.mk,$(P2134)/obj/%.o,$(CC_DEP)))\
@@ -38,9 +39,8 @@ on_error = ([ -f "$1" ] && (cat "$1"; mv "$1" "$(1:.log=.error)"; false))
 
 define cc_cmake =
 $(call gather,$(addprefix $(P2134),.log .error),)\
-$(if $(filter 2,$(CLEAN_GROUP)),\
 $(call clean,$(P2134),rm-r)\
-$(call clean,$(addprefix $(P2134),.log .error),rm))\
+$(call clean,$(addprefix $(P2134),.log .error),rm)\
 $(eval
 $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
     $$(strip $(CMAKE) \

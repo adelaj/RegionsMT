@@ -1,5 +1,5 @@
-CMAKE ?= cmake
 BASH ?= bash
+CMAKE ?= cmake
 SHELL := $(BASH)
 
 TOOLCHAIN ?=
@@ -7,7 +7,6 @@ ARCH ?=
 CONFIG ?=
 MATRIX ?= gcc:$(shell uname -m):Release
 PREFIX ?= ..
-CLEAN_GROUP ?= 1
 
 override PREFIX := $(lastword $(PREFIX))
 

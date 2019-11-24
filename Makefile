@@ -37,12 +37,12 @@ $(call var_reg,$(addprefix $$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/,gsl.lib gslcblas.
 # Remember to add /D_DLL if we are using dynamic instance of 'pthread-win32' 
 $(call var_reg,/W4 /DFORCE_POSIX_THREADS /DPTW32_STATIC_LIB,$$1,CFLAGS,$(TARGET),msvc:%:%)
 
-.PHONY: all test cmake($(TARGET)) all($(TARGET)) test($(TARGET))
+$(call noop,all test clean $(call vect,2 3,%,cmake(%) all(%) test(%),$(TARGET),patsubst))
+
 $(call build,msvc_cmake,$(TARGET),$(call matrix_trunc,1 2,$(MSVC_MATRIX)))
 $(call build,cc,$(TARGET),$(CC_MATRIX))
 $(call build,msvc_cmake_target,$(TARGET),$(MSVC_MATRIX))
 
-.PHONY: clean
 $(do_clean)
 
 include $(wildcard $(call coalesce,INCLUDE,))
