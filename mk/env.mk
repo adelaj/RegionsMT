@@ -7,6 +7,7 @@ ARCH ?=
 CONFIG ?=
 MATRIX ?= gcc:$(shell uname -m):Release
 PREFIX ?= ..
+CLEAN ?=
 
 override PREFIX := $(lastword $(PREFIX))
 

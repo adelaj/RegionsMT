@@ -38,11 +38,13 @@ $(call var_reg,$(addprefix $$$$(PREFIX)/$$$$3/gsl/$$$$4/$$$$5/,gsl.lib gslcblas.
 $(call var_reg,/W4 /DFORCE_POSIX_THREADS /DPTW32_STATIC_LIB,$$1,CFLAGS,$(TARGET),msvc:%:%)
 
 $(call noop,all test clean $(call vect,2 3,%,cmake(%) all(%) test(%),$(TARGET),patsubst))
+$(call vect,2,$$2: $$(patsubst %,$$2(%),$$(TARGET)),cmake all test,feval)
 
 $(call build,msvc_cmake,$(TARGET),$(call matrix_trunc,1 2,$(MSVC_MATRIX)))
 $(call build,cc,$(TARGET),$(CC_MATRIX))
 $(call build,msvc_cmake_target,$(TARGET),$(MSVC_MATRIX))
 
+CLEAN += $(patsubst %,all(%),$(TARGET))
 $(do_clean)
 
 include $(wildcard $(call coalesce,INCLUDE,))

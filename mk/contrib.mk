@@ -1,7 +1,7 @@
 ﻿define cmakelists =
 $(eval
-$$(PREFIX)/$$1/CMakeLists.txt: $$(PREFIX)/$$1.log
-    cp $$(ROOT)/contrib/$$(<F:.log=.cmake) $$@
+$$(PREFIX)/$$1/CMakeLists.txt: $$(ROOT)/contrib/$$1.cmake $$(PREFIX)/$$1.log 
+    cp $$< $$@
 cmakelists($$1): $$(PREFIX)/$$1/CMakeLists.txt)
 endef
 
@@ -46,7 +46,7 @@ $(call var_base,git://github.com/GerHobbelt/pthread-win32.git,,URL:pthread-win32
 # Fixing bug with 'long double' under MinGW gcc
 $(call var_reg,-D__USE_MINGW_ANSI_STDIO,$$1,CFLAGS:gsl,gcc gcc-%,%:%)
 
-$(call noop,$(call vect,2 3,%,% clean(%),$(call vect,2 3,%,git(%) cmakelists(%) cmake(%) all(%) test(%),gsl pthread-win32,patsubst),patsubst))
+$(call noop,$(call vect,2 3,%,git(%) cmakelists(%) cmake(%) all(%) test(%),gsl pthread-win32,patsubst))
 
 $(call git,gsl)
 $(call cmakelists,gsl)
