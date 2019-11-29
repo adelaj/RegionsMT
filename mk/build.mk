@@ -101,7 +101,7 @@ $(call quot,$(CMAKE)) \
 --config $$(notdir $$(@D)) \
 --verbose \
 --parallel \
--- $(call fetch_var,MSBUILDFLAGS $1 $(TOOLCHAIN:$2) $3 $4)" \
+-- $(call fetch_var,MSBUILDFLAGS $1 $(TOOLCHAIN:$2) $3 $4) \
 &> $$(basename $$@).log \
 || $$(call on_error,$$(basename $$@).log)
 
