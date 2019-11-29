@@ -88,7 +88,7 @@ $(EP213).log: $$(PREFIX)/$$1/CMakeLists.txt $$(call fetch_var2,CREQ $(ER123),. $
     -D CMAKE_STATIC_LINKER_FLAGS_DEBUG="$(call fetch_var,ARFLAGS $(R123) Debug)" \
     $(call fetch_var,CMAKEFLAGS $(R123)) \
     -S $$(<D) \
-    -B $$(@:.log=)" \
+    -B $$(@:.log=) \
     &> $$@ \
     || $$(call on_error,$$@))
 cmake($$1): $(EP213).log)
