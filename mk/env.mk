@@ -1,5 +1,7 @@
 BASH ?= bash
 CMAKE ?= cmake
+GIT ?= git
+EVAV ?=
 SHELL := $(BASH)
 
 TOOLCHAIN ?=

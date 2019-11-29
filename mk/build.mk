@@ -2,7 +2,7 @@
 # $env:MSYS2PATH=C:\msys32\usr\bin\bash.exe -c 'echo $PATH'
 # $env:MSYS2WD=C:\msys32\usr\bin\bash.exe -c 'pwd'
 # $env:MSYSTEM="MINGW32"
-# C:\msys32\usr\bin\bash.exe -l -c 'cd $MSYS2WD; PATH=$MSYS2PATH:$PATH mingw32-make --warn-undefined-variables CLEAN_GROUP=\"1 2\" MATRIX=\"msvc1:Win32:Debug\" TOOLCHAIN=\"msvc1:msvc\" -O -n clean'
+# C:\msys32\usr\bin\bash.exe -l -c 'cd $MSYS2WD; PATH=$MSYS2PATH:$PATH mingw32-make --warn-undefined-variables CLEAN_GROUP="1 2" MATRIX="msvc1:Win32:Debug" TOOLCHAIN="msvc1:msvc" -O -n clean'
 
 build = $(call vect,2 3,$$(eval $$$$(call $1,$$2,$$(subst :,$$(COMMA),$$3))),$2,$3,feval)
 
@@ -40,7 +40,7 @@ $(call clean,$(P2134),rm-r,all($1))\
 $(call clean,$(addprefix $(P2134),.log .error),rm,all($1))\
 $(eval
 $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
-    $$(strip $(CMAKE) \
+    $$(strip $(call quot,$(CMAKE)) \
     -G "Unix Makefiles" \
     -D CMAKE_MAKE_PROGRAM="$(MAKE)" \
     -D CMAKE_C_COMPILER="$(call fetch_var,CC $(TOOLCHAIN:$2))" \
@@ -77,15 +77,15 @@ $(eval MSVC_LDREQ_RELEASE := $(patsubst %,../../%,$(call fetch_var2,LDREQ $(R123
 $(eval MSVC_LDREQ_DEBUG := $(patsubst %,../../%,$(call fetch_var2,LDREQ $(R123) Debug,. $1 $2 $3 Debug)))
 $(eval
 $(EP213).log: $$(PREFIX)/$$1/CMakeLists.txt $$(call fetch_var2,CREQ $(ER123),. $$1 $$2 $$3)
-    $$(strip powershell "$(CMAKE) \
-    -G \"Visual Studio 16 2019\" \
-    -A \"$$(@F:.log=)\" \
-    -D CMAKE_C_FLAGS_RELEASE=\"$(strip $(call fetch_var,CFLAGS $(R123) Release) $(MSVC_CREQ))\" \
-    -D CMAKE_C_FLAGS_DEBUG=\"$(strip $(call fetch_var,CFLAGS $(R123) Debug) $(MSVC_CREQ))\" \
-    -D CMAKE_EXE_LINKER_FLAGS_RELEASE=\"$(strip $(call fetch_var,LDFLAGS $(R123) Release) $(MSVC_LDREQ_RELEASE))\" \
-    -D CMAKE_EXE_LINKER_FLAGS_DEBUG=\"$(strip $(call fetch_var,LDFLAGS $(R123) Debug) $(MSVC_LDREQ_DEBUG))\" \
-    -D CMAKE_STATIC_LINKER_FLAGS_RELEASE=\"$(call fetch_var,ARFLAGS $(R123) Release)\" \
-    -D CMAKE_STATIC_LINKER_FLAGS_DEBUG=\"$(call fetch_var,ARFLAGS $(R123) Debug)\" \
+    $$(strip $(call quot,$(CMAKE)) \
+    -G "Visual Studio 16 2019" \
+    -A "$$(@F:.log=)" \
+    -D CMAKE_C_FLAGS_RELEASE="$(strip $(call fetch_var,CFLAGS $(R123) Release) $(MSVC_CREQ))" \
+    -D CMAKE_C_FLAGS_DEBUG="$(strip $(call fetch_var,CFLAGS $(R123) Debug) $(MSVC_CREQ))" \
+    -D CMAKE_EXE_LINKER_FLAGS_RELEASE="$(strip $(call fetch_var,LDFLAGS $(R123) Release) $(MSVC_LDREQ_RELEASE))" \
+    -D CMAKE_EXE_LINKER_FLAGS_DEBUG="$(strip $(call fetch_var,LDFLAGS $(R123) Debug) $(MSVC_LDREQ_DEBUG))" \
+    -D CMAKE_STATIC_LINKER_FLAGS_RELEASE="$(call fetch_var,ARFLAGS $(R123) Release)" \
+    -D CMAKE_STATIC_LINKER_FLAGS_DEBUG="$(call fetch_var,ARFLAGS $(R123) Debug)" \
     $(call fetch_var,CMAKEFLAGS $(R123)) \
     -S $$(<D) \
     -B $$(@:.log=)" \
@@ -95,7 +95,7 @@ cmake($$1): $(EP213).log)
 endef
 
 msvc_cmake_build =\
-powershell "$(CMAKE) \
+$(call quot,$(CMAKE)) \
 --build $$(<:.log=) \
 --target $$* \
 --config $$(notdir $$(@D)) \
@@ -112,7 +112,8 @@ $(call clean,$(addprefix $(PREFIX)/$1,.log .error),rm,git($1))\
 $(eval
 $$(PREFIX)/$$1.log:
     $(if $(wildcard $(PREFIX)/$1),\
-    git -C $$(@:.log=) pull --depth 1 &> $$@,\
-    git clone --depth 1 $$(URL:$$(@F:.log=)) $$(@:.log=) &> $$@) || $$(call on_error,$$@)
+    $(call quot,$(GIT)) -C $$(@:.log=) pull --depth 1 &> $$@,\
+    $(call quot,$(GIT)) clone --depth 1 $$(URL:$$(@F:.log=)) $$(@:.log=) &> $$@) || $$(call on_error,$$@)
 git($$1): $$(PREFIX)/$$1.log)
 endef
+

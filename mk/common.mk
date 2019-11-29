@@ -115,4 +115,6 @@ tr = $(if $1,$(call tr,$(call nofirstword,$1),$(subst $(basename $(firstword $1)
 uc = $(call tr,$(a.A-z.Z),$1)
 lc = $(call tr,$(A.a-Z.z),$1)
 
+quot = $(if $(call nofirstword,$1),"$1",$1)
+
 print(%):; @echo '$* = $($*)'
