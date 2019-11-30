@@ -26,8 +26,6 @@ matrix:
           - PREFIX=.
           - TOOLCHAIN=clang:clang-8
           - MATRIX=`echo {clang,gcc}:{x86_64,i386}:{Debug,Release}`
-        before_script:
-          - git submodule foreach git pull origin master
         script:
           - make -j all
           - make -j -k test || true
