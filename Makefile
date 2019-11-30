@@ -41,7 +41,7 @@ $(call build,msvc_cmake,$(TARGET),$(call matrix_trunc,1 2,$(MSVC_MATRIX)))
 $(call build,cc,$(TARGET),$(CC_MATRIX))
 $(call build,msvc_cmake_target,$(TARGET),$(MSVC_MATRIX))
 
-CLEAN += $(patsubst %,all(%),$(TARGET))
+override CLEAN += $(patsubst %,all(%),$(TARGET))
 $(do_clean)
 
 include $(wildcard $(call coalesce,INCLUDE,))
