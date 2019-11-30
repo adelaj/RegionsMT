@@ -20,8 +20,6 @@ install:
       
 build_script:
   - ps: |
-        $env:TARGET=""
-        $env:PREFIX="."
         $env:CHERE_INVOKING="1"
         $env:GIT=C:\msys64\usr\bin\bash.exe -c '/usr/bin/which git'
   - C:\msys64\usr\bin\bash.exe -lc "$MAKE -j all"
