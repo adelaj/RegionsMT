@@ -23,7 +23,6 @@ matrix:
                   - llvm-8-dev
         env:
           - CMAKE=/usr/bin/cmake
-          - PREFIX=.
           - TOOLCHAIN=clang:clang-8
           - MATRIX=`echo {clang,gcc}:{x86_64,i386}:{Debug,Release}`
         script:
