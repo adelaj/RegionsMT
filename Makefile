@@ -16,11 +16,8 @@ $(EP2134)/%.exe $(EP2134)/%.log: $(EP213).log $(call fetch_var2,CREQ $(R123),. $
     $(msvc_cmake_build)
 $(EP2134)/ALL_BUILD.log: $(EP2134)/$1.exe
 all($$1): $(EP2134)/ALL_BUILD.log
-all: | all($$1)
 $(EP2134)/RUN_TESTS.log: $(EP2134)/ALL_BUILD.log
-test($$1): $(EP2134)/RUN_TESTS.log
-test: | test($$1)
-)
+test($$1): $(EP2134)/RUN_TESTS.log)
 endef
 
 TARGET := RegionsMT
