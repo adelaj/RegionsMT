@@ -418,7 +418,7 @@ static int Main(int argc, char **argv)
     };
 
     struct log log;
-    if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, NULL))
+    if (log_init(&log, NULL, 1 + 1 * BLOCK_WRITE, 0, &ttl_style, &style, NULL))
     {
         //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~~#*%~#*", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, 12041241241ull);
         //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~#*%~#*.\n", 0x393, 920);
@@ -610,6 +610,21 @@ int wmain(int argc, wchar_t **wargv)
     argv_dispose(argc, argv);
     return main_res;
 }
+
+#   ifdef __MINGW32__
+#   include <shellapi.h>
+
+int main()
+{
+    int argc;
+    wchar_t **wargv = CommandLineToArgvW(GetCommandLineW(), &argc);
+    if (!wargv) return EXIT_FAILURE;
+    int main_res = wmain(argc, wargv);
+    LocalFree(wargv);
+    return main_res;
+}
+
+#   endif
 
 #else
 

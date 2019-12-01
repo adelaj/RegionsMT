@@ -43,9 +43,6 @@ endef
 $(call var_base,git://github.com/BrianGladman/gsl.git,,URL:gsl)
 $(call var_base,git://github.com/GerHobbelt/pthread-win32.git,,URL:pthread-win32)
 
-# Fixing bug with 'long double' under MinGW gcc
-$(call var_reg,-D__USE_MINGW_ANSI_STDIO,$$1,CFLAGS:gsl,gcc gcc-%,%:%)
-
 $(call noop,$(call vect,2 3,%,git(%) cmakelists(%) cmake(%) all(%) test(%),gsl pthread-win32,patsubst))
 
 $(call git,gsl)

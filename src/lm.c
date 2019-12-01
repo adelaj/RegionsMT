@@ -1010,7 +1010,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             }
             reg[pos + off] = pr;
         }
-    }    
+    }
 
     struct lm_supp supp;
     if (!lm_init(&supp, cov.dim, dimx)) return 0;
