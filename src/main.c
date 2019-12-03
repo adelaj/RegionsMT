@@ -527,7 +527,7 @@ static int Main(int argc, char **argv)
 #   include <windows.h>
 
 // Translating UTF-16 command-line parameters to UTF-8
-bool argv_from_wargv(char ***p_argv, size_t argc, wchar_t **wargv)
+static bool argv_from_wargv(char ***p_argv, size_t argc, wchar_t **wargv)
 {
     char **argv;
     if (!array_init(&argv, NULL, argc, sizeof(*argv), 0, ARRAY_STRICT)) return 0;
@@ -583,16 +583,16 @@ bool argv_from_wargv(char ***p_argv, size_t argc, wchar_t **wargv)
     return 0;
 }
 
-void argv_dispose(size_t argc, char **argv)
+static void argv_dispose(size_t argc, char **argv)
 {
     if (argc) free(argv[0]);
     free(argv);
 }
 
-int wmain(int argc, wchar_t **wargv)
+static int Wmain(int argc, wchar_t **wargv)
 {
     // Memory leaks will be reported at the program exit
-    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF);
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);
     _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
@@ -600,14 +600,36 @@ int wmain(int argc, wchar_t **wargv)
     _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
 
-    // Making console output UTF-8 friendly
-    if (!SetConsoleOutputCP(CP_UTF8)) return EXIT_FAILURE;
+    _CrtMemState ms1, ms2, md;
+    _CrtMemCheckpoint(&ms1);
+
+    // Trying to make console output UTF-8 friendly
+    SetConsoleOutputCP(CP_UTF8);
     
+    // Trying to enable handling for VT sequences
+    HANDLE ho = GetStdHandle(STD_ERROR_HANDLE);
+    if (ho != INVALID_HANDLE_VALUE)
+    {
+        DWORD mode = 0;
+        if (GetConsoleMode(ho, &mode)) SetConsoleMode(ho, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+    }
+
     // Performing UTF-16LE to UTF-8 translation and executing main routine
     char **argv;
-    if (!argv_from_wargv(&argv, argc, wargv)) return EXIT_FAILURE;
-    int main_res = Main(argc, argv);
-    argv_dispose(argc, argv);
+    int main_res = EXIT_FAILURE;
+    if (argv_from_wargv(&argv, argc, wargv))
+    {
+        main_res = Main(argc, argv);
+        argv_dispose(argc, argv);
+    }
+
+    _CrtMemCheckpoint(&ms2);
+    if (_CrtMemDifference(&md, &ms1, &ms2))
+    {
+        _CrtMemDumpAllObjectsSince(&ms1);
+        _CrtMemDumpStatistics(&md);
+    }
+
     return main_res;
 }
 
@@ -619,9 +641,16 @@ int main()
     int argc;
     wchar_t **wargv = CommandLineToArgvW(GetCommandLineW(), &argc);
     if (!wargv) return EXIT_FAILURE;
-    int main_res = wmain(argc, wargv);
+    int main_res = Wmain(argc, wargv);
     LocalFree(wargv);
     return main_res;
+}
+
+#   else
+
+int wmain(int argc, wchar_t **wargv)
+{
+    return Wmain(argc, wargv);
 }
 
 #   endif

@@ -12,7 +12,7 @@ environment:
 
 install:
   - ps: |
-        $env:MATRIX=C:\msys64\usr\bin\bash.exe -c 'echo gcc:$ARCH:{Debug,Release}'
+        $env:MATRIX=C:\msys64\usr\bin\bash.exe -c 'echo gcc@mingw:$ARCH:{Debug,Release}'
         $env:MAKE="mingw32-make"
   - C:\msys64\usr\bin\bash.exe -lc "pacman -Syu --noconfirm"
   - C:\msys64\usr\bin\bash.exe -lc "pacman -Syu --noconfirm"

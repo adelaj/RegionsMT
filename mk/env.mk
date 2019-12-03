@@ -30,7 +30,7 @@ __matrix_trunc_base = $(patsubst :%,%,$(call compress,,$(foreach i,$1,$(word $i,
 
 override MATRIX := $(call uniq,$(MATRIX))
 
-CC_TOOLCHAIN := gcc gcc-% mingw clang clang-% icc
+CC_TOOLCHAIN := gcc gcc-% gcc@mingw clang clang-% icc
 CC_ARCH := i386 i686 x86_64
 CC_MATRIX := $(call matrix_ftr,$(MATRIX),$(call vect,2 3 4,$$2:$$3:$$4,$(CC_TOOLCHAIN),$(CC_ARCH),Release Debug,print))
 

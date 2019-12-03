@@ -326,7 +326,7 @@ endif ()
 include(CheckLibraryExists)
 check_library_exists(m cos "" HAVE_LIBM)
 if (HAVE_LIBM)
-    set(CMAKE_REQUIRED_LIBRARIES m)
+    set(CMAKE_REQUIRED_LIBRARIES ${CMAKE_REQUIRED_LIBRARIES} m)
 endif ()
 
 include(CheckCSourceCompiles)

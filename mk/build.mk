@@ -19,21 +19,23 @@ ER1234 := $(ER123) $$(CONFIG:$$4)
 define cc =
 $(eval CC_DEP := $(patsubst $(SRC:$1)/%,$(P2134)/mk/%.mk,$(call rwildcard,$(addsuffix /,$(SRC:$1)),*.c)))\
 $(eval CC_OBJ := $(patsubst $(P2134)/mk/%.mk,$(P2134)/obj/%.o,$(CC_DEP)))\
-$(call gather,$(P2134)/$1 $(CC_DEP) $(CC_OBJ),)\
-$(call clean,$(P2134)/$1 $(CC_DEP) $(CC_OBJ),rm,all($1))\
 $(eval CC_CREQ := $$(call fetch_var2,CREQ $(ER1234),. $$1 $$2 $$3 $$4))\
+$(eval CC_EXE := $$(lastword $$1 $$(call fetch_var2,EXE $(ER1234),. $$1 $$2 $$3 $$4)))\
+$(call gather,$(P2134)/$(CC_EXE) $(CC_DEP) $(CC_OBJ),)\
+$(call clean,$(P2134)/$(CC_EXE) $(CC_DEP) $(CC_OBJ),rm,all($1))\
 $(call var_base,$(CC_DEP),$$1,INCLUDE)\
 $(eval
-$(EP2134)/$$1: $(CC_OBJ) $$(call fetch_var2,LDREQ $(ER1234),. $$1 $$2 $$3 $$4)
+$(EP2134)/$(CC_EXE): $(CC_OBJ) $$(call fetch_var2,LDREQ $(ER1234),. $$1 $$2 $$3 $$4)
     $$(strip $(call fetch_var,LD $(TOOLCHAIN:$2)) $(call fetch_var,LDFLAGS $(R1234)) -o $$@ $$^ $(call fetch_var,LDLIB $(R1234)))
 $(EP2134)/obj/%.o: $(SRC:$1)/% $(EP2134)/mk/%.mk $(CC_CREQ)
     $$(strip $(call fetch_var,CC $(TOOLCHAIN:$2)) -MMD -MP -MF$$(word 2,$$^) $(call fetch_var,CFLAGS $(R1234)) $(addprefix -I,$(CC_CREQ:.log=)) -o $$@ -c $$<)
-all($$1): $(EP2134)/$$1
-test($$1): $(EP2134)/$$1)
+all($$1): $(EP2134)/$(CC_EXE)
+test($$1): $(EP2134)/$(CC_EXE))
 endef
 
 on_error = ([ -f "$1" ] && (cat "$1"; mv "$1" "$(1:.log=.error)"; false))
 
+# Warning! 'CMAKE_C_LINK_EXECUTABLE' has no effect for 'mingw' toolchains
 define cc_cmake =
 $(call gather,$(addprefix $(P2134),.log .error),)\
 $(call clean,$(P2134),rm-r,all($1))\
@@ -52,6 +54,7 @@ $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
     -D CMAKE_C_FLAGS_$(call uc,$4)="$(call fetch_var,CFLAGS $(R1234))" \
     -D CMAKE_EXE_LINKER_FLAGS_$(call uc,$4)="$(call fetch_var,LDFLAGS $(R1234))" \
     -D CMAKE_C_LINK_EXECUTABLE="<CMAKE_LINKER> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>" \
+    -D CMAKE_REQUIRED_LIBRARIES="$(call fetch_var,LDLIB $(R1234))" \
     $(call fetch_var,CMAKEFLAGS $(R1234)) \
     -S $$(<D) \
     -B $$(@:.log=) \
