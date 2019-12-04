@@ -27,13 +27,13 @@ $(call var_base,$(CC_DEP),$$1,INCLUDE)\
 $(eval
 $(EP2134)/$(CC_EXE): $(CC_OBJ) $$(call fetch_var2,LDREQ $(ER1234),. $$1 $$2 $$3 $$4)
     $$(strip $(call fetch_var,LD $(TOOLCHAIN:$2)) $(call fetch_var,LDFLAGS $(R1234)) -o $$@ $$^ $(call fetch_var,LDLIB $(R1234)))
-$(EP2134)/obj/%.o: $(SRC:$1)/% $(EP2134)/mk/%.mk $(CC_CREQ)
-    $$(strip $(call fetch_var,CC $(TOOLCHAIN:$2)) -MMD -MP -MF$$(word 2,$$^) $(call fetch_var,CFLAGS $(R1234)) $(addprefix -I,$(CC_CREQ:.log=)) -o $$@ -c $$<)
+$(EP2134)/obj/%.o: $(SRC:$1)/% $(CC_CREQ) | $(EP2134)/mk/%.mk
+    $$(strip $(call fetch_var,CC $(TOOLCHAIN:$2)) -MMD -MP -MF$$| $(call fetch_var,CFLAGS $(R1234)) $(addprefix -I,$(CC_CREQ:.log=)) -o $$@ -c $$<)
 all($$1): $(EP2134)/$(CC_EXE)
 test($$1): $(EP2134)/$(CC_EXE))
 endef
 
-on_error = ([ -f "$1" ] && (cat "$1"; mv "$1" "$(1:.log=.error)"; false))
+on_error = ([ -f $1 ] && (cat $1; mv $1 $(1:.log=.error); false))
 
 # Warning! 'CMAKE_C_LINK_EXECUTABLE' has no effect for 'mingw' toolchains
 define cc_cmake =
@@ -42,7 +42,7 @@ $(call clean,$(P2134),rm-r,all($1))\
 $(call clean,$(addprefix $(P2134),.log .error),rm,all($1))\
 $(eval
 $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
-    $$(strip $(call quot,$(CMAKE)) \
+    $$(strip $(CMAKE) \
     -G "Unix Makefiles" \
     -D CMAKE_MAKE_PROGRAM="$(MAKE)" \
     -D CMAKE_C_COMPILER="$(call fetch_var,CC $(TOOLCHAIN:$2))" \
@@ -80,7 +80,7 @@ $(eval MSVC_LDREQ_RELEASE := $(patsubst %,../../%,$(call fetch_var2,LDREQ $(R123
 $(eval MSVC_LDREQ_DEBUG := $(patsubst %,../../%,$(call fetch_var2,LDREQ $(R123) Debug,. $1 $2 $3 Debug)))
 $(eval
 $(EP213).log: $$(PREFIX)/$$1/CMakeLists.txt $$(call fetch_var2,CREQ $(ER123),. $$1 $$2 $$3)
-    $$(strip $(call quot,$(CMAKE)) \
+    $$(strip $(CMAKE) \
     -G "Visual Studio 16 2019" \
     -A "$$(@F:.log=)" \
     -D CMAKE_C_FLAGS_RELEASE="$(strip $(call fetch_var,CFLAGS $(R123) Release) $(MSVC_CREQ))" \
@@ -98,7 +98,7 @@ cmake($$1): $(EP213).log)
 endef
 
 msvc_cmake_build =\
-$(call quot,$(CMAKE)) \
+$(CMAKE) \
 --build $$(<:.log=) \
 --target $$* \
 --config $$(notdir $$(@D)) \
@@ -115,8 +115,8 @@ $(call clean,$(addprefix $(PREFIX)/$1,.log .error),rm,git($1))\
 $(eval
 $$(PREFIX)/$$1.log:
     $(if $(wildcard $(PREFIX)/$1),\
-    $(call quot,$(GIT)) -C $$(@:.log=) pull --depth 1 &> $$@,\
-    $(call quot,$(GIT)) clone --depth 1 $$(URL:$$(@F:.log=)) $$(@:.log=) &> $$@) || $$(call on_error,$$@)
+    $(GIT) -C $$(@:.log=) pull --depth 1 &> $$@,\
+    $(GIT) clone --depth 1 $$(URL:$$(@F:.log=)) $$(@:.log=) &> $$@) || $$(call on_error,$$@)
 git($$1): $$(PREFIX)/$$1.log)
 endef
 

@@ -4,6 +4,9 @@ GIT ?= git
 EVAV ?=
 SHELL := $(BASH)
 
+override CMAKE := $(call quot,$(CMAKE))
+override GIT := $(call quot,$(GIT))
+
 TOOLCHAIN ?=
 ARCH ?=
 CONFIG ?=

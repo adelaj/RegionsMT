@@ -600,7 +600,7 @@ static int Wmain(int argc, wchar_t **wargv)
     _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
 
-    _CrtMemState ms1, ms2, md;
+    _CrtMemState ms1;
     _CrtMemCheckpoint(&ms1);
 
     // Trying to make console output UTF-8 friendly
@@ -623,6 +623,7 @@ static int Wmain(int argc, wchar_t **wargv)
         argv_dispose(argc, argv);
     }
 
+    _CrtMemState ms2, md;
     _CrtMemCheckpoint(&ms2);
     if (_CrtMemDifference(&md, &ms1, &ms2))
     {

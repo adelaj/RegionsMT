@@ -34,35 +34,40 @@ struct lm_term {
 };
 
 struct lm_supp {
-    size_t *filter, *ind, *reg_vect_len;
-    uint8_t *gen;
-    double *obs, *reg, *reg_vect;
+    size_t *filter;
+    double *obs, *reg, *par, *cov;
     gsl_multifit_linear_workspace *workspace;
 };
 
 void lm_close(struct lm_supp *supp)
 {
     free(supp->filter);
-    free(supp->gen);
-
+    free(supp->obs);
+    free(supp->reg);
+    free(supp->par);
+    free(supp->cov);
+    gsl_multifit_linear_free(supp->workspace);
 }
 
 bool lm_init(struct lm_supp *supp, size_t phen_cnt, size_t reg_cnt)
 {
-    if (//array_init(&supp->reg_vect_len, NULL, term_max_len, sizeof(*supp->reg_vect_len), 0, ARRAY_STRICT) &&
-        //array_init(&supp->ind, NULL, term_max_len, sizeof(*supp->ind), 0, ARRAY_STRICT) &&
-        //array_init(&supp->reg_vect, NULL, reg_vect_cnt, sizeof(*supp->reg_vect), 0, ARRAY_STRICT) &&
+    //supp->par = NULL;
+    //gsl_vector_alloc(reg_cnt + 3);
+    supp->workspace = gsl_multifit_linear_alloc(phen_cnt, reg_cnt + 3);
+
+    if (supp->workspace &&
+        //array_init(&supp->reg_vect_len, NULL, term_max_len, sizeof(*supp->reg_vect_len), 0, ARRAY_STRICT) &&
+        array_init(&supp->cov, NULL, (reg_cnt + 3) * reg_cnt + 3, sizeof(*supp->cov), 0, ARRAY_STRICT) &&
+        array_init(&supp->par, NULL, reg_cnt + 3, sizeof(*supp->par), 0, ARRAY_STRICT) &&
         array_init(&supp->reg, NULL, (reg_cnt + 3) * phen_cnt, 2 * sizeof(*supp->reg), 0, ARRAY_STRICT) &&
         array_init(&supp->obs, NULL, phen_cnt, 2 * sizeof(*supp->obs), 0, ARRAY_STRICT) &&
-        array_init(&supp->gen, NULL, phen_cnt, 2 * sizeof(*supp->gen), 0, ARRAY_STRICT) &&
         array_init(&supp->filter, NULL, phen_cnt, sizeof(*supp->filter), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
         //array_init(&supp->outer, NULL, phen_ucnt, GEN_CNT * sizeof(*supp->outer), 0, ARRAY_STRICT) &&
         //array_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->tbl), 0, ARRAY_STRICT)
-        1
-        ) return 1;
+        1) return 1;
 
     lm_close(supp);
-    return 1;
+    return 0;
 }
 
 struct lm_expr {
@@ -119,7 +124,7 @@ bool check_matrix_full_rank(double *matrix, double *dot, double *norm, size_t di
 }
 
 // 'phen' is actually a double pointer
-struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_ord, size_t phen_ind, size_t *cov_level, size_t phen_cnt, size_t reg_cnt, struct lm_term *term, size_t *term_len, size_t term_len_cnt, enum categorical_flags flags)
+struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double *phen, size_t phen_cnt, size_t reg_cnt, enum categorical_flags flags)
 {
     struct categorical_res res;
     array_broadcast(res.nlpv, countof(res.nlpv), sizeof(*res.nlpv), &(double) { nan(__func__) });
@@ -129,67 +134,34 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_or
     size_t cnt = filter_init(supp->filter, gen, phen_cnt);
     if (!cnt) return res;
 
+    size_t tda = reg_cnt + 3;
+
     //
     // BASELINE MODEL
     //
-    double S_h;
+    double s_h;
     {
         size_t dimx = cnt, dimy = 1 + reg_cnt;
-        // Setting up the matrix of regressors:
-        // 0) Intercept parameter
-        for (size_t j = 0, k = 0; j < dimx; j++, k += dimy)
-            supp->reg[k] = 1.;
-
-        // 1) Phenotypes
-        size_t off = 1;
-        for (size_t j = 0; j < dimx; j++)
-            supp->obs[j + cnt] = supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
         
-        // 3) Covariates
-        for (size_t z = 0, zz = off, yy = 0; z < cnt; z++, zz += dimy, yy = 0)
+        // Phenotypes and covariates
+        for (size_t j = 0, k = 2; j < dimx; j++, k += tda)
         {
-            for (size_t j = 0, k = 0, zzz = 0; j < term_len_cnt; j++)
-            {
-                size_t pos = 0, stride = 1;
-                for (size_t l = 0; k < term_len[j]; k++, l++)
-                {
-                    size_t d = term[k].deg;
-                    if (d)
-                    {
-                        double x0 = ((double *) cov_ord[term[k].off])[supp->filter[z]], x = x0;
-                        stride *= d;
-                        supp->reg_vect[pos++] = x;
-                        for (size_t y = 1; y < d; y++)
-                            supp->reg_vect[pos++] = x *= x0;
-                    }
-                    else
-                    {
-                        size_t r = ((size_t *) cov_ord[term[k].off])[supp->filter[z]];
-                        stride *= cov_level[term[k].off] - 1;
-                        for (size_t y = 1; y < cov_level[term[k].off]; y++)
-                            supp->reg_vect[pos++] = y == r;
-                    }
-                    supp->reg_vect_len[l] = pos;
-                }
-                tensor_prod(term_len[j] - yy, supp->reg_vect, supp->reg_vect_len, supp->reg + zz + zzz, supp->ind);
-                zzz += stride;
-                yy = term_len[j];
-            }
+            supp->obs[j] = phen[supp->filter[j]];
+            supp->reg[k] = 1.;
+            memcpy(supp->reg + k + 1, reg + reg_cnt * supp->filter[j], reg_cnt * sizeof(*supp->reg));
+        }
+        if (flags & TEST_TYPE_ALLELIC)
+        {
+            memcpy(supp->obs + dimx, supp->obs, dimx * sizeof(*supp->obs));
+            memcpy(supp->reg + dimx * tda + 2, supp->reg + 2, (dimx * tda - 2) * sizeof(*supp->reg));
         }
 
-        // 3) Fit BASELINE model
-        gsl_vector *P = gsl_vector_alloc(dimy);
-        gsl_matrix_view R = gsl_matrix_view_array(supp->reg, dimx, dimy);
-        gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx);
-        gsl_multifit_linear_workspace *W = gsl_multifit_linear_alloc(dimx, dimy);
-        gsl_matrix *C = gsl_matrix_alloc(dimy, dimy);
+        // Fit BASELINE model
+        gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg, dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
+        gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
         size_t rk;
-        gsl_multifit_linear_tsvd(&R.matrix, &O.vector, 1e-5, P, C, &S_h, &rk, W);
-
-        gsl_matrix_free(C);
-        gsl_vector_free(P);
-        gsl_multifit_linear_free(W);
+        gsl_multifit_linear_tsvd(&R.matrix, &O.vector, 1e-5, &P.vector, &C.matrix, &s_h, &rk, supp->workspace);
     }
 
     // Performing computations for each alternative
@@ -201,220 +173,69 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, void **cov_or
         double ss_e;
         size_t df_e;
         {
-            size_t dimx = cnt << (i == 3), dimy0 = 2 + (i == 0), dimy = dimy0 + reg_cnt;
-            // Setting up the matrix of regressors:
-            // 0) Intercept parameter
-            for (size_t j = 0, k = 0; j < dimx; j++, k += dimy)
-                supp->reg[k] = 1.;
-
-            // 1) Genotypes & phenotypes
-            size_t off = 1;
+            size_t dimx = cnt << (i == 3), dimy = 2 + (i == 0) + reg_cnt;
+            
+            // Genotypes
             switch (i)
             {
             case 0: // codominant
-                for (size_t j = 0, k = off; j < dimx; j++, k += dimy)
+                for (size_t j = 0, k = 0; j < dimx; j++, k += tda)
                 {
                     uint8_t g = gen[supp->filter[j]];
                     supp->reg[k] = (double) (g == 1);
                     supp->reg[k + 1] = (double) (g == 2);
-                    //supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
-                }
-                off += 2;
+                }                
                 break;
             case 1: // recessive
-                for (size_t j = 0, k = off; j < dimx; j++, k += dimy)
-                {
-                    uint8_t g = gen[supp->filter[j]];
-                    supp->reg[k] = (double) (g == 2);
-                    //supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
-                }
-                off++;
+                for (size_t j = 0, k = 1; j < dimx; j++, k += tda) 
+                    supp->reg[k] = (double) (gen[supp->filter[j]] == 2);
                 break;
             case 2: // dominant
-                for (size_t j = 0, k = off; j < dimx; j++, k += dimy)
+                for (size_t j = 0, k = 1; j < dimx; j++, k += tda)
                 {
                     uint8_t g = gen[supp->filter[j]];
                     supp->reg[k] = (double) ((g == 1) || (g == 2));
-                    //supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
                 }
-                off++;
                 break;
             default: // allelic
-                for (size_t j = 0, k = off; j < cnt; j++, k += dimy)
+                for (size_t j = 0, k = 1; j < cnt; j++, k += tda)
                 {
                     uint8_t g = gen[supp->filter[j]];
                     supp->reg[k] = (double) (g == 2);
-                    supp->reg[k + cnt * dimy] = (double) ((g == 1) || (g == 2));
-                    //supp->obs[j + cnt] = supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
-                }
-                off++;
-            }
-
-            // 2) Test that matrix of genotypes has full rank
-            //gsl_matrix_view T = gsl_matrix_view_array_with_tda(supp->reg, dimx, dimy0, dimy);
-
-            // 3) Covariates
-            for (size_t z = 0, zz = off, yy = 0; z < cnt; z++, zz += dimy, yy = 0)
-            {
-                for (size_t j = 0, k = 0, zzz = 0; j < term_len_cnt; j++)
-                {
-                    size_t pos = 0, stride = 1;
-                    for (size_t l = 0; k < term_len[j]; k++, l++)
-                    {
-                        size_t d = term[k].deg;
-                        if (d)
-                        {                            
-                            double x0 = ((double *) cov_ord[term[k].off])[supp->filter[z]], x = x0;
-                            stride *= d;
-                            supp->reg_vect[pos++] = x;
-                            for (size_t y = 1; y < d; y++)
-                                supp->reg_vect[pos++] = x *= x0;
-                        }
-                        else
-                        {
-                            size_t r = ((size_t *) cov_ord[term[k].off])[supp->filter[z]];
-                            stride *= cov_level[term[k].off] - 1;
-                            for (size_t y = 1; y < cov_level[term[k].off]; y++)
-                                supp->reg_vect[pos++] = y == r;
-                        }
-                        supp->reg_vect_len[l] = pos;                        
-                    }
-                    tensor_prod(term_len[j] - yy, supp->reg_vect, supp->reg_vect_len, supp->reg + zz + zzz, supp->ind);
-                    zzz += stride;
-                    yy = term_len[j];
-                }
-                if (i == 3)
-                {
-                    memcpy(supp->reg + zz + dimy * cnt, supp->reg + zz, sizeof(*supp->reg) * (dimy - dimy0)); // Allelic mode
+                    supp->reg[k + cnt * tda] = (double) ((g == 1) || (g == 2));
                 }
             }
+            
+            // Fit model for 'TEST'
+            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + (i != 0), dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
+            gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
-            // 3) Fit model for 'TEST'
-            gsl_vector *P = gsl_vector_alloc(dimy);
-            gsl_matrix_view R = gsl_matrix_view_array(supp->reg, dimx, dimy);
-            gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx);
-            gsl_multifit_linear_workspace *W = gsl_multifit_linear_alloc(dimx, dimy);
-            gsl_matrix *C = gsl_matrix_alloc(dimy, dimy);
-
-            gsl_multifit_linear_tsvd(&R.matrix, &O.vector, 1e-5, P, C, &ss_e, &df_e, W);
+            gsl_multifit_linear_tsvd(&R.matrix, &O.vector, 1e-5, &P.vector, &C.matrix, &ss_e, &df_e, supp->workspace);
             df_e = dimx - df_e;
-
-            gsl_matrix_free(C);
-            gsl_vector_free(P);
-            gsl_multifit_linear_free(W);            
         }
-        size_t df_h = 1 + (i == 1);
-        double s_h = S_h;
-        if (i == 3) s_h += s_h;
-        res.nlpv[i] = gsl_cdf_fdist_Q(((s_h - ss_e) * (double) df_e) / (ss_e * (double) df_h), (double) df_h, (double) df_e);
+
+        size_t df_h = 1 + (i == 0);
+        res.nlpv[i] = gsl_cdf_fdist_Q((((i == 3 ? s_h + s_h : s_h) - ss_e) * (double) df_e) / (ss_e * (double) df_h), (double) df_h, (double) df_e);
 
         //
         // MODEL FOR QAS
         //
-
-        double qas;
+        if (i == 0) 
         {
-            size_t dimx = cnt << (i == 3), dimy0 = 2, dimy = dimy0 + reg_cnt;
-            // Setting up the matrix of regressors:
-            // 0) Intercept parameter
-            for (size_t j = 0, k = 0; j < dimx; j++, k += dimy)
-                supp->reg[k] = 1.;
-
-            // 1) Genotypes & phenotypes
-            size_t off = 1;
-            switch (i)
-            {
-            case 0: // codominant
-                for (size_t j = 0, k = off; j < dimx; j++, k += dimy)
-                {
-                    uint8_t g = gen[supp->filter[j]];
-                    supp->reg[k] = (double) g;
-                    //supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
-                }
-                off++;
-                break;
-            case 1: // recessive
-                for (size_t j = 0, k = off; j < dimx; j++, k += dimy)
-                {
-                    uint8_t g = gen[supp->filter[j]];
-                    supp->reg[k] = (double) (g == 2);
-                    //supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
-                }
-                off++;
-                break;
-            case 2: // dominant
-                for (size_t j = 0, k = off; j < dimx; j++, k += dimy)
-                {
-                    uint8_t g = gen[supp->filter[j]];
-                    supp->reg[k] = (double) ((g == 1) || (g == 2));
-                    //supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
-                }
-                off++;
-                break;
-            default: // allelic
-                for (size_t j = 0, k = off; j < cnt; j++, k += dimy)
-                {
-                    uint8_t g = gen[supp->filter[j]];
-                    supp->reg[k] = (double) (g == 2);
-                    supp->reg[k + cnt * dimy] = (double) ((g == 1) || (g == 2));
-                    //supp->obs[j + cnt] = supp->obs[j] = ((double *) cov_ord[phen_ind])[supp->filter[j]];
-                }
-                off++;
-            }
-
-            // 2) Test that matrix of genotypes has full rank
-            //gsl_matrix_view T = gsl_matrix_view_array_with_tda(supp->reg, dimx, dimy0, dimy);
-
-            // 3) Covariates
-            for (size_t z = 0, zz = off, yy = 0; z < cnt; z++, zz += dimy, yy = 0)
-            {
-                for (size_t j = 0, k = 0, zzz = 0; j < term_len_cnt; j++)
-                {
-                    size_t pos = 0, stride = 1;
-                    for (size_t l = 0; k < term_len[j]; k++, l++)
-                    {
-                        size_t d = term[k].deg;
-                        if (d)
-                        {
-                            double x0 = ((double *) cov_ord[term[k].off])[supp->filter[z]], x = x0;
-                            stride *= d;
-                            supp->reg_vect[pos++] = x;
-                            for (size_t y = 1; y < d; y++)
-                                supp->reg_vect[pos++] = x *= x0;
-                        }
-                        else
-                        {
-                            size_t r = ((size_t *) cov_ord[term[k].off])[supp->filter[z]];
-                            stride *= cov_level[term[k].off] - 1;
-                            for (size_t y = 1; y < cov_level[term[k].off]; y++)
-                                supp->reg_vect[pos++] = y == r;
-                        }
-                        supp->reg_vect_len[l] = pos;
-                    }
-                    tensor_prod(term_len[j] - yy, supp->reg_vect, supp->reg_vect_len, supp->reg + zz + zzz, supp->ind);
-                    zzz += stride;
-                    yy = term_len[j];
-                }
-                if (i == 3) memcpy(supp->reg + zz + dimy * cnt, supp->reg + zz, sizeof(*supp->reg) * (dimy - dimy0)); // Allelic mode 
-            }
-
-            // 3) Fit model for 'QAS'
-            gsl_vector *P = gsl_vector_alloc(dimy);
-            gsl_matrix_view R = gsl_matrix_view_array(supp->reg, dimx, dimy);
-            gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx);
-            gsl_multifit_linear_workspace *W = gsl_multifit_linear_alloc(dimx, dimy);
-            gsl_matrix *C = gsl_matrix_alloc(dimy, dimy);
+            size_t dimx = cnt, dimy = 2 + reg_cnt;
+            
+            for (size_t j = 0, k = 1; j < dimx; j++, k += tda)
+                supp->reg[k] = (double) gen[supp->filter[j]];
+            
+            // Fit model for 'QAS'
+            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg, dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
+            gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
             double chisq;
             size_t rk;
-            gsl_multifit_linear_tsvd(&R.matrix, &O.vector, 1e-5, P, C, &chisq, &rk, W);
-            qas = gsl_vector_get(P, 1);
-
-            gsl_matrix_free(C);
-            gsl_vector_free(P);
-            gsl_multifit_linear_free(W);
+            gsl_multifit_linear_tsvd(&R.matrix, &O.vector, 1e-5, &P.vector, &C.matrix, &chisq, &rk, supp->workspace);
         }
-        res.qas[i] = qas;
+        res.qas[i] = supp->par[1];
     }
     return res;
 }
@@ -908,7 +729,6 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
         }        
     }
 
-
     /*
     uint8_t *bits = NULL;
     if (!array_init(&bits, NULL, UINT8_CNT(arg.term_len_cnt), sizeof(*bits), 0, ARRAY_STRICT | ARRAY_CLEAR)) return 0;
@@ -976,16 +796,16 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     size_t ucnt = arg.term_len_cnt;
     if (!orders_stable_unique(&ord, data, &ucnt, blk * sizeof(*data), term_cmp, &(struct term_cmp_thunk) { .blk = blk, .blk0 = blk0 })) return 0;
 
-    size_t dimx = 0;
+    size_t dimy = 0;
     for (size_t i = 0; i < ucnt; i++)
-        dimx += par_term[ord[i]];
+        dimy += par_term[ord[i]];
     
     double *reg;
-    if (!array_init(&reg, NULL, dimx * cov.dim, sizeof(*reg), 0, ARRAY_STRICT)) return 0;
+    if (!array_init(&reg, NULL, dimy * cov.dim, sizeof(*reg), 0, ARRAY_STRICT)) return 0;
     
-    for (size_t x = 0; x < cov.dim; x++)
+    for (size_t x = 0, pos = 0; x < cov.dim; x++)
     {
-        for (size_t i = 0, pos = 0; i < ucnt; i++)
+        for (size_t i = 0; i < ucnt; i++)
         {
             size_t ind = ord[i], off = 0, mul = 1, j = 0;
             for (; j < blk0; j++) if (size_bit_test(data + blk * ind + blk0, j))
@@ -1002,21 +822,21 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
                 continue;
             }
             double pr = 1.;
-            for (size_t j = 0; j < blk0; j++)
+            for (j = 0; j < blk0; j++) if (data[j])
             {
-                if (!data[j]) continue;
                 double val = j % COV_SORT_CNT ? (double) ((size_t *) cov.ord[j])[x] : ((double *) cov.ord[j])[x];
-                pr *= pow(val, data[j]);
+                pr *= pow(val, (size_t) data[j]);
             }
             reg[pos + off] = pr;
+            pos += par_term[ind];
         }
     }
 
     struct lm_supp supp;
-    if (!lm_init(&supp, cov.dim, dimx)) return 0;
+    if (!lm_init(&supp, cov.dim, dimy)) return 0;
 
-    struct lm_term phen = { .off = 0, .deg = 1 };
-    if (!cov_querry(&cov, &(struct buff) {.str = (char *) phen_name }, &phen, 1, log)) return 0;
+    struct lm_term phen = { .off = 0, .deg = 1, .sort = 0 };
+    if (!cov_querry(&cov, &(struct buff) { .str = (char *) phen_name }, &phen, 1, log)) return 0;
 
     FILE *f = fopen(path_out, "w");
     if (!f)
@@ -1028,7 +848,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     for (size_t i = 0; i < snp_cnt; i++)
     {
         uint64_t t = get_time();
-        struct categorical_res x = lm_impl(&supp, gen + i * cov.dim, cov.ord, phen.off, cov.level, cov.dim, dimx, arg.term, arg.term_len, arg.term_len_cnt, 15);
+        struct categorical_res x = lm_impl(&supp, gen + i * cov.dim, reg, cov.ord[phen.off], cov.dim, dimy, 15);
         fprintf(f,
             "%zu,%.15e,%.15e\n"
             "%zu,%.15e,%.15e\n"
