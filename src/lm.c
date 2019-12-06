@@ -53,11 +53,11 @@ bool lm_init(struct lm_supp *supp, size_t phen_cnt, size_t reg_cnt)
 {
     //supp->par = NULL;
     //gsl_vector_alloc(reg_cnt + 3);
-    supp->workspace = gsl_multifit_linear_alloc(phen_cnt, reg_cnt + 3);
+    supp->workspace = gsl_multifit_linear_alloc(2 * phen_cnt, reg_cnt + 3);
 
     if (supp->workspace &&
         //array_init(&supp->reg_vect_len, NULL, term_max_len, sizeof(*supp->reg_vect_len), 0, ARRAY_STRICT) &&
-        array_init(&supp->cov, NULL, (reg_cnt + 3) * reg_cnt + 3, sizeof(*supp->cov), 0, ARRAY_STRICT) &&
+        array_init(&supp->cov, NULL, (reg_cnt + 3) * (reg_cnt + 3), sizeof(*supp->cov), 0, ARRAY_STRICT) &&
         array_init(&supp->par, NULL, reg_cnt + 3, sizeof(*supp->par), 0, ARRAY_STRICT) &&
         array_init(&supp->reg, NULL, (reg_cnt + 3) * phen_cnt, 2 * sizeof(*supp->reg), 0, ARRAY_STRICT) &&
         array_init(&supp->obs, NULL, phen_cnt, 2 * sizeof(*supp->obs), 0, ARRAY_STRICT) &&
@@ -157,7 +157,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
         }
 
         // Fit BASELINE model
-        gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg, dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
+        gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + 2, dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
         gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
         size_t rk;
@@ -228,7 +228,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
                 supp->reg[k] = (double) gen[supp->filter[j]];
             
             // Fit model for 'QAS'
-            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg, dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
+            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + 1, dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
             gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
             double chisq;
@@ -595,8 +595,8 @@ void cov_close(struct cov *cov)
     str_pool_close(&cov->pool);
     free(cov->buff.str);
     free(cov->level);
+    for (size_t i = 0; i < COV_SORT_CNT * cov->cnt; free(cov->ord[i++]));
     free(cov->ord);
-    //for (size_t i = 0; i < COV_SORT_CNT * cov->cnt; free(cov->off[i++]));
     free(cov->off);
 }
 
@@ -795,7 +795,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     uintptr_t *ord;
     size_t ucnt = arg.term_len_cnt;
     if (!orders_stable_unique(&ord, data, &ucnt, blk * sizeof(*data), term_cmp, &(struct term_cmp_thunk) { .blk = blk, .blk0 = blk0 })) return 0;
-
+        
     size_t dimy = 0;
     for (size_t i = 0; i < ucnt; i++)
         dimy += par_term[ord[i]];
@@ -825,7 +825,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             for (j = 0; j < blk0; j++) if (data[j])
             {
                 double val = j % COV_SORT_CNT ? (double) ((size_t *) cov.ord[j])[x] : ((double *) cov.ord[j])[x];
-                pr *= pow(val, (size_t) data[j]);
+                pr *= pow(val, (double) data[j]);
             }
             reg[pos + off] = pr;
             pos += par_term[ind];
@@ -859,12 +859,17 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             4 * i + 3, x.nlpv[2], x.qas[2],
             4 * i + 4, x.nlpv[3], x.qas[3]);
         fflush(f);
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Computation of linear model for snp no. %~uz took %~T.\n", i, t, get_time());
+        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Computation of linear model for snp no. %~uz took %~T.\n", i + 1, t, get_time());
     }
     fclose(f);
+    lm_close(&supp);
 
+    free(reg);
+    free(gen);
     free(data);
-    //free(bits);
+    free(par_term);
+    free(ord);
+    cov_close(&cov);
     lm_expr_arg_close(&arg);    
     return 1;
 }

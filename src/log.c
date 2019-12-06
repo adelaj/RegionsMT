@@ -806,7 +806,7 @@ bool log_message_crt(struct log *restrict log, struct code_metric code_metric, e
 
 bool log_message_fopen(struct log *restrict log, struct code_metric code_metric, enum message_type type, const char *restrict path, Errno_t err)
 {
-    return log_message_fmt(log, code_metric, type, "Unable to open the file %~P: %C!\n", path, err);
+    return log_message_fmt(log, code_metric, type, "Unable to open the file %~P. %C!\n", path, err);
 }
 
 bool log_message_fseek(struct log *restrict log, struct code_metric code_metric, enum message_type type, int64_t offset, const char *restrict path)

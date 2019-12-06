@@ -418,7 +418,7 @@ static int Main(int argc, char **argv)
     };
 
     struct log log;
-    if (log_init(&log, NULL, 1 + 1 * BLOCK_WRITE, 0, &ttl_style, &style, NULL))
+    if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, NULL))
     {
         //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~~#*%~#*", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, 12041241241ull);
         //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~#*%~#*.\n", 0x393, 920);
@@ -592,16 +592,13 @@ static void argv_dispose(size_t argc, char **argv)
 static int Wmain(int argc, wchar_t **wargv)
 {
     // Memory leaks will be reported at the program exit
-    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF);
+    _CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
     _CrtSetReportMode(_CRT_WARN, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_WARN, _CRTDBG_FILE_STDERR);
     _CrtSetReportMode(_CRT_ERROR, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_ERROR, _CRTDBG_FILE_STDERR);
     _CrtSetReportMode(_CRT_ASSERT, _CRTDBG_MODE_FILE);
     _CrtSetReportFile(_CRT_ASSERT, _CRTDBG_FILE_STDERR);
-
-    _CrtMemState ms1;
-    _CrtMemCheckpoint(&ms1);
 
     // Trying to make console output UTF-8 friendly
     SetConsoleOutputCP(CP_UTF8);
@@ -616,21 +613,9 @@ static int Wmain(int argc, wchar_t **wargv)
 
     // Performing UTF-16LE to UTF-8 translation and executing main routine
     char **argv;
-    int main_res = EXIT_FAILURE;
-    if (argv_from_wargv(&argv, argc, wargv))
-    {
-        main_res = Main(argc, argv);
-        argv_dispose(argc, argv);
-    }
-
-    _CrtMemState ms2, md;
-    _CrtMemCheckpoint(&ms2);
-    if (_CrtMemDifference(&md, &ms1, &ms2))
-    {
-        _CrtMemDumpAllObjectsSince(&ms1);
-        _CrtMemDumpStatistics(&md);
-    }
-
+    if (!argv_from_wargv(&argv, argc, wargv)) return EXIT_FAILURE;
+    int main_res = Main(argc, argv);
+    argv_dispose(argc, argv);
     return main_res;
 }
 

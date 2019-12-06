@@ -21,6 +21,7 @@ test($$1): $(EP2134)/RUN_TESTS.log)
 endef
 
 TARGET := RegionsMT
+override CLEAN := $(if $(call coalesce,CLEAN,,),$(if $(filter all,$(CLEAN)),$(patsubst %,all(%),$(TARGET)) $(filter-out all,$(CLEAN)),$(CLEAN)))
 
 $(call var_reg,$$$$2.exe,,EXE,$(TARGET),gcc@mingw:%:%)
 
@@ -43,7 +44,6 @@ $(call build,msvc_cmake,$(TARGET),$(call matrix_trunc,1 2,$(MSVC_MATRIX)))
 $(call build,cc,$(TARGET),$(CC_MATRIX))
 $(call build,msvc_cmake_target,$(TARGET),$(MSVC_MATRIX))
 
-override CLEAN += $(patsubst %,all(%),$(TARGET))
 $(do_clean)
 
 include $(wildcard $(call coalesce,INCLUDE,))

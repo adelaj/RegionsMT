@@ -30,9 +30,9 @@ $(call var_reg,-D_UCRT -D__MSVCRT_VERSION__=0x1400 -D_UNICODE -D__USE_MINGW_ANSI
 $(call var_reg,-mcrtdll=ucrt,$$1,LDLIB:%:gcc@mingw:%:%)
 
 # Warning! Add "/D_DLL" if using "/MD" instead of "/MT"
-$(call var_reg,/MP /arch:AVX /volatile:ms /D_DLL /D_UNICODE /D_CRT_SECURE_NO_WARNINGS,$$1,CFLAGS:%:msvc:%:%)
-$(call var_reg,/MDd /Od /RTC1 /Zi /FS /D_DEBUG,$$1,CFLAGS:%:msvc:%:Debug)
-$(call var_reg,/MD /GL /O2,$$1,CFLAGS:%:msvc:%:Release)
+$(call var_reg,/MP /arch:AVX /volatile:ms /D_UNICODE /D_CRT_SECURE_NO_WARNINGS,$$1,CFLAGS:%:msvc:%:%)
+$(call var_reg,/MTd /Od /RTC1 /Zi /FS /D_DEBUG,$$1,CFLAGS:%:msvc:%:Debug)
+$(call var_reg,/D_DLL /MD /GL /O2,$$1,CFLAGS:%:msvc:%:Release)
 $(call var_reg,/LTCG,$$1,LDFLAGS ARFLAGS,%:msvc:%:Release)
 $(call var_reg,/SUBSYSTEM:CONSOLE,$$1,LDFLAGS:%:msvc:%:%)
 $(call var_reg,/DEBUG /INCREMENTAL,$$1,LDFLAGS:%:msvc:%:Debug)

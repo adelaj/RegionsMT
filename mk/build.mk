@@ -37,10 +37,11 @@ on_error = ([ -f $1 ] && (cat $1; mv $1 $(1:.log=.error); false))
 
 # Warning! 'CMAKE_C_LINK_EXECUTABLE' has no effect for 'mingw' toolchains
 define cc_cmake =
-$(call gather,$(addprefix $(P2134),.log .error),)\
+$(call gather,$(P2134) $(addprefix $(P2134),.log .error),)\
 $(call clean,$(P2134),rm-r,all($1))\
 $(call clean,$(addprefix $(P2134),.log .error),rm,all($1))\
 $(eval
+$(EP2134): $(EP2134).log 
 $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
     $$(strip $(CMAKE) \
     -G "Unix Makefiles" \
@@ -72,13 +73,14 @@ $$(strip $(CMAKE) \
 || $$(call on_error,$$(basename $$@).log))
 
 define msvc_cmake =
-$(call gather,$(addprefix $(P213),.log .error),)
+$(call gather,$(P213) $(addprefix $(P213),.log .error),)
 $(call clean,$(P213),rm-r,all($1))
 $(call clean,$(addprefix $(P213),.log .error),rm,all($1))
 $(eval MSVC_CREQ := $(addprefix /I../../,$(basename $(call fetch_var2,CREQ $(R123),. $1 $2 $3))))
 $(eval MSVC_LDREQ_RELEASE := $(patsubst %,../../%,$(call fetch_var2,LDREQ $(R123) Release,. $1 $2 $3 Release)))
 $(eval MSVC_LDREQ_DEBUG := $(patsubst %,../../%,$(call fetch_var2,LDREQ $(R123) Debug,. $1 $2 $3 Debug)))
 $(eval
+$(EP213): $(EP213).log
 $(EP213).log: $$(PREFIX)/$$1/CMakeLists.txt $$(call fetch_var2,CREQ $(ER123),. $$1 $$2 $$3)
     $$(strip $(CMAKE) \
     -G "Visual Studio 16 2019" \
@@ -109,10 +111,11 @@ $(CMAKE) \
 || $$(call on_error,$$(basename $$@).log)
 
 define git = 
-$(call gather,$(addprefix $(PREFIX)/$1,.log .error),)\
+$(call gather,$(PREFIX)/$1 $(addprefix $(PREFIX)/$1,.log .error),)\
 $(call clean,$(PREFIX)/$1,rm-rf,git($1))\
 $(call clean,$(addprefix $(PREFIX)/$1,.log .error),rm,git($1))\
 $(eval
+$$(PREFIX)/$$1: $$(PREFIX)/$$1.log
 $$(PREFIX)/$$1.log:
     $(if $(wildcard $(PREFIX)/$1),\
     $(GIT) -C $$(@:.log=) pull --depth 1 &> $$@,\
