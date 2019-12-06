@@ -54,7 +54,7 @@ do_clean_base =\
 $(if $(call var_base_decl,$1,$$(filter-out $$($$3),$$1),DO_CLEAN),\
 $(eval clean: | clean($$1))\
 $(if $(wildcard $1),\
-$(if $(call var_base_decl,$(foreach i,$(CLEAN),$(call coalesce,CHILD:$i:$1,)),,CHILD:%:$1),\
+$(if $(call var_base_decl,$(strip $(foreach i,$(CLEAN),$(call coalesce,CHILD:$i:$1,))),,CHILD:%:$1),\
 $(eval clean($$1): | $$(patsubst %,clean(%),$$(CHILD:%:$$1)))\
 $(call vect,1,$(CHILD:%:$1),do_clean_base)\
 $(if $(or $(filter $(call coalesce,DIRTY,),$(CHILD:%:$1)),$(filter-out $(CHILD:%:$1),$(wildcard $1/*))),\
@@ -63,4 +63,4 @@ $(call rmdir,clean($1))),\
 $(call $(lastword noop $(foreach i,$(CLEAN),$(call coalesce,LEAF:$i:$1,))),clean($1))),\
 $(call noop,clean($1))))
 
-do_clean = $(call vect,1,$(foreach i,$(CLEAN),$(call coalesce,CLEAN:$i,)),do_clean_base)
+do_clean = $(call vect,1,$(strip $(foreach i,$(CLEAN),$(call coalesce,CLEAN:$i,))),do_clean_base)

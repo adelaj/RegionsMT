@@ -28,7 +28,7 @@ $(eval
 $(EP2134)/$(CC_EXE): $(CC_OBJ) $$(call fetch_var2,LDREQ $(ER1234),. $$1 $$2 $$3 $$4)
     $$(strip $(call fetch_var,LD $(TOOLCHAIN:$2)) $(call fetch_var,LDFLAGS $(R1234)) -o $$@ $$^ $(call fetch_var,LDLIB $(R1234)))
 $(EP2134)/obj/%.o: $(SRC:$1)/% $(CC_CREQ) | $(EP2134)/mk/%.mk
-    $$(strip $(call fetch_var,CC $(TOOLCHAIN:$2)) -MMD -MP -MF$$| $(call fetch_var,CFLAGS $(R1234)) $(addprefix -I,$(CC_CREQ:.log=)) -o $$@ -c $$<)
+    $$(strip $(call fetch_var,CC $(TOOLCHAIN:$2)) -MMD -MP -MF$$(firstword $$|) $(call fetch_var,CFLAGS $(R1234)) $(addprefix -I,$(CC_CREQ:.log=)) -o $$@ -c $$<)
 all($$1): $(EP2134)/$(CC_EXE)
 test($$1): $(EP2134)/$(CC_EXE))
 endef
