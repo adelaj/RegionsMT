@@ -29,11 +29,11 @@ test($$1): $(EP2134)/RUN_TESTS.log)
 endef
 
 define msvc_cmake_pthread-win32 =
-$(call gather,$(P2134)/pthreadVSE2.lib,)\
+$(call gather,$(P2134)/pthread-win32.log,)\
 $(eval
-$(EP2134)/pthreadVSE2.lib: $(EP2134)/pthread-win32.log
 $(EP2134)/%.log: $(EP213).log
     $(msvc_cmake_build)
+$(EP2134)/pthreadVSE2.lib: $(EP2134)/pthread-win32.log
 $(EP2134)/ALL_BUILD.log: $(EP2134)/pthreadVSE2.lib
 all($$1): $(EP2134)/ALL_BUILD.log
 $(EP2134)/RUN_TESTS.log: $(EP2134)/ALL_BUILD.log
