@@ -1,14 +1,14 @@
 clone_depth: 1
 
-image: 
-  - Visual Studio 2019
-
 environment:
     matrix:
-      - MSYSTEM: MSYS2
-      - MSYSTEM: MINGW32
+      - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+        MSYSTEM: MSYS2
+      - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+        MSYSTEM: MINGW32
         ARCH: i686
-      - MSYSTEM: MINGW64
+      - APPVEYOR_BUILD_WORKER_IMAGE: Visual Studio 2019
+        MSYSTEM: MINGW64
         ARCH: x86_64
 
 install:
@@ -33,10 +33,6 @@ after_test:
 
 for:
   -
-    image:
-        only:
-          - Visual Studio 2019
-
     matrix:
         only:
           - MSYSTEM: MSYS2
