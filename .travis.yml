@@ -21,6 +21,7 @@ matrix:
                   - clang-8
                   - llvm-8
                   - llvm-8-dev
+                  - lld
         env:
           - CMAKE=/usr/bin/cmake
           - TOOLCHAIN=clang:clang-8

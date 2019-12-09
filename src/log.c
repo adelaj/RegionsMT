@@ -699,15 +699,11 @@ bool log_init(struct log *restrict log, char *restrict path, size_t lim, enum lo
 bool log_flush(struct log *restrict log)
 {
     size_t cnt = log->cnt;
-    if (cnt)
-    {
-        size_t wr = fwrite(log->buff, 1, cnt, log->file);
-        log->tot += wr;
-        log->cnt = 0;
-        fflush(log->file);
-        return wr == cnt;
-    }
-    return 1;
+    if (!cnt) return 1;
+    size_t wr = fwrite(log->buff, 1, cnt, log->file);
+    log->tot += wr;
+    log->cnt = 0;
+    return !fflush(log->file) && wr == cnt;
 }
 
 // May be used for 'log' allocated by 'calloc' (or filled with zeros statically)

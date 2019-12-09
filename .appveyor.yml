@@ -1,6 +1,7 @@
 clone_depth: 1
 
-image: Visual Studio 2019
+image: 
+  - Visual Studio 2019
 
 environment:
     matrix:
@@ -12,11 +13,11 @@ environment:
 
 install:
   - ps: |
-        $env:MATRIX=C:\msys64\usr\bin\bash.exe -c 'echo gcc@mingw:$ARCH:{Debug,Release}'
+        $env:MATRIX=C:\msys64\usr\bin\bash.exe -c 'echo {gcc,clang}@mingw:$ARCH:{Debug,Release}'
         $env:MAKE="mingw32-make"
   - C:\msys64\usr\bin\bash.exe -lc "pacman -Syu --noconfirm"
   - C:\msys64\usr\bin\bash.exe -lc "pacman -Syu --noconfirm"
-  - C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-$ARCH-gcc mingw-w64-$ARCH-make mingw-w64-$ARCH-cmake"
+  - C:\msys64\usr\bin\bash.exe -lc "pacman -S --noconfirm --needed mingw-w64-$ARCH-gcc mingw-w64-$ARCH-clang mingw-w64-$ARCH-lld mingw-w64-$ARCH-make mingw-w64-$ARCH-cmake"
       
 build_script:
   - ps: |
@@ -32,6 +33,10 @@ after_test:
 
 for:
   -
+    image:
+        only:
+          - Visual Studio 2019
+
     matrix:
         only:
           - MSYSTEM: MSYS2

@@ -40,6 +40,9 @@ define cc_cmake =
 $(call gather,$(P2134) $(addprefix $(P2134),.log .error),)\
 $(call clean,$(P2134),rm-r,all($1))\
 $(call clean,$(addprefix $(P2134),.log .error),rm,all($1))\
+$(eval CC_CFLAGS := $(call fetch_var,CFLAGS $(R1234)))\
+$(eval CC_LDFLAGS := $(call fetch_var,LDFLAGS $(R1234)))\
+$(eval CC_CREQ := $(addprefix -I../../,$(basename $(call fetch_var2,CREQ $(R1234),. $1 $2 $3 $4))))\
 $(eval
 $(EP2134): $(EP2134).log 
 $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
@@ -52,10 +55,14 @@ $(EP2134).log: $$(PREFIX)/$$1/CMakeLists.txt
     -D CMAKE_AR="$(shell which $(call fetch_var,AR $(TOOLCHAIN:$2)))" \
     -D CMAKE_RANLIB="$(shell which $(call fetch_var,RANLIB $(TOOLCHAIN:$2)))" \
     -D CMAKE_BUILD_TYPE="$4" \
-    -D CMAKE_C_FLAGS_$(call uc,$4)="$(call fetch_var,CFLAGS $(R1234))" \
-    -D CMAKE_EXE_LINKER_FLAGS_$(call uc,$4)="$(call fetch_var,LDFLAGS $(R1234))" \
+    -D CMAKE_C_FLAGS_$(call uc,$4)="$(CC_CFLAGS)" \
+    -D CMAKE_EXE_LINKER_FLAGS_$(call uc,$4)="$(CC_LDFLAGS)" \
     -D CMAKE_C_LINK_EXECUTABLE="<CMAKE_LINKER> <LINK_FLAGS> <OBJECTS> -o <TARGET> <LINK_LIBRARIES>" \
     -D CMAKE_REQUIRED_LIBRARIES="$(call fetch_var,LDLIB $(R1234))" \
+    -D CMAKE_REQUIRED_INCLUDES="$(call compress,;,$(CC_CREQ))" \
+    -D CMAKE_REQUIRED_LINK_OPTIONS="$(call compress,;,$(CC_LDFLAGS))" \
+    -D CMAKE_REQUIRED_DEFINITIONS="$(filter -D%,$(CC_CFLAGS))" \
+    -D CMAKE_REQUIRED_FLAGS="$(filter-out -D%,$(CC_CFLAGS))" \
     $(call fetch_var,CMAKEFLAGS $(R1234)) \
     -S $$(<D) \
     -B $$(@:.log=) \

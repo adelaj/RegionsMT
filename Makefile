@@ -23,7 +23,7 @@ endef
 TARGET := RegionsMT
 override CLEAN := $(if $(call coalesce,CLEAN,,),$(if $(filter all,$(CLEAN)),$(patsubst %,all(%),$(TARGET)) $(filter-out all,$(CLEAN)),$(CLEAN)))
 
-$(call var_reg,$$$$2.exe,,EXE,$(TARGET),gcc@mingw:%:%)
+$(call var_reg,$$$$2.exe,,EXE,$(TARGET),gcc@mingw clang@mingw,%:%)
 
 $(call var,$(ROOT)/src,,SRC,$(TARGET))
 $(call var_reg,$(addprefix -l,m pthread),$$1,LDLIB,$(TARGET),$(CC_TOOLCHAIN),%:%)
