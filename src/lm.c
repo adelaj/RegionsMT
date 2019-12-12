@@ -57,11 +57,11 @@ bool lm_init(struct lm_supp *supp, size_t phen_cnt, size_t reg_cnt)
 
     if (supp->workspace &&
         //array_init(&supp->reg_vect_len, NULL, term_max_len, sizeof(*supp->reg_vect_len), 0, ARRAY_STRICT) &&
-        array_init(&supp->cov, NULL, (reg_cnt + 3) * (reg_cnt + 3), sizeof(*supp->cov), 0, ARRAY_STRICT) &&
-        array_init(&supp->par, NULL, reg_cnt + 3, sizeof(*supp->par), 0, ARRAY_STRICT) &&
-        array_init(&supp->reg, NULL, (reg_cnt + 3) * phen_cnt, 2 * sizeof(*supp->reg), 0, ARRAY_STRICT) &&
-        array_init(&supp->obs, NULL, phen_cnt, 2 * sizeof(*supp->obs), 0, ARRAY_STRICT) &&
-        array_init(&supp->filter, NULL, phen_cnt, sizeof(*supp->filter), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
+        array_init(&supp->cov, NULL, (reg_cnt + 3) * (reg_cnt + 3), sizeof(*supp->cov), 0, ARRAY_STRICT).status &&
+        array_init(&supp->par, NULL, reg_cnt + 3, sizeof(*supp->par), 0, ARRAY_STRICT).status &&
+        array_init(&supp->reg, NULL, (reg_cnt + 3) * phen_cnt, 2 * sizeof(*supp->reg), 0, ARRAY_STRICT).status &&
+        array_init(&supp->obs, NULL, phen_cnt, 2 * sizeof(*supp->obs), 0, ARRAY_STRICT).status &&
+        array_init(&supp->filter, NULL, phen_cnt, sizeof(*supp->filter), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
         //array_init(&supp->outer, NULL, phen_ucnt, GEN_CNT * sizeof(*supp->outer), 0, ARRAY_STRICT) &&
         //array_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->tbl), 0, ARRAY_STRICT)
         1) return 1;
@@ -123,6 +123,32 @@ bool check_matrix_full_rank(double *matrix, double *dot, double *norm, size_t di
     return 0;
 }
 
+/*
+void gauss(double *m, bool *piv, size_t dimx, size_t dimy, size_t tda)
+{
+    size_t dim = MAX(dimx, dimy);
+    memset(piv, 0, dim * sizeof(*piv));
+    for (size_t i = 0; i < dimx; i++)
+    {
+        size_t x = 0, y = 0;
+        double max = m[0];
+        for (size_t j = 1; j < dimx; j++) if (!piv[j])
+        {
+            for (size_t k = 0; k < dimy; k++) if (!piv[k])
+            {
+                double tmp = m[k + j * tda];
+                if (fabs(tmp) <= max) continue;
+                x = j;
+                y = k;
+                max = tmp;
+            }
+        }
+        piv[y] = 1;
+
+    }
+}
+*/
+
 // 'phen' is actually a double pointer
 struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double *phen, size_t phen_cnt, size_t reg_cnt, enum categorical_flags flags)
 {
@@ -139,7 +165,8 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
     //
     // BASELINE MODEL
     //
-    double s_h;
+    size_t rk;
+    double s_h, tol = 1e-9;
     {
         size_t dimx = cnt, dimy = 1 + reg_cnt;
         
@@ -160,8 +187,10 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
         gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + 2, dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
         gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
-        size_t rk;
-        gsl_multifit_linear_tsvd(&R.matrix, &O.vector, 1e-5, &P.vector, &C.matrix, &s_h, &rk, supp->workspace);
+        
+        gsl_multifit_linear_tsvd(&R.matrix, &O.vector, tol, &P.vector, &C.matrix, &s_h, &rk, supp->workspace);
+
+
     }
 
     // Performing computations for each alternative
@@ -172,8 +201,10 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
         //
         double ss_e;
         size_t df_e;
+        uint8_t bits = 0;
         {
             size_t dimx = cnt << (i == 3), dimy = 2 + (i == 0) + reg_cnt;
+            if (dimy > dimx) continue;
             
             // Genotypes
             switch (i)
@@ -182,35 +213,84 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
                 for (size_t j = 0, k = 0; j < dimx; j++, k += tda)
                 {
                     uint8_t g = gen[supp->filter[j]];
+                    bits |= 1 << g;
                     supp->reg[k] = (double) (g == 1);
                     supp->reg[k + 1] = (double) (g == 2);
-                }                
+                }
+                switch (dimx) // Checking consistency of the genotypes
+                {
+                case 0:
+                    continue;
+                case 1:
+                    break;
+                case 2:
+                    if (bits == 3 || bits == 5 || bits == 6) break;
+                    continue;
+                default:
+                    if (bits == 7) break;
+                    continue;
+                }
                 break;
             case 1: // recessive
-                for (size_t j = 0, k = 1; j < dimx; j++, k += tda) 
-                    supp->reg[k] = (double) (gen[supp->filter[j]] == 2);
+                for (size_t j = 0, k = 1; j < dimx; j++, k += tda)
+                {
+                    uint8_t g = gen[supp->filter[j]];
+                    bits |= 1 << g;
+                    supp->reg[k] = (double) (g == 2);
+                }
+                switch (dimx)
+                {
+                case 0:
+                    continue;
+                case 1:
+                    break;
+                default:
+                    if (bits == 5 || bits == 7) break;
+                    continue;
+                }
                 break;
             case 2: // dominant
                 for (size_t j = 0, k = 1; j < dimx; j++, k += tda)
                 {
                     uint8_t g = gen[supp->filter[j]];
+                    bits |= 1 << g;
                     supp->reg[k] = (double) ((g == 1) || (g == 2));
                 }
+                switch (dimx)
+                {
+                case 0:
+                    continue;
+                case 1:
+                    break;
+                default:
+                    if (bits == 3 || bits == 5 || bits == 7) break;
+                    continue;
+                }
                 break;
-            default: // allelic
+            case 3: // allelic
                 for (size_t j = 0, k = 1; j < cnt; j++, k += tda)
                 {
                     uint8_t g = gen[supp->filter[j]];
+                    bits |= 1 << g;
                     supp->reg[k] = (double) (g == 2);
                     supp->reg[k + cnt * tda] = (double) ((g == 1) || (g == 2));
+                }
+                switch (dimx)
+                {
+                case 0:
+                    continue;
+                default:
+                    if ((bits & 2) || bits == 5) break;
+                    continue;
                 }
             }
             
             // Fit model for 'TEST'
+            
             gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + (i != 0), dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
             gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
-            gsl_multifit_linear_tsvd(&R.matrix, &O.vector, 1e-5, &P.vector, &C.matrix, &ss_e, &df_e, supp->workspace);
+            gsl_multifit_linear_tsvd(&R.matrix, &O.vector, tol, &P.vector, &C.matrix, &ss_e, &df_e, supp->workspace);
             df_e = dimx - df_e;
         }
 
@@ -223,17 +303,20 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
         if (i == 0) 
         {
             size_t dimx = cnt, dimy = 2 + reg_cnt;
-            
-            for (size_t j = 0, k = 1; j < dimx; j++, k += tda)
+            if (dimy > dimx) continue;
+
+            for (size_t j = 0, k = 1; j < dimx; j++, k += tda) 
                 supp->reg[k] = (double) gen[supp->filter[j]];
-            
+            // Warning! No bit check is required
+
             // Fit model for 'QAS'
+            
             gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + 1, dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
             gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
             double chisq;
             size_t rk;
-            gsl_multifit_linear_tsvd(&R.matrix, &O.vector, 1e-5, &P.vector, &C.matrix, &chisq, &rk, supp->workspace);
+            gsl_multifit_linear_tsvd(&R.matrix, &O.vector, tol, &P.vector, &C.matrix, &chisq, &rk, supp->workspace);
         }
         res.qas[i] = supp->par[1];
     }
@@ -279,16 +362,16 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
     case LM_EXPR_INIT:
         if (!utf8.val) return 1;
         if (utf8_is_whitespace_len(utf8.val, utf8.len)) return 1; // Removing leading whitespaces        
-        if (!array_init(&arg->term_len, &arg->term_len_cap, 1, sizeof(*arg->term_len), 0, ARRAY_CLEAR) ||
-            !array_init(&arg->term, &arg->term_cap, 1, sizeof(*arg->term), 0, ARRAY_CLEAR) ||
-            !str_pool_init(&arg->pool, 0, 0, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        if (!array_init(&arg->term_len, &arg->term_len_cap, 1, sizeof(*arg->term_len), 0, ARRAY_CLEAR).status ||
+            !array_init(&arg->term, &arg->term_cap, 1, sizeof(*arg->term), 0, ARRAY_CLEAR).status ||
+            !str_pool_init(&arg->pool, 0, 0, 0).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
             arg->term_len[arg->term_len_cnt++]++;
             arg->term_cnt++;
             //if (strchr("^:+()", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
             //else 
-            if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 context->metric = metric;
@@ -316,7 +399,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
                 return 1;
             }
         }
-        else if (!buff_append(context->buff, utf8.chr, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else if (!buff_append(context->buff, utf8.chr, utf8.len, 0).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
             if (!utf8_is_whitespace_len(utf8.val, utf8.len)) context->len = context->buff->len;
@@ -329,7 +412,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
         //if (strchr("^:+(", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
         //else 
         if (utf8.val == ')') log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, metric, "Covariate name expected before %~c", ')');
-        else if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
             context->metric = metric;
@@ -345,15 +428,15 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
         if (utf8.val == ')')
         {
             context->buff->len = context->len;
-            if (!buff_append(context->buff, 0, 0, BUFFER_TERM) ||
-                !str_pool_insert(&arg->pool, context->buff->str, context->len, &arg->term[arg->term_cnt - 1].off, 0, NULL)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            if (!buff_append(context->buff, 0, 0, BUFFER_TERM).status ||
+                !str_pool_insert(&arg->pool, context->buff->str, context->len, &arg->term[arg->term_cnt - 1].off, 0, NULL).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 context->st = LM_EXPR_OP;
                 return 1;
             }
         }
-        else if (!buff_append(context->buff, utf8.chr, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else if (!buff_append(context->buff, utf8.chr, utf8.len, 0).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
             if (!utf8_is_whitespace_len(utf8.val, utf8.len)) context->len = context->buff->len;
@@ -377,7 +460,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
             return 1;
         case '+':
             arg->term[arg->term_cnt - 1].deg = 1;
-            if (!array_test(&arg->term_len, &arg->term_len_cap, sizeof(*arg->term_len), 0, ARRAY_CLEAR, arg->term_len_cnt, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            if (!array_test(&arg->term_len, &arg->term_len_cap, sizeof(*arg->term_len), 0, ARRAY_CLEAR, arg->term_len_cnt, 1).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 context->st = LM_EXPR_TYPE_INIT;
@@ -395,14 +478,14 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
     case LM_EXPR_TYPE_INIT:
         if (!utf8.val) break;
         if (utf8_is_whitespace_len(utf8.val, utf8.len)) return 1; // Removing leading whitespaces
-        if (!array_test(&arg->term, &arg->term_cap, sizeof(*arg->term), 0, ARRAY_CLEAR, arg->term_cnt, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        if (!array_test(&arg->term, &arg->term_cap, sizeof(*arg->term), 0, ARRAY_CLEAR, arg->term_cnt, 1).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
             //arg->len[arg->len_cnt - 1]++;
             arg->term_cnt++;
             //if (strchr("^*+()", utf8.val)) log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
             //else 
-            if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 context->metric = metric;
@@ -438,7 +521,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
             return 1;
         case '+':
             arg->term[arg->term_cnt - 1].deg = context->val.uz;
-            if (!array_test(&arg->term_len, &arg->term_len_cap, sizeof(*arg->term_len), 0, ARRAY_CLEAR, arg->term_len_cnt, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            if (!array_test(&arg->term_len, &arg->term_len_cap, sizeof(*arg->term_len), 0, ARRAY_CLEAR, arg->term_len_cnt, 1).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 context->st = LM_EXPR_TYPE_INIT;
@@ -461,7 +544,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
     case LM_EXPR_FLAG_INIT:
         if (!utf8.val) break;
         if (utf8_is_whitespace_len(utf8.val, utf8.len)) return 1;
-        if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        if (!buff_append(context->buff, utf8.chr, utf8.len, BUFFER_DISCARD).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
             context->metric = metric;
@@ -487,7 +570,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
             }
             break;
         }
-        else if (!buff_append(context->buff, utf8.chr, utf8.len, 0)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+        else if (!buff_append(context->buff, utf8.chr, utf8.len, 0).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
         else
         {
             if (!utf8_is_whitespace_len(utf8.val, utf8.len)) context->len = context->buff->len;
@@ -531,7 +614,7 @@ static bool cov_name_handler(const char *str, size_t len, void *res, void *Conte
         //return 1;
     }*/   
     size_t *p_ind;
-    unsigned r = str_pool_insert(&cov->pool, str, len, NULL, sizeof(size_t), &p_ind);
+    unsigned r = str_pool_insert(&cov->pool, str, len, NULL, sizeof(size_t), &p_ind).status;
     if (!r) return 0;
     // if (r & HASH_PRESENT) return 0;
     *p_ind = cov->cnt++; // Just override column index with new one
@@ -542,7 +625,7 @@ static bool cov_handler(const char *str, size_t len, void *res, void *Context)
 {
     struct cov *cov = Context;
     size_t off = cov->buff.len + !!cov->buff.len;
-    if (!buff_append(&cov->buff, str, len, BUFFER_INIT | BUFFER_TERM)) return 0;
+    if (!buff_append(&cov->buff, str, len, BUFFER_INIT | BUFFER_TERM).status) return 0;
     *(size_t *) res = off;
     return 1;
 }
@@ -557,7 +640,7 @@ static bool tbl_cov_selector(struct tbl_col *cl, size_t row, size_t col, void *t
         *cl = (struct tbl_col) { .handler = { .read = cov_name_handler }, .context = context->cov };
     else
     {
-        if (!array_test(&context->cov->off, &context->cap, sizeof(*context->cov->off), 0, 0, context->cnt, 1)) return 0;
+        if (!array_test(&context->cov->off, &context->cap, sizeof(*context->cov->off), 0, 0, context->cnt, 1).status) return 0;
         *cl = (struct tbl_col){ .handler = {.read = cov_handler }, .ptr = context->cov->off + context->cnt, .context = context->cov };
         context->cnt++;
     }
@@ -575,13 +658,13 @@ bool cov_init(struct cov *cov, const char *path, struct log *log)
     size_t skip = 0, cnt = 0, length = 0;
     struct tbl_cov_context context = { .cov = cov, .cap = 0 };
     
-    if (str_pool_init(&cov->pool, 200, 0, sizeof(size_t)))
+    if (str_pool_init(&cov->pool, 200, 0, sizeof(size_t)).status)
     {
         if (tbl_read(path, 0, tbl_cov_selector, NULL, &context, NULL, &skip, &cnt, &length, ',', log))
         {            
             cov->dim = cnt - 1;
-            if (array_init(&cov->ord, NULL, cov->cnt, COV_SORT_CNT * sizeof(*cov->ord), 0, ARRAY_CLEAR) &&
-                array_init(&cov->level, NULL, cov->cnt, COV_SORT_CNT * sizeof(*cov->level), 0, 0)) return 1;
+            if (array_init(&cov->ord, NULL, cov->cnt, COV_SORT_CNT * sizeof(*cov->ord), 0, ARRAY_CLEAR).status &&
+                array_init(&cov->level, NULL, cov->cnt, COV_SORT_CNT * sizeof(*cov->level), 0, 0).status) return 1;
             free(cov->level);
             free(cov->ord);
         }
@@ -611,7 +694,8 @@ static int term_cmp(const void *A, const void *B, void *Thunk)
     int cmp = 0;
     size_t i = 0;
     for (; i < thunk->blk0 && !cmp; cmp = size_stable_cmp_asc(a + i, b + i, NULL), i++);
-    for (; i < thunk->blk && !cmp; cmp = size_stable_cmp_asc(&(size_t) { size_bit_scan_forward(~a[i] & b[i]) }, &(size_t) { size_bit_scan_forward(a[i] & ~b[i]) }, NULL), i++);
+    for (; i < thunk->blk && !cmp; i++)
+        cmp = size_stable_cmp_asc(&(size_t) { size_bit_scan_forward(~a[i] & b[i]) }, &(size_t) { size_bit_scan_forward(a[i] & ~b[i]) }, NULL);
     return cmp;
 }
 
@@ -633,10 +717,10 @@ bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t
             if (term[i].sort & COV_SORT_FLAG_STR)
             {
                 *level = cov->dim;
-                if (!ranks_unique(ptr, cov->off + ind * cov->dim, level, sizeof(*cov->off), str_off_cmp, cov->buff.str)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+                if (!ranks_unique(ptr, cov->off + ind * cov->dim, level, sizeof(*cov->off), str_off_cmp, cov->buff.str).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
                 else continue;
             }
-            else if (!array_init(ptr, NULL, cov->dim, sizeof(double), 0, ARRAY_STRICT)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+            else if (!array_init(ptr, NULL, cov->dim, sizeof(double), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
             else
             {
                 for (size_t j = 0; j < cov->dim; j++)
@@ -661,6 +745,78 @@ bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t
     }
     return 1;
 }
+
+static bool lm_term_cnt(size_t *data, size_t blk0, size_t blk, size_t *p_cnt)
+{
+    size_t cnt = 1, j = 1;
+    if (blk0)
+    {
+        if (data[0]) cnt = data[0];
+        for (; j < blk0; j++)
+        {
+            if (!data[j]) continue;
+            size_t hi;
+            cnt = size_mul(&hi, cnt, data[j]);
+            if (hi) return 0;
+        }
+    }
+    else
+    {
+        size_t m = size_pop_cnt(data[0]);
+        if (m) cnt = (size_t) 1 << m;
+    }
+    for (; j < blk; j++)
+    {
+        size_t m = size_pop_cnt(data[j]);
+        if (!m) continue;
+        size_t hi;
+        cnt = size_mul(&hi, cnt, (size_t) 1 << m);
+        if (hi) return 0;
+    }
+    *p_cnt = cnt - 1;
+    return 1;
+}
+
+bool lm_expand(size_t *data, size_t blk0, size_t blk, size_t *p_cnt)
+{
+    size_t cnt = *p_cnt;
+    if (!cnt) return 1;
+    
+    size_t ecnt;
+    if (!lm_term_cnt(data[0], blk0, blk, &ecnt)) return 0;
+    for (size_t i = 1; i < cnt; i++)
+    {
+        size_t car, tmp = ecnt;
+        if (!lm_term_cnt(data[0], blk0, blk, &ecnt)) return 0;
+        ecnt = size_add(&car, ecnt, tmp);
+        if (car) return 0;
+    }
+    
+    size_t *ind = NULL, *edata = NULL;
+    if (array_init(&edata, NULL, ecnt, sizeof(*data) * blk, 0, ARRAY_STRICT | ARRAY_CLEAR).status)
+    {
+        if (array_init(&ind, NULL, blk, sizeof(*ind), 0, ARRAY_STRICT | ARRAY_CLEAR).status)
+        { }
+        free(edata);
+    }
+
+    for (size_t i = 0; i < cnt; i++)
+    {
+        for (;;)
+        {
+            size_t j = 0;
+            for (; j < blk0 && ind[j] == data[i * blk + j]; ind[j] = 0, j++);
+            if (j == blk0)
+            {
+                for (; j < blk; j++);
+                if (j < blk0);
+            }
+            else ind[j]++;
+
+        }
+    }
+}
+
 
 bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen, const char *path_gen, const char *path_out, struct log *log)
 {
@@ -689,7 +845,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
 
     // Warning! Table transposition is required
     size_t *off_trans;
-    if (!array_init(&off_trans, NULL, cov.dim * cov.cnt, sizeof(*off_trans), 0, 0)) return 0;
+    if (!array_init(&off_trans, NULL, cov.dim * cov.cnt, sizeof(*off_trans), 0, 0).status) return 0;
     for (size_t i = 0; i < cov.cnt; i++)
         for (size_t j = 0; j < cov.dim; j++)
             off_trans[i * cov.dim + j] = cov.off[i + cov.cnt * j];
@@ -707,8 +863,8 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     size_t blk0 = cov.cnt * COV_SORT_CNT, blk = blk0 + SIZE_CNT(cov.cnt * COV_SORT_CNT);
     
     size_t *data = NULL, *par_term = NULL;
-    if (!array_init(&data, NULL, arg.term_len_cnt, sizeof(*data) * blk, 0, ARRAY_STRICT | ARRAY_CLEAR)) return 0;
-    if (!array_init(&par_term, NULL, arg.term_len_cnt, sizeof(*data), 0, ARRAY_STRICT | ARRAY_CLEAR)) return 0;
+    if (!array_init(&data, NULL, arg.term_len_cnt, sizeof(*data) * blk, 0, ARRAY_STRICT | ARRAY_CLEAR).status) return 0;
+    if (!array_init(&par_term, NULL, arg.term_len_cnt, sizeof(*data), 0, ARRAY_STRICT | ARRAY_CLEAR).status) return 0;
     
     for (size_t i = 0, j = 0; i < arg.term_len_cnt; i++)
     {
@@ -794,14 +950,14 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
 
     uintptr_t *ord;
     size_t ucnt = arg.term_len_cnt;
-    if (!orders_stable_unique(&ord, data, &ucnt, blk * sizeof(*data), term_cmp, &(struct term_cmp_thunk) { .blk = blk, .blk0 = blk0 })) return 0;
+    if (!orders_stable_unique(&ord, data, &ucnt, blk * sizeof(*data), term_cmp, &(struct term_cmp_thunk) { .blk = blk, .blk0 = blk0 }).status) return 0;
         
     size_t dimy = 0;
     for (size_t i = 0; i < ucnt; i++)
         dimy += par_term[ord[i]];
     
     double *reg;
-    if (!array_init(&reg, NULL, dimy * cov.dim, sizeof(*reg), 0, ARRAY_STRICT)) return 0;
+    if (!array_init(&reg, NULL, dimy * cov.dim, sizeof(*reg), 0, ARRAY_STRICT).status) return 0;
     
     for (size_t x = 0, pos = 0; x < cov.dim; x++)
     {
@@ -815,9 +971,9 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
                 off += (val - 1) * mul;
                 mul *= cov.level[j] - 1;
             }
-            array_broadcast(reg + pos, par_term[ind], sizeof(*reg), &(double) { 0. });
             if (j < blk0)
             {
+                array_broadcast(reg + pos, par_term[ind], sizeof(*reg), &(double) { 0. });
                 pos += par_term[ind];
                 continue;
             }
@@ -827,7 +983,9 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
                 double val = j % COV_SORT_CNT ? (double) ((size_t *) cov.ord[j])[x] : ((double *) cov.ord[j])[x];
                 pr *= pow(val, (double) data[j]);
             }
+            array_broadcast(reg + pos, off, sizeof(*reg), &(double) { 0. });
             reg[pos + off] = pr;
+            array_broadcast(reg + pos + off + 1, size_sub_sat(par_term[ind], off + 1), sizeof(*reg), &(double) { 0. });
             pos += par_term[ind];
         }
     }

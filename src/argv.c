@@ -151,8 +151,7 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                 continue;
             }            
         }
-        if (!array_test(p_arr, p_cnt, sizeof(**p_arr), 0, 0, cnt, 1)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-        else
+        if (log_array(log, CODE_METRIC, array_test(p_arr, p_cnt, sizeof(**p_arr), 0, 0, cnt, 1)).status)
         {
             (*p_arr)[cnt++] = argv[i]; // Storing positional parameters
             continue;
@@ -163,8 +162,8 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
     if (succ)
     {
         if (capture && par.mode == PAR_VALUED) log_message_warning_argv_name(log, CODE_METRIC, argc - 1, ARGV_MISSING_VALUE, capture < 0, str, len);
-        if (!array_test(p_arr, p_cnt, sizeof(**p_arr), 0, ARRAY_REDUCE, cnt)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-        else return 1;
+        array_test(p_arr, p_cnt, sizeof(**p_arr), 0, ARRAY_REDUCE, cnt);
+        return 1;
     }
     free(*p_arr);
     *p_cnt = 0;

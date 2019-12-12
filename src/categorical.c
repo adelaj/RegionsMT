@@ -132,12 +132,12 @@ bool categorical_init(struct categorical_supp *supp, size_t phen_cnt, size_t phe
     if (phen_ucnt > phen_cnt) return 0; // Wrong parameter    
     
     *supp = (struct categorical_supp) { 0 };
-    if (array_init(&supp->phen_val, NULL, phen_ucnt, sizeof(*supp->phen_val), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
-        array_init(&supp->phen_mar, NULL, phen_ucnt, sizeof(*supp->phen_mar), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
-        array_init(&supp->phen_bits, NULL, UINT8_CNT(phen_ucnt), sizeof(*supp->phen_bits), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
-        array_init(&supp->filter, NULL, phen_cnt, sizeof(*supp->filter), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
-        array_init(&supp->outer, NULL, phen_ucnt, GEN_CNT * sizeof(*supp->outer), 0, ARRAY_STRICT) &&
-        array_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->tbl), 0, ARRAY_STRICT)) return 1;
+    if (array_init(&supp->phen_val, NULL, phen_ucnt, sizeof(*supp->phen_val), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
+        array_init(&supp->phen_mar, NULL, phen_ucnt, sizeof(*supp->phen_mar), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
+        array_init(&supp->phen_bits, NULL, UINT8_CNT(phen_ucnt), sizeof(*supp->phen_bits), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
+        array_init(&supp->filter, NULL, phen_cnt, sizeof(*supp->filter), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
+        array_init(&supp->outer, NULL, phen_ucnt, GEN_CNT * sizeof(*supp->outer), 0, ARRAY_STRICT).status &&
+        array_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->tbl), 0, ARRAY_STRICT).status) return 1;
 
     categorical_close(supp);
     return 1;
@@ -158,13 +158,13 @@ bool maver_adj_init(struct maver_adj_supp *supp, size_t snp_cnt, size_t phen_cnt
     if (phen_ucnt > phen_cnt) return 0; // Wrong parameter
 
     *supp = (struct maver_adj_supp) { 0 };
-    if (array_init(&supp->phen_perm, NULL, phen_cnt, sizeof(*supp->phen_perm), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
-        array_init(&supp->phen_mar, NULL, phen_cnt, sizeof(*supp->phen_mar), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
-        array_init(&supp->phen_bits, NULL, UINT8_CNT(phen_ucnt), sizeof(*supp->phen_bits), 0, ARRAY_STRICT | ARRAY_FAILSAFE) &&
-        array_init(&supp->snp_data, NULL, snp_cnt, sizeof(*supp->snp_data), 0, ARRAY_STRICT) &&
-        array_init(&supp->filter, NULL, snp_cnt * phen_cnt, sizeof(*supp->filter), 0, ARRAY_STRICT) && // Result of 'snp_cnt * phen_cnt' is assumed not to be wrapped due to the validness of the 'gen' array
-        array_init(&supp->outer, NULL, phen_ucnt, GEN_CNT * sizeof(*supp->outer), 0, ARRAY_STRICT) &&
-        array_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->tbl), 0, ARRAY_STRICT)) return 1;
+    if (array_init(&supp->phen_perm, NULL, phen_cnt, sizeof(*supp->phen_perm), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
+        array_init(&supp->phen_mar, NULL, phen_cnt, sizeof(*supp->phen_mar), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
+        array_init(&supp->phen_bits, NULL, UINT8_CNT(phen_ucnt), sizeof(*supp->phen_bits), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
+        array_init(&supp->snp_data, NULL, snp_cnt, sizeof(*supp->snp_data), 0, ARRAY_STRICT).status &&
+        array_init(&supp->filter, NULL, snp_cnt * phen_cnt, sizeof(*supp->filter), 0, ARRAY_STRICT).status && // Result of 'snp_cnt * phen_cnt' is assumed not to be wrapped due to the validness of the 'gen' array
+        array_init(&supp->outer, NULL, phen_ucnt, GEN_CNT * sizeof(*supp->outer), 0, ARRAY_STRICT).status &&
+        array_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->tbl), 0, ARRAY_STRICT).status) return 1;
     
     maver_adj_close(supp);
     return 0;

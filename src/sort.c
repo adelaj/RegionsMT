@@ -18,14 +18,15 @@ static bool generic_cmp(const void *A, const void *B, void *Thunk)
     return thunk->cmp(*(const void **) A, *(const void **) B, thunk->context);
 }
 
-bool pointers(void *p_ptr, const void *arr, size_t cnt, size_t sz, cmp_callback cmp, void *context)
+struct array_result pointers(void *p_ptr, const void *arr, size_t cnt, size_t sz, cmp_callback cmp, void *context)
 {
-    uintptr_t *res;
-    if (!array_init(&res, NULL, cnt, sizeof(*res), 0, ARRAY_STRICT)) return 0;
-    for (size_t i = 0; i < cnt; res[i] = (uintptr_t) arr + i * sz, i++);
-    quick_sort(res, cnt, sizeof(*res), generic_cmp, &(struct generic_cmp_thunk) { .cmp = cmp, .context = context });
-    *(uintptr_t **) p_ptr = res;
-    return 1;
+    uintptr_t *ptr;
+    struct array_result res = array_init(&ptr, NULL, cnt, sizeof(*ptr), 0, ARRAY_STRICT);
+    if (!res.status) return res;
+    for (size_t i = 0; i < cnt; ptr[i] = (uintptr_t) arr + i * sz, i++);
+    quick_sort(ptr, cnt, sizeof(*ptr), generic_cmp, &(struct generic_cmp_thunk) { .cmp = cmp, .context = context });
+    *(uintptr_t **) p_ptr = ptr;
+    return res;
 }
 
 struct generic_cmp_stable_thunk {
@@ -42,14 +43,15 @@ static bool generic_cmp_stable(const void *A, const void *B, void *Thunk)
     return 0;
 }
 
-bool pointers_stable(void *p_ptr, const void *arr, size_t cnt, size_t sz, stable_cmp_callback cmp, void *context)
+struct array_result pointers_stable(void *p_ptr, const void *arr, size_t cnt, size_t sz, stable_cmp_callback cmp, void *context)
 {
-    uintptr_t *res;
-    if (!array_init(&res, NULL, cnt, sizeof(*res), 0, ARRAY_STRICT)) return 0;
-    for (size_t i = 0; i < cnt; res[i] = (uintptr_t) arr + i * sz, i++);
-    quick_sort(res, cnt, sizeof(*res), generic_cmp_stable, &(struct generic_cmp_stable_thunk) { .cmp = cmp, .context = context });
-    *(uintptr_t **) p_ptr = res;
-    return 1;
+    uintptr_t *ptr;
+    struct array_result res = array_init(&ptr, NULL, cnt, sizeof(*ptr), 0, ARRAY_STRICT);
+    if (!res.status) return res;
+    for (size_t i = 0; i < cnt; ptr[i] = (uintptr_t) arr + i * sz, i++);
+    quick_sort(ptr, cnt, sizeof(*ptr), generic_cmp_stable, &(struct generic_cmp_stable_thunk) { .cmp = cmp, .context = context });
+    *(uintptr_t **) p_ptr = ptr;
+    return res;
 }
 
 void orders_from_pointers_inplace(uintptr_t *ptr, uintptr_t base, size_t cnt, size_t sz)
@@ -57,32 +59,34 @@ void orders_from_pointers_inplace(uintptr_t *ptr, uintptr_t base, size_t cnt, si
     for (size_t i = 0; i < cnt; ptr[i] = (ptr[i] - base) / sz, i++);
 }
 
-bool orders_stable(void *p_ord, const void *arr, size_t cnt, size_t sz, stable_cmp_callback cmp, void *context)
+struct array_result orders_stable(void *p_ord, const void *arr, size_t cnt, size_t sz, stable_cmp_callback cmp, void *context)
 {
-    uintptr_t *res;
-    if (!pointers_stable(&res, arr, cnt, sz, cmp, context)) return 0;
-    orders_from_pointers_inplace(res, (uintptr_t) arr, cnt, sz);
-    *(uintptr_t **) p_ord = res;
-    return 1;
+    uintptr_t *ord;
+    struct array_result res = pointers_stable(&ord, arr, cnt, sz, cmp, context);
+    if (!res.status) return res;
+    orders_from_pointers_inplace(ord, (uintptr_t) arr, cnt, sz);
+    *(uintptr_t **) p_ord = ord;
+    return res;
 }
 
-bool orders_stable_unique(void *p_ord, const void *arr, size_t *p_cnt, size_t sz, stable_cmp_callback cmp, void *context)
+struct array_result orders_stable_unique(void *p_ord, const void *arr, size_t *p_cnt, size_t sz, stable_cmp_callback cmp, void *context)
 {
     size_t cnt = *p_cnt;
-    uintptr_t *res;
-    if (!pointers_stable(&res, arr, cnt, sz, cmp, context)) return 0;
+    uintptr_t *ord;
+    struct array_result res = pointers_stable(&ord, arr, cnt, sz, cmp, context);
+    if (!res.status) return res;
 
     uintptr_t tmp = 0;
     size_t ucnt = 0;    
-    if (cnt) tmp = res[0], res[ucnt++] = (tmp - (uintptr_t) arr) / sz;
+    if (cnt) tmp = ord[0], ord[ucnt++] = (tmp - (uintptr_t) arr) / sz;
     for (size_t i = 1; i < cnt; i++)
-        if (cmp((const void *) res[i], (const void *) tmp, context) > 0) tmp = res[i], res[ucnt++] = (tmp - (uintptr_t) arr) / sz;
+        if (cmp((const void *) ord[i], (const void *) tmp, context) > 0) tmp = ord[i], ord[ucnt++] = (tmp - (uintptr_t) arr) / sz;
     
     // Even if the operation fails, the result is still valid
-    array_test(&res, &ucnt, sizeof(*res), 0, ARRAY_REDUCE, ucnt);
-    *(uintptr_t **) p_ord = res;
+    array_test(&ord, &ucnt, sizeof(*ord), 0, ARRAY_REDUCE, ucnt);
+    *(uintptr_t **) p_ord = ord;
     if (*p_cnt) *p_cnt = ucnt;
-    return 1;
+    return res;
 }
 
 void ranks_from_pointers_impl(size_t *rnk, const uintptr_t *ptr, uintptr_t base, size_t cnt, size_t sz)
@@ -90,29 +94,36 @@ void ranks_from_pointers_impl(size_t *rnk, const uintptr_t *ptr, uintptr_t base,
     for (size_t i = 0; i < cnt; rnk[(ptr[i] - base) / sz] = i, i++);
 }
 
-bool ranks_from_pointers(void *p_rnk, const uintptr_t *ptr, uintptr_t base, size_t cnt, size_t sz)
+struct array_result ranks_from_pointers(void *p_rnk, const uintptr_t *ptr, uintptr_t base, size_t cnt, size_t sz)
 {
-    size_t *res;
-    if (!array_init(&res, NULL, cnt, sizeof(*res), 0, ARRAY_STRICT)) return 0;
-    ranks_from_pointers_impl(res, ptr, base, cnt, sz);
-    *(size_t **) p_rnk = res;
-    return 1;
+    size_t *rnk;
+    struct array_result res = array_init(&rnk, NULL, cnt, sizeof(*rnk), 0, ARRAY_STRICT);
+    if (!res.status) return res;
+    ranks_from_pointers_impl(rnk, ptr, base, cnt, sz);
+    *(size_t **) p_rnk = rnk;
+    return res;
 }
 
-bool ranks_from_orders(void *p_rnk, const uintptr_t *ord, size_t cnt)
+struct array_result ranks_from_orders(void *p_rnk, const uintptr_t *ord, size_t cnt)
 {
     return ranks_from_pointers(p_rnk, ord, 0, cnt, 1);
 }
 
-bool ranks_unique(void *p_rnk, const void *arr, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
+struct array_result ranks_unique(void *p_rnk, const void *arr, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
 {
     bool succ = 0;
     size_t *rnk;
     uintptr_t *ptr = NULL;
-    if (pointers(&ptr, arr, *p_cnt, sz, cmp, context) && 
-        ranks_unique_from_pointers(&rnk, ptr, (uintptr_t) arr, p_cnt, sz, cmp, context)) *(size_t **) p_rnk = rnk, succ = 1;
+    struct array_result res = pointers(&ptr, arr, *p_cnt, sz, cmp, context);
+    if (!res.status) return res;
+    res = ranks_unique_from_pointers(&rnk, ptr, (uintptr_t) arr, p_cnt, sz, cmp, context);
+    if (res.status)
+    {
+        *(size_t **) p_rnk = rnk;
+        succ = 1;
+    }
     free(ptr);
-    return succ;
+    return res;
 }
 
 // Warning! 'ptr' may contain pointers to the 'rnk' array (i. e. 'rnk' = 'base').
@@ -131,13 +142,14 @@ void ranks_unique_from_pointers_impl(size_t *rnk, const uintptr_t *ptr, uintptr_
     *p_cnt = ucnt + 1;
 }
 
-bool ranks_unique_from_pointers(void *p_rnk, const uintptr_t *ptr, uintptr_t base, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
+struct array_result ranks_unique_from_pointers(void *p_rnk, const uintptr_t *ptr, uintptr_t base, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
 {
-    size_t *res;
-    if (!array_init(&res, NULL, *p_cnt, sizeof(*res), 0, ARRAY_STRICT)) return 0;
-    ranks_unique_from_pointers_impl(res, ptr, base, p_cnt, sz, cmp, context);
-    *(size_t **) p_rnk = res;
-    return 1;
+    size_t *rnk;
+    struct array_result res = array_init(&rnk, NULL, *p_cnt, sizeof(*rnk), 0, ARRAY_STRICT);
+    if (!res.status) return res;
+    ranks_unique_from_pointers_impl(rnk, ptr, base, p_cnt, sz, cmp, context);
+    *(size_t **) p_rnk = rnk;
+    return res;
 }
 
 struct cmp_helper_thunk {
@@ -153,7 +165,7 @@ static bool cmp_helper(const void *a, const void *b, void *Context)
     return context->cmp((char *) context->arr + (uintptr_t) a * context->sz, (char *) context->arr + (uintptr_t) b * context->sz, context->context);
 }
 
-bool ranks_unique_from_orders(void *p_rnk, const uintptr_t *ord, const void *arr, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
+struct array_result ranks_unique_from_orders(void *p_rnk, const uintptr_t *ord, const void *arr, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
 {
     return ranks_unique_from_pointers(p_rnk, ord, 0, p_cnt, 1, cmp_helper, &(struct cmp_helper_thunk) { .cmp = cmp, .arr = arr, .sz = sz, .context = context });
 }
@@ -175,31 +187,34 @@ void ranks_from_pointers_inplace_impl(uintptr_t *restrict ptr, uintptr_t base, s
     }
 }
 
-bool ranks_from_pointers_inplace(uintptr_t *restrict ptr, uintptr_t base, size_t cnt, size_t sz)
+struct array_result ranks_from_pointers_inplace(uintptr_t *restrict ptr, uintptr_t base, size_t cnt, size_t sz)
 {
-    uint8_t *restrict bits = NULL;
-    if (!array_init(&bits, NULL, UINT8_CNT(cnt), sizeof(*bits), 0, ARRAY_STRICT | ARRAY_CLEAR)) return 0;
+    uint8_t *bits = NULL;
+    struct array_result res = array_init(&bits, NULL, UINT8_CNT(cnt), sizeof(*bits), 0, ARRAY_STRICT | ARRAY_CLEAR);
+    if (!res.status) return res;
     ranks_from_pointers_inplace_impl(ptr, base, cnt, sz, bits);
     free(bits);
-    return 1;
+    return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
 }
 
-bool ranks_from_orders_inplace(uintptr_t *restrict ord, size_t cnt)
+struct array_result ranks_from_orders_inplace(uintptr_t *restrict ord, size_t cnt)
 {
     return ranks_from_pointers_inplace(ord, 0, cnt, 1);
 }
 
-bool ranks_stable(void *p_rnk, const void *arr, size_t cnt, size_t sz, stable_cmp_callback cmp, void *context)
+struct array_result ranks_stable(void *p_rnk, const void *arr, size_t cnt, size_t sz, stable_cmp_callback cmp, void *context)
 {
-    uintptr_t *res;
-    if (!pointers_stable(&res, arr, cnt, sz, cmp, context)) return 0;
-    if (ranks_from_pointers_inplace(res, (uintptr_t) arr, cnt, sz))
+    uintptr_t *rnk;
+    struct array_result res0 = pointers_stable(&rnk, arr, cnt, sz, cmp, context);
+    if (!res0.status) return res0;
+    struct array_result res1 = ranks_from_pointers_inplace(rnk, (uintptr_t) arr, cnt, sz);
+    if (res1.status)
     {
-        *(uintptr_t **) p_rnk = res;
-        return 1;
+        *(uintptr_t **) p_rnk = rnk;
+        return res0;
     }
-    free(res);
-    return 0;
+    free(rnk);
+    return res1;
 }
 
 void orders_apply_impl(uintptr_t *restrict ord, size_t cnt, size_t sz, void *restrict arr, uint8_t *restrict bits, void *restrict swp)
@@ -233,13 +248,14 @@ void orders_apply_impl(uintptr_t *restrict ord, size_t cnt, size_t sz, void *res
 }
 
 // This procedure applies orders to the array. Orders are not assumed to be a surjective map. 
-bool orders_apply(uintptr_t *restrict ord, size_t cnt, size_t sz, void *restrict arr)
+struct array_result orders_apply(uintptr_t *restrict ord, size_t cnt, size_t sz, void *restrict arr)
 {
     uint8_t *bits = NULL;
-    if (!array_init(&bits, NULL, UINT8_CNT(cnt), sizeof(*bits), 0, ARRAY_STRICT | ARRAY_CLEAR)) return 0;
+    struct array_result res = array_init(&bits, NULL, UINT8_CNT(cnt), sizeof(*bits), 0, ARRAY_STRICT | ARRAY_CLEAR);
+    if (!res.status) return res;
     orders_apply_impl(ord, cnt, sz, arr, bits, Alloca(sz));
     free(bits);
-    return 1;
+    return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
 }
 
 static void swap(void *restrict a, void *restrict b, void *restrict swp, size_t sz)
@@ -433,30 +449,31 @@ enum {
     FLAG_NOT_EMPTY = 2
 };
 
-bool hash_table_init(struct hash_table *tbl, size_t cnt, size_t szk, size_t szv)
+struct array_result hash_table_init(struct hash_table *tbl, size_t cnt, size_t szk, size_t szv)
 {
     size_t lcnt = size_log2(size_add_sat(cnt, 3), 1);
-    if (lcnt == SIZE_BIT)
-    {
-        errno = ERANGE;
-        return 0;
-    }
+    if (lcnt == SIZE_BIT) return (struct array_result) { .error = ARRAY_OVERFLOW };
     cnt = (size_t) 1 << lcnt;
-    if (array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT))
+    struct array_result res = array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT);
+    if (res.status)
     {
-        if (array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT))
+        size_t tot = res.tot;
+        res = array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT);
+        if (res.status)
         {
-            if (array_init(&tbl->flags, NULL, NIBBLE_CNT(cnt), sizeof(*tbl->flags), 0, ARRAY_CLEAR | ARRAY_STRICT))
+            tot = size_add_sat(tot, res.tot);
+            res = array_init(&tbl->flags, NULL, NIBBLE_CNT(cnt), sizeof(*tbl->flags), 0, ARRAY_CLEAR | ARRAY_STRICT);
+            if (res.status)
             {
                 tbl->cnt = tbl->tot = tbl->lim = 0;
                 tbl->lcap = lcnt;
-                return 1;
+                return (struct array_result) { .status = ARRAY_SUCCESS, .tot = size_add_sat(tot, res.tot) };
             }
             free(tbl->val);
         }
         free(tbl->key);
     }
-    return 0;
+    return res;
 }
 
 void hash_table_close(struct hash_table *tbl)
@@ -505,12 +522,13 @@ void *hash_table_fetch_val(struct hash_table *tbl, size_t h, size_t szv)
     return (char *) tbl->val + h * szv;
 }
 
-static bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context)
+static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context)
 {
     void *restrict key = Alloca(szk), *restrict val = Alloca(szv);
     size_t cnt = (size_t) 1 << lcnt, msk = cnt - 1, cap = (size_t) 1 << tbl->lcap;
     uint8_t *flags;
-    if (!array_init(&flags, NULL, NIBBLE_CNT(cnt), sizeof(*flags), 0, ARRAY_CLEAR | ARRAY_STRICT)) return 0;
+    struct array_result res = array_init(&flags, NULL, NIBBLE_CNT(cnt), sizeof(*flags), 0, ARRAY_CLEAR | ARRAY_STRICT);
+    if (!res.status) return res;
     for (size_t i = 0; i < cap; i++)
     {
         if (uint8_bit_fetch_burst2(tbl->flags, i) != FLAG_NOT_EMPTY) continue;
@@ -536,12 +554,12 @@ static bool hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, s
     tbl->lcap = lcnt;
     tbl->tot = tbl->cnt;
     tbl->lim = (size_t) ((double) cnt * .77 + .5); // Magic constants from the 'khash.h'
-    return 1;
+    return res;
 }
 
-unsigned hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, size_t szv, hash_callback hash, cmp_callback eq, void *context)
+struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, size_t szv, hash_callback hash, cmp_callback eq, void *context)
 {
-    unsigned res = 1;
+    struct array_result res = { .status = 1 };
     size_t cap = (size_t) 1 << tbl->lcap;
     if (tbl->tot >= tbl->lim)
     {
@@ -549,28 +567,43 @@ unsigned hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, 
         if ((cap >> 1) <= tbl->cnt)
         {
             lcnt = size_log2(size_add_sat(cap, 1), 1);
-            if (lcnt == SIZE_BIT)
-            {
-                errno = ERANGE;
-                return 0;
-            }
+            if (lcnt == SIZE_BIT) return (struct array_result) { .error = ARRAY_OVERFLOW };
         }
         else lcnt = cap > 5 ? size_log2(cap - 1, 1) : 2;
         size_t cnt = (size_t) 1 << lcnt;
-        if (tbl->cnt >= (size_t) ((double) cnt * .77 + .5) || cap == cnt) res |= HASH_UNTOUCHED; // Magic constants from the 'khash.h'
+        if (tbl->cnt >= (size_t) ((double) cnt * .77 + .5) || cap == cnt) res.status |= HASH_UNTOUCHED; // Magic constants from the 'khash.h'
         else
         {
-            if (!(cap < cnt ?
-                array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
-                array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC) &&
-                hash_table_rehash(tbl, lcnt, szk, szv, hash, context) :
-                hash_table_rehash(tbl, lcnt, szk, szv, hash, context) &&
-                array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE) &&
-                array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE))) return 0;
+            if (cap < cnt)
+            {
+                res = array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC);
+                if (!res.status) return res;
+                size_t tot = res.tot;
+                res = array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC);
+                res.tot = size_add_sat(tot, res.tot);
+                if (!res.status) return res;
+                tot = res.tot;
+                res = hash_table_rehash(tbl, lcnt, szk, szv, hash, context);
+                res.tot = size_add_sat(tot, res.tot);
+                if (!res.status) return res;                
+            }
+            else
+            {
+                res = hash_table_rehash(tbl, lcnt, szk, szv, hash, context);
+                if (!res.status) return res;
+                size_t tot = res.tot;
+                res = array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
+                res.tot = size_add_sat(tot, res.tot);
+                if (!res.status) return res;
+                tot = res.tot;
+                res = array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
+                res.tot = size_add_sat(tot, res.tot);
+                if (!res.status) return res;
+            }
             cap = cnt; // Update capacity after rehashing
         }
     }
-    else res |= HASH_UNTOUCHED;
+    else res.status |= HASH_UNTOUCHED;
     size_t msk = cap - 1, h = *p_h & msk;
     for (size_t i = 0, j = h, tmp = cap;;)
     {
@@ -580,7 +613,8 @@ unsigned hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, 
         else if (eq((char *) tbl->key + h * szk, key, context))
         {
             *p_h = h;
-            return res | HASH_PRESENT;
+            res.status |= HASH_PRESENT;
+            return res;
         }
         h = (h + ++i) & msk;
         if (h != j) continue;

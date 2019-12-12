@@ -15,7 +15,7 @@ bool test_categorical_generator_a(void *dst, size_t *p_context, struct log *log)
         { MATCX(2, (size_t[]) { 10, 20, 100, 20 }), 7.5171259287287606 } // Chi-Square
     };
     size_t *tbl, ind = *p_context;
-    if (!array_init(&tbl, NULL, data[ind].cnt, sizeof(*tbl), 0, ARRAY_STRICT)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+    if (!array_init(&tbl, NULL, data[ind].cnt, sizeof(*tbl), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
     else
     {
         memcpy(dst, data + ind, sizeof(*data));
@@ -38,9 +38,9 @@ bool test_categorical_a(void *In, struct log *log)
     bool succ = 0;
     struct test_categorical_a *in = In;
     size_t *xmar = NULL, *ymar = NULL, *outer = NULL;
-    if (!array_init(&outer, NULL, in->cnt, sizeof(*outer), 0, ARRAY_STRICT) ||
-        !array_init(&xmar, NULL, in->dimx, sizeof(*xmar), 0, ARRAY_STRICT | ARRAY_CLEAR) ||
-        !array_init(&ymar, NULL, in->dimy, sizeof(*ymar), 0, ARRAY_STRICT | ARRAY_CLEAR)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+    if (!array_init(&outer, NULL, in->cnt, sizeof(*outer), 0, ARRAY_STRICT).status ||
+        !array_init(&xmar, NULL, in->dimx, sizeof(*xmar), 0, ARRAY_STRICT | ARRAY_CLEAR).status ||
+        !array_init(&ymar, NULL, in->dimy, sizeof(*ymar), 0, ARRAY_STRICT | ARRAY_CLEAR).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
     else
     {
         double nlpv; // qas;

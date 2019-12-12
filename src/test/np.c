@@ -9,7 +9,7 @@ bool test_np_generator_a(void *dst, size_t *p_context, struct log *log)
 {
     size_t context = *p_context, cnt = (size_t) 1 << context;
     char *str;
-    if (!array_init(&str, NULL, cnt, sizeof(*str), 0, ARRAY_STRICT)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+    if (!array_init(&str, NULL, cnt, sizeof(*str), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
     else
     {
         for (size_t i = 0; i < cnt;) 

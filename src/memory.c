@@ -14,15 +14,20 @@ void array_broadcast(void *arr, size_t cnt, size_t sz, void *val)
     for (size_t i = 0; i < tot; i += sz) memcpy((char *) arr + i, val, sz);
 }
 
-struct array_init_status {
-    size_t tot;
-    unsigned status;
-};
+// Total size = xdim * (ydim * sz + ydiff) + xdiff 
+struct array_result matrix_init(void *p_Src, size_t *restrict p_cap, size_t xdim, size_t ydim, size_t sz, size_t xdiff, size_t ydiff, enum array_flags flags)
+{
+    size_t xtot = xdim;
+    if (!size_mul_add_test(&xtot, sz, ydiff)) return (struct array_result) { .error = ARRAY_OVERFLOW };
+    struct array_result res = array_init(p_Src, p_cap, xdim, xtot, xdiff, flags);
+    if (res.status == ARRAY_SUCCESS) *p_cap *= ydim;
+    return res;
+}
 
 // 'p_cap' -- pointer to initial capacity
 // 'cnt' -- desired capacity
 // On error 'p_Src' and 'p_cap' are untouched
-unsigned array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, size_t diff, enum array_flags flags)
+struct array_result array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, size_t diff, enum array_flags flags)
 {
     void **restrict p_src = p_Src, *src = *p_src;
     if (src && p_cap && (flags & ARRAY_REALLOC))
@@ -30,32 +35,24 @@ unsigned array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, 
         size_t bor, tmp = size_sub(&bor, cnt, *p_cap);
         if (bor) // cnt < *p_cap
         {
-            if (!(flags & ARRAY_REDUCE)) return 1 | ARRAY_UNTOUCHED;
+            if (!(flags & ARRAY_REDUCE)) return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
             size_t tot = cnt * sz + diff; // No checks for overflows
             void *res = realloc(src, tot); // Array shrinking
-            if (tot && !res) return 0;
+            if (tot && !res) return (struct array_result) { .error = ARRAY_OUT_OF_MEMORY, .tot = tot };
             *p_cap = cnt;
             *p_src = res;
-            return 1;
+            return (struct array_result) { .status = ARRAY_SUCCESS, .tot = tot };
         }
-        else if (!tmp) return 1 | ARRAY_UNTOUCHED; // cnt == cap            
+        else if (!tmp) return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED }; // cnt == cap            
     }
     if (!(flags & ARRAY_STRICT) && cnt)
     {
         size_t log2 = size_log2(cnt, 1);
         cnt = log2 == SIZE_BIT ? cnt : (size_t) 1 << log2;
     }
-    size_t tot;
-    if ((flags & ARRAY_STRICT) && (flags & ARRAY_FAILSAFE)) tot = cnt * sz + diff;
-    else
-    {
-        tot = cnt;
-        if (!size_mul_add_test(&tot, sz, diff))
-        {
-            errno = ERANGE;
-            return 0;
-        }
-    }
+    size_t tot = cnt;
+    if ((flags & ARRAY_STRICT) && (flags & ARRAY_FAILSAFE)) tot *= sz, tot += diff;
+    else if (!size_mul_add_test(&tot, sz, diff)) return (struct array_result) { .error = ARRAY_OVERFLOW };
     void *res;
     if (src && (flags & ARRAY_REALLOC))
     {
@@ -67,27 +64,26 @@ unsigned array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, 
         }
     }
     else res = flags & ARRAY_CLEAR ? calloc(tot, 1) : malloc(tot);
-    if (tot && !res) return 0;
+    if (tot && !res) return (struct array_result) { .error = ARRAY_OUT_OF_MEMORY, .tot = tot };
     *p_src = res;
     if (p_cap) *p_cap = cnt;
-    return 1;
+    return (struct array_result) { .status = ARRAY_SUCCESS, .tot = tot };
 }
 
-unsigned array_test_impl(void *p_Arr, size_t *restrict p_cap, size_t sz, size_t diff, enum array_flags flags, size_t *restrict arg, size_t cnt)
+struct array_result array_test_impl(void *p_Arr, size_t *restrict p_cap, size_t sz, size_t diff, enum array_flags flags, size_t *restrict arg, size_t cnt)
 {
     size_t car, sum = size_sum(&car, arg, cnt);
-    if (!car) return array_init(p_Arr, p_cap, sum, sz, diff, flags | ARRAY_REALLOC);
-    errno = ERANGE;
-    return 0;
+    return car ? (struct array_result) { .error = ARRAY_OVERFLOW } : array_init(p_Arr, p_cap, sum, sz, diff, flags | ARRAY_REALLOC);
 }
 
-bool queue_init(struct queue *queue, size_t cnt, size_t sz)
+struct array_result queue_init(struct queue *queue, size_t cnt, size_t sz)
 {
     size_t cap;
-    if (!array_init(&queue->arr, &cap, cnt, sz, 0, 0)) return 0;
+    struct array_result res = array_init(&queue->arr, &cap, cnt, sz, 0, 0);
+    if (!res.status) 
     queue->cap = cap;
     queue->begin = queue->cnt = 0;
-    return 1;
+    return res;
 }
 
 void queue_close(struct queue *queue)
@@ -95,11 +91,11 @@ void queue_close(struct queue *queue)
     free(queue->arr);
 }
 
-unsigned queue_test(struct queue *queue, size_t diff, size_t sz)
+struct array_result queue_test(struct queue *queue, size_t diff, size_t sz)
 {
     size_t cap = queue->cap;
-    unsigned res = array_test(&queue->arr, &cap, sz, 0, 0, queue->cnt, diff);
-    if (!res || (res & ARRAY_UNTOUCHED)) return res;
+    struct array_result res = array_test(&queue->arr, &cap, sz, 0, 0, queue->cnt, diff);
+    if (!res.status || (res.status & ARRAY_UNTOUCHED)) return res;
 
     size_t bor, rem = size_sub(&bor, queue->begin, queue->cap - queue->cnt);
     if (!bor && rem) // queue->begin > queue->cap - queue->cnt
@@ -114,7 +110,7 @@ unsigned queue_test(struct queue *queue, size_t diff, size_t sz)
         else memcpy((char *) queue->arr + queue->cap * sz, queue->arr, rem * sz);
     }
     queue->cap = cap;
-    return ARRAY_SUCCESS;
+    return res;
 }
 
 void *queue_fetch(struct queue *queue, size_t offset, size_t sz)
@@ -196,18 +192,18 @@ static void queue_enqueue_yield_hi(struct queue *restrict queue, generator_callb
     queue->cnt += cnt;
 }
 
-unsigned queue_enqueue(struct queue *restrict queue, bool hi, void *restrict arr, size_t cnt, size_t sz)
+struct array_result queue_enqueue(struct queue *restrict queue, bool hi, void *restrict arr, size_t cnt, size_t sz)
 {
-    unsigned res = queue_test(queue, cnt, sz);
-    if (!res) return 0;
+    struct array_result res = queue_test(queue, cnt, sz);
+    if (!res.status) return res;
     (hi ? queue_enqueue_hi : queue_enqueue_lo)(queue, arr, cnt, sz);
     return res;
 }
 
-unsigned queue_enqueue_yield(struct queue *restrict queue, bool hi, generator_callback genetator, void *context, size_t cnt, size_t sz)
+struct array_result queue_enqueue_yield(struct queue *restrict queue, bool hi, generator_callback genetator, void *context, size_t cnt, size_t sz)
 {
-    unsigned res = queue_test(queue, cnt, sz);
-    if (!res) return 0;
+    struct array_result res = queue_test(queue, cnt, sz);
+    if (!res.status) return res;
     (hi ? queue_enqueue_yield_hi : queue_enqueue_yield_lo)(queue, genetator, context, cnt, sz);
     return res;
 }
@@ -225,41 +221,49 @@ void queue_dequeue(struct queue *queue, size_t offset, size_t sz)
     if (queue->begin == queue->cap) queue->begin = 0;
 }
 
-unsigned persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz)
+struct array_result persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz)
 {
     if (!cnt)
     {
         memset(arr, 0, sizeof(*arr));
-        return 1 | ARRAY_UNTOUCHED;
+        return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
     }
     size_t off = arr->off = size_log2(cnt, 0);
-    if (!array_init(&arr->ptr, &arr->cap, arr->tot = 1, sizeof(*arr->ptr), 0, 0)) return 0;
-    if (array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT)) return 1;
+    struct array_result res0 = array_init(&arr->ptr, &arr->cap, arr->bck = 1, sizeof(*arr->ptr), 0, 0);
+    if (!res0.status) return res0;
+    struct array_result res1 = array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT);
+    if (res1.status) return (struct array_result) { .status = ARRAY_SUCCESS, .tot = size_add_sat(res0.tot, res1.tot) };
     free(arr->ptr);
-    return 0;
+    return res1;
 }
 
 void persistent_array_close(struct persistent_array *arr)
 {
-    for (size_t i = 0; i < arr->tot; free(arr->ptr[i++]));
+    for (size_t i = 0; i < arr->bck; free(arr->ptr[i++]));
     free(arr->ptr);
 }
 
-unsigned persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz)
+struct array_result persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz)
 {
-    size_t cap = (size_t) 1 << arr->tot << arr->off;
-    if (cnt < cap) return 1 | ARRAY_UNTOUCHED;
-    if (!arr->tot) return persistent_array_init(arr, cnt, sz);
-    size_t tot = size_log2(cnt + 1, 1) - arr->off;
-    if (!array_test(&arr->ptr, &arr->cap, sizeof(*arr->ptr), 0, 0, tot)) return 0;
-    for (size_t i = arr->tot; i < tot; i++, cap <<= 1)
+    size_t cap = (size_t) 1 << arr->bck << arr->off;
+    if (cnt < cap) return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
+    if (!arr->bck) return persistent_array_init(arr, cnt, sz);
+    size_t bck = size_log2(cnt + 1, 1) - arr->off;
+    struct array_result res = array_test(&arr->ptr, &arr->cap, sizeof(*arr->ptr), 0, 0, bck);
+    if (!res.status) return res;
+    size_t tot = res.tot;
+    for (size_t i = arr->bck; i < bck; i++, cap <<= 1)
     {
-        if (array_init(arr->ptr + i, NULL, cap, sz, 0, ARRAY_STRICT)) continue;
-        arr->tot = i;
-        return 0;
+        res = array_init(arr->ptr + i, NULL, cap, sz, 0, ARRAY_STRICT);
+        if (!res.status)
+        {
+            arr->bck = i;
+            return res;
+        }
+        tot = size_add_sat(tot, res.tot);
     }
-    arr->tot = tot;
-    return 1;    
+    arr->bck = bck;
+    return (struct array_result) { .status = ARRAY_SUCCESS, .tot = tot };
 }
 
 void *persistent_array_fetch(struct persistent_array *arr, size_t ind, size_t sz)

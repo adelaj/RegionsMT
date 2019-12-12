@@ -24,7 +24,7 @@ static bool tbl_phen_selector(struct tbl_col *cl, size_t row, size_t col, void *
         return 1;
     }
     struct phen_context *context = Context;
-    if (!array_test(tbl, &context->cap, sizeof(size_t), 0, 0, row, 1)) return 0;
+    if (!array_test(tbl, &context->cap, sizeof(size_t), 0, 0, row, 1).status) return 0;
     *cl = (struct tbl_col) { .handler = { .read = str_tbl_handler }, .ptr = *(size_t **) tbl + row, .context = &context->handler_context };
     return 1;
 }
@@ -50,7 +50,7 @@ static bool gen_handler(const char *str, size_t len, void *res, void *Context)
     struct gen_context *context = Context;
     if (!context->phen_cnt) context->phen_cnt = len;
     else if (len != context->phen_cnt) return 0;
-    if (!array_test(res, &context->gen_cap, sizeof(uint8_t), 0, 0, context->gen_cnt, len)) return 0;
+    if (!array_test(res, &context->gen_cap, sizeof(uint8_t), 0, 0, context->gen_cnt, len).status) return 0;
     for (size_t i = 0; i < len; i++) (*(uint8_t **) res)[context->gen_cnt + i]  = (uint8_t) str[i] - '0';
     context->gen_cnt += len;
     return 1;
@@ -80,7 +80,7 @@ static bool tbl_top_hit_selector(struct tbl_col *cl, size_t row, size_t col, voi
     }
     else if (col == 2)
     {
-        if (!array_test(tbl, p_Cap, sizeof(struct interval), 0, 0, row, 1)) return 0;
+        if (!array_test(tbl, p_Cap, sizeof(struct interval), 0, 0, row, 1).status) return 0;
         *cl = (struct tbl_col) { .handler = { .read = size_handler }, .ptr = &(*(struct interval **) tbl)[row].left };
     }
     else if (col == 3)
@@ -142,7 +142,7 @@ bool categorical_run_chisq(const char *path_phen, const char *path_gen, const ch
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
 
     uintptr_t *phen_ptr;
-    if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str)) goto error;
+    if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str).status) goto error;
     size_t phen_ucnt = phen_cnt;
     ranks_unique_from_pointers_impl(phen, phen_ptr, (uintptr_t) phen, &phen_ucnt, sizeof(*phen), str_off_cmp, phen_context.handler_context.str);
     free(phen_ptr);
@@ -198,7 +198,7 @@ bool categorical_run_adj(const char *path_phen, const char *path_gen, const char
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
 
     uintptr_t *phen_ptr;
-    if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str)) goto error;
+    if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str).status) goto error;
     size_t phen_ucnt = phen_cnt;
     ranks_unique_from_pointers_impl(phen, phen_ptr, (uintptr_t) phen, &phen_ucnt, sizeof(*phen), str_off_cmp, phen_context.handler_context.str);
     free(phen_ptr);

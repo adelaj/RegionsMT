@@ -487,7 +487,7 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, const struct sty
             pos += off + 1;
             off = cnt = size_add_sat(cnt, len);
             tmp = len = size_sub_sat(tmp, len);
-            if (!tmp) i = SIZE_MAX; // Exit loop if there is no more space
+            if (!tmp) i = SIZE_MAX; // Exit the loop if there is no more space
             break;
         }
         print(buff + cnt, &len, fmt + pos, off, 1);
@@ -678,8 +678,7 @@ bool log_init(struct log *restrict log, char *restrict path, size_t lim, enum lo
     {
         bool tty = (flags & (LOG_FORCE_TTY)) || file_is_tty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
         size_t cap = bom ? MAX(lim, lengthof(UTF8_BOM)) : lim;
-        if (!array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)) log_message_crt(log_error, CODE_METRIC, MESSAGE_ERROR, errno);
-        else
+        if (log_array(log_error, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)).status)
         {
             if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
             else log->cnt = 0;
@@ -765,9 +764,9 @@ static bool log_message_impl(struct log *restrict log, struct code_metric metric
             }
             else if (!handler.ord(log->buff + cnt, &len, context, log->style)) return 0;
         }
-        unsigned res = array_test(&log->buff, &log->cap, sizeof(*log->buff), 0, 0, cnt, len, 1); // All messages are NULL-terminated
-        if (!res) return 0;
-        if (!(res & ARRAY_UNTOUCHED)) continue;
+        struct array_result res = array_test(&log->buff, &log->cap, sizeof(*log->buff), 0, 0, cnt, len, 1); // All messages are NULL-terminated
+        if (!res.status) return 0;
+        if (!(res.status & ARRAY_UNTOUCHED)) continue;
         cnt += len;
         break;
     }
@@ -808,4 +807,20 @@ bool log_message_fopen(struct log *restrict log, struct code_metric code_metric,
 bool log_message_fseek(struct log *restrict log, struct code_metric code_metric, enum message_type type, int64_t offset, const char *restrict path)
 {
     return log_message_fmt(log, code_metric, type, "Unable to seek into the position %~uq of the file %~P!\n", offset, path);
+}
+
+struct array_result log_array(struct log *restrict log, struct code_metric code_metric, struct array_result res)
+{
+    switch (res.error)
+    {
+    case ARRAY_OUT_OF_MEMORY:
+        log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to allocate %~uz bytes of memory! %C!\n", res.tot, errno);
+        break;
+    case ARRAY_OVERFLOW:
+        log_message_fmt(log, code_metric, MESSAGE_ERROR, "Memory allocation failed! %C!\n", ERANGE);
+        break;
+    case ARRAY_NO_ERROR:
+        break;
+    }
+    return res; 
 }

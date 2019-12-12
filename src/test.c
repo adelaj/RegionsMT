@@ -14,7 +14,7 @@ bool test(const struct test_group *group_arr, size_t cnt, struct log *log)
     size_t test_data_sz = 0;
     for (size_t i = 0; i < cnt; i++) if (test_data_sz < group_arr[i].test_sz) test_data_sz = group_arr[i].test_sz;
     void *test_data = NULL;
-    if (!array_init(&test_data, NULL, test_data_sz, 1, 0, ARRAY_STRICT)) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
+    if (!array_init(&test_data, NULL, test_data_sz, 1, 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
     else
     {
         succ = 1;

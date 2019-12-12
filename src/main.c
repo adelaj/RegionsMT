@@ -530,7 +530,7 @@ static int Main(int argc, char **argv)
 static bool argv_from_wargv(char ***p_argv, size_t argc, wchar_t **wargv)
 {
     char **argv;
-    if (!array_init(&argv, NULL, argc, sizeof(*argv), 0, ARRAY_STRICT)) return 0;
+    if (!array_init(&argv, NULL, argc, sizeof(*argv), 0, ARRAY_STRICT).status) return 0;
     size_t base_cnt = 0, i;
     for (i = 0; i < argc; i++) // Determining total length and performing error checking
     {
@@ -549,7 +549,7 @@ static bool argv_from_wargv(char ***p_argv, size_t argc, wchar_t **wargv)
     {
         if (!argc) return 1;
         char *base;
-        if (array_init(&base, NULL, base_cnt, sizeof(*base), 0, ARRAY_STRICT))
+        if (array_init(&base, NULL, base_cnt, sizeof(*base), 0, ARRAY_STRICT).status)
         {
             char *byte = base;
             for (i = 0; i < argc; i++) // Performing translation

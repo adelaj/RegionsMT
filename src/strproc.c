@@ -168,19 +168,19 @@ bool str_tbl_handler(const char *str, size_t len, void *p_Off, void *Context)
         *p_off = context->str_cnt - 1;
         return 1;
     }
-    if (!array_test(&context->str, &context->str_cap, sizeof(*context->str), 0, 0, context->str_cnt, len, 1)) return 0;
+    if (!array_test(&context->str, &context->str_cap, sizeof(*context->str), 0, 0, context->str_cnt, len, 1).status) return 0;
     *p_off = context->str_cnt;
     memcpy(context->str + context->str_cnt, str, (len + 1) * sizeof(*context->str));
     context->str_cnt += len + 1;
     return 1;
 }
 
-unsigned buff_append(struct buff *buff, const char *str, size_t len, enum buff_flags flags)
+struct array_result buff_append(struct buff *buff, const char *str, size_t len, enum buff_flags flags)
 {
     size_t pos = flags & BUFFER_DISCARD ? 0 : buff->len;
     bool init = flags & BUFFER_INIT, term = flags & BUFFER_TERM;
-    unsigned res = array_test(&buff->str, &buff->cap, sizeof(*buff->str), 0, 0, len, pos, init + term);
-    if (!res) return 0;
+    struct array_result res = array_test(&buff->str, &buff->cap, sizeof(*buff->str), 0, 0, len, pos, init + term);
+    if (!res.status) return res;
     memcpy(buff->str + pos + init, str, len * sizeof(*buff->str));
     pos += len + init;
     if (term) buff->str[pos] = '\0';
@@ -188,15 +188,15 @@ unsigned buff_append(struct buff *buff, const char *str, size_t len, enum buff_f
     return res;
 }
 
-bool str_pool_init(struct str_pool *pool, size_t cnt, size_t len, size_t szv)
+struct array_result str_pool_init(struct str_pool *pool, size_t cnt, size_t len, size_t szv)
 {
-    if (array_init(&pool->buff.str, &pool->buff.cap, len, sizeof(*pool->buff.str), 0, 0))
-    {
-        pool->buff.len = 0;
-        if (hash_table_init(&pool->tbl, cnt, sizeof(size_t), szv)) return 1;
-        free(pool->buff.str);
-    }
-    return 0;
+    struct array_result res0 = array_init(&pool->buff.str, &pool->buff.cap, len, sizeof(*pool->buff.str), 0, 0);
+    if (!res0.status) return res0;
+    pool->buff.len = 0;
+    struct array_result res1 = hash_table_init(&pool->tbl, cnt, sizeof(size_t), szv);
+    if (res1.status) return (struct array_result) { .status = ARRAY_SUCCESS, .tot = size_add_sat(res0.tot, res1.tot) };
+    free(pool->buff.str);
+    return res1;
 }
 
 void str_pool_close(struct str_pool *pool)
@@ -227,12 +227,12 @@ enum {
 };
 
 // Warning! String 'str' should be null-terminated
-unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, size_t *p_off, size_t szv, void *p_val)
+struct array_result str_pool_insert(struct str_pool *pool, const char *str, size_t len, size_t *p_off, size_t szv, void *p_val)
 {
     size_t h = str_x33_hash(str, NULL), cnt = pool->tbl.cnt;
-    unsigned res = hash_table_alloc(&pool->tbl, &h, str, sizeof(size_t), szv, str_off_x33_hash, str_off_str_eq, pool->buff.str);
-    if (!res) return 0;
-    if (res & HASH_PRESENT)
+    struct array_result res = hash_table_alloc(&pool->tbl, &h, str, sizeof(size_t), szv, str_off_x33_hash, str_off_str_eq, pool->buff.str);
+    if (!res.status) return res;
+    if (res.status & HASH_PRESENT)
     {
         if (p_off) *p_off = *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t));
         if (p_val) *(void **) p_val = hash_table_fetch_val(&pool->tbl, h, szv);
@@ -240,21 +240,16 @@ unsigned str_pool_insert(struct str_pool *pool, const char *str, size_t len, siz
     }
     // Position should be saved before the buffer update
     size_t off = pool->buff.len + (len && cnt);
-    res &= buff_append(&pool->buff, str, len, cnt ? BUFFER_INIT | BUFFER_TERM : BUFFER_TERM);
-    if (!res)
+    struct array_result res0 = buff_append(&pool->buff, str, len, cnt ? BUFFER_INIT | BUFFER_TERM : BUFFER_TERM);
+    if (!res0.status)
     {
         hash_table_dealloc(&pool->tbl, h);
-        return 0;
+        return res0;
     }
     *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t)) = off;
     if (p_off) *p_off = off;
     if (p_val) *(void **) p_val = hash_table_fetch_val(&pool->tbl, h, szv);
-    return res;
-}
-
-size_t str_pool_(struct str_pool *pool)
-{
-    return pool->tbl.cnt + !pool->buff.str[0];
+    return (struct array_result) { .status = res.status & res0.status, .tot = size_add_sat(res.tot, res0.tot) };
 }
 
 bool str_pool_fetch(struct str_pool *pool, const char *str, size_t szv, void *p_val)

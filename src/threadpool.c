@@ -104,7 +104,7 @@ struct thread_pool {
 static struct task_queue *task_queue_create(size_t cap)
 {
     struct task_queue *res;
-    if (!array_init(&res, &cap, cap, sizeof(*res->tasks), sizeof(*res), 0)) return NULL;
+    if (!array_init(&res, &cap, cap, sizeof(*res->tasks), sizeof(*res), 0).status) return NULL;
     
     res->cap = cap;
     res->begin = res->cnt = 0;
@@ -115,7 +115,7 @@ static bool task_queue_test(struct task_queue **p_queue, size_t diff)
 {
     struct task_queue *res = *p_queue;
     size_t cap = res->cap;
-    if (!array_test(&res, &cap, sizeof(*res->tasks), sizeof(*res), 0, res->cnt, diff)) return 0;
+    if (!array_test(&res, &cap, sizeof(*res->tasks), sizeof(*res), 0, res->cnt, diff).status) return 0;
     if (cap == res->cap) return 1; // Queue has already enough space
     
     size_t left = res->begin + res->cnt;

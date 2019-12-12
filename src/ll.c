@@ -68,7 +68,7 @@ uint32_t uint32_bit_scan_forward(uint32_t x)
 
 uint32_t uint32_pop_cnt(uint32_t x)
 {
-    return __builtin_popcount(x);
+    return __builtin_popcount((unsigned) x);
 }
 
 #   ifdef __x86_64__
@@ -78,17 +78,17 @@ DECLARE_LOAD_ACQUIRE(size_t, size)
 
 size_t size_bit_scan_reverse(size_t x)
 {
-    return x ? SIZE_BIT - __builtin_clzll(x) - 1 : SIZE_MAX;
+    return x ? SIZE_BIT - __builtin_clzll((unsigned long long) x) - 1 : SIZE_MAX;
 }
 
 size_t size_bit_scan_forward(size_t x)
 {
-    return x ? __builtin_ctzll(x) : SIZE_MAX;
+    return x ? __builtin_ctzll((unsigned long long) x) : SIZE_MAX;
 }
 
 size_t size_pop_cnt(size_t x)
 {
-    return __builtin_popcountll(x);
+    return __builtin_popcountll((unsigned long long) x);
 }
 
 #   endif 
@@ -160,51 +160,51 @@ DECLARE_LOAD_ACQUIRE(size_t, size)
 
 void size_inc_interlocked(volatile size_t *mem)
 {
-    _InterlockedIncrement64((volatile __int64 *) mem);
+    _InterlockedIncrement64((volatile long long *) mem);
 }
 
 void size_dec_interlocked(volatile size_t *mem)
 {
-    _InterlockedDecrement64((volatile __int64 *) mem);
+    _InterlockedDecrement64((volatile long long *) mem);
 }
 
 size_t size_mul(size_t *p_hi, size_t a, size_t b)
 {
-    unsigned __int64 hi;
-    size_t res = (size_t) _umul128((unsigned __int64) a, (unsigned __int64) b, &hi);
+    unsigned long long hi;
+    size_t res = (size_t) _umul128((unsigned long long) a, (unsigned long long) b, &hi);
     *p_hi = (size_t) hi;
     return res;
 }
 
 size_t size_add(size_t *p_car, size_t x, size_t y)
 {
-    unsigned __int64 res;
-    *p_car = _addcarry_u64(0, (unsigned __int64) x, (unsigned __int64) y, &res);
+    unsigned long long res;
+    *p_car = _addcarry_u64(0, (unsigned long long) x, (unsigned long long) y, &res);
     return (size_t) res;
 }
 
 size_t size_sub(size_t *p_bor, size_t x, size_t y)
 {
-    unsigned __int64 res;
-    *p_bor = _subborrow_u64(0, (unsigned __int64) x, (unsigned __int64) y, &res);
+    unsigned long long res;
+    *p_bor = _subborrow_u64(0, (unsigned long long) x, (unsigned long long) y, &res);
     return (size_t) res;
 }
 
 size_t size_bit_scan_reverse(size_t x)
 {
     unsigned long res;
-    return _BitScanReverse64(&res, (unsigned __int64) x) ? (size_t) res : SIZE_MAX;
+    return _BitScanReverse64(&res, (unsigned long long) x) ? (size_t) res : SIZE_MAX;
 }
 
 size_t size_bit_scan_forward(size_t x)
 {
     unsigned long res;
-    return _BitScanForward64(&res, (unsigned __int64) x) ? (size_t) res : SIZE_MAX;
+    return _BitScanForward64(&res, (unsigned long long) x) ? (size_t) res : SIZE_MAX;
 }
 
 size_t size_pop_cnt(size_t x)
 {
-    return (size_t) __popcnt64((__int64) x);
+    return (size_t) __popcnt64((unsigned long long) x);
 }
 
 #   elif defined _M_IX86
