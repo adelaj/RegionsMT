@@ -578,10 +578,12 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
             {
                 res = array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC);
                 if (!res.status) return res;
+
                 size_t tot = res.tot;
                 res = array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC);
                 res.tot = size_add_sat(tot, res.tot);
                 if (!res.status) return res;
+                
                 tot = res.tot;
                 res = hash_table_rehash(tbl, lcnt, szk, szv, hash, context);
                 res.tot = size_add_sat(tot, res.tot);
@@ -591,10 +593,12 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
             {
                 res = hash_table_rehash(tbl, lcnt, szk, szv, hash, context);
                 if (!res.status) return res;
+                
                 size_t tot = res.tot;
                 res = array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
                 res.tot = size_add_sat(tot, res.tot);
                 if (!res.status) return res;
+                
                 tot = res.tot;
                 res = array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
                 res.tot = size_add_sat(tot, res.tot);

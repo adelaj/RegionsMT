@@ -151,7 +151,7 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                 continue;
             }            
         }
-        if (log_array(log, CODE_METRIC, array_test(p_arr, p_cnt, sizeof(**p_arr), 0, 0, cnt, 1)).status)
+        if (log_array(log, CODE_METRIC, array_test(p_arr, p_cnt, sizeof(**p_arr), 0, 0, cnt, 1)))
         {
             (*p_arr)[cnt++] = argv[i]; // Storing positional parameters
             continue;

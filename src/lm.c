@@ -748,15 +748,15 @@ bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t
 
 static bool lm_term_cnt(size_t *data, size_t blk0, size_t blk, size_t *p_cnt)
 {
-    size_t cnt = 1, j = 1;
+    size_t cnt = 1, i = 1;
     if (blk0)
     {
         if (data[0]) cnt = data[0];
-        for (; j < blk0; j++)
+        for (; i < blk0; i++)
         {
-            if (!data[j]) continue;
+            if (!data[i]) continue;
             size_t hi;
-            cnt = size_mul(&hi, cnt, data[j]);
+            cnt = size_mul(&hi, cnt, data[i]);
             if (hi) return 0;
         }
     }
@@ -765,9 +765,9 @@ static bool lm_term_cnt(size_t *data, size_t blk0, size_t blk, size_t *p_cnt)
         size_t m = size_pop_cnt(data[0]);
         if (m) cnt = (size_t) 1 << m;
     }
-    for (; j < blk; j++)
+    for (; i < blk; i++)
     {
-        size_t m = size_pop_cnt(data[j]);
+        size_t m = size_pop_cnt(data[i]);
         if (!m) continue;
         size_t hi;
         cnt = size_mul(&hi, cnt, (size_t) 1 << m);
@@ -1005,7 +1005,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     
     for (size_t i = 0; i < snp_cnt; i++)
     {
-        uint64_t t = get_time();
+        //uint64_t t = get_time();
         struct categorical_res x = lm_impl(&supp, gen + i * cov.dim, reg, cov.ord[phen.off], cov.dim, dimy, 15);
         fprintf(f,
             "%zu,%.15e,%.15e\n"
@@ -1017,7 +1017,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             4 * i + 3, x.nlpv[2], x.qas[2],
             4 * i + 4, x.nlpv[3], x.qas[3]);
         fflush(f);
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Computation of linear model for snp no. %~uz took %~T.\n", i + 1, t, get_time());
+        //log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Computation of linear model for snp no. %~uz took %~T.\n", i + 1, t, get_time());
     }
     fclose(f);
     lm_close(&supp);

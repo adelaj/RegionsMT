@@ -678,7 +678,7 @@ bool log_init(struct log *restrict log, char *restrict path, size_t lim, enum lo
     {
         bool tty = (flags & (LOG_FORCE_TTY)) || file_is_tty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
         size_t cap = bom ? MAX(lim, lengthof(UTF8_BOM)) : lim;
-        if (log_array(log_error, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)).status)
+        if (log_array(log_error, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)))
         {
             if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
             else log->cnt = 0;
@@ -809,7 +809,7 @@ bool log_message_fseek(struct log *restrict log, struct code_metric code_metric,
     return log_message_fmt(log, code_metric, type, "Unable to seek into the position %~uq of the file %~P!\n", offset, path);
 }
 
-struct array_result log_array(struct log *restrict log, struct code_metric code_metric, struct array_result res)
+bool log_array(struct log *restrict log, struct code_metric code_metric, struct array_result res)
 {
     switch (res.error)
     {
@@ -822,5 +822,5 @@ struct array_result log_array(struct log *restrict log, struct code_metric code_
     case ARRAY_NO_ERROR:
         break;
     }
-    return res; 
+    return res.status; 
 }

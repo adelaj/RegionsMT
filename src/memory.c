@@ -229,12 +229,13 @@ struct array_result persistent_array_init(struct persistent_array *arr, size_t c
         return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
     }
     size_t off = arr->off = size_log2(cnt, 0);
-    struct array_result res0 = array_init(&arr->ptr, &arr->cap, arr->bck = 1, sizeof(*arr->ptr), 0, 0);
-    if (!res0.status) return res0;
-    struct array_result res1 = array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT);
-    if (res1.status) return (struct array_result) { .status = ARRAY_SUCCESS, .tot = size_add_sat(res0.tot, res1.tot) };
+    struct array_result res = array_init(&arr->ptr, &arr->cap, arr->bck = 1, sizeof(*arr->ptr), 0, 0);
+    if (!res.status) return res;
+    size_t tot = res.tot;
+    res = array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT);
+    if (res.status) return (struct array_result) { .status = ARRAY_SUCCESS, .tot = size_add_sat(tot, res.tot) };
     free(arr->ptr);
-    return res1;
+    return res;
 }
 
 void persistent_array_close(struct persistent_array *arr)

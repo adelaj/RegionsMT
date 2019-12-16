@@ -526,60 +526,67 @@ static int Main(int argc, char **argv)
 #if _WIN32
 #   include <windows.h>
 
-// Translating UTF-16 command-line parameters to UTF-8
+// Determining total buffer length (with null-terminators) and performing error checking
+static bool wargv_cnt_impl(size_t argc, wchar_t **wargv, size_t *p_cnt)
+{
+    size_t cnt = argc; // Size of the null-terminators
+    for (size_t i = 0; i < argc; i++)
+    {
+        uint32_t val;
+        uint8_t context = 0;
+        for (wchar_t *word = wargv[i]; *word; word++)
+        {
+            if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) return 0;
+            if (context) continue;
+            size_t car;
+            cnt = size_add(&car, cnt, utf8_len(val));
+            if (car) return 0;
+        }
+    }
+    *p_cnt = cnt;
+    return 1;
+}
+
+// Performing translation from UTF-16LE to UTF-8
+static bool wargv_to_argv_impl(size_t argc, wchar_t **wargv, char *base, char **argv)
+{
+    for (size_t i = 0; i < argc; i++)
+    {
+        argv[i] = base;
+        uint32_t val;
+        uint8_t context = 0;
+        for (wchar_t *word = wargv[i]; *word; word++)
+        {
+            if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) return 0;
+            if (context) continue;
+            uint8_t len;
+            utf8_encode(val, (uint8_t *) base, &len);
+            base += len;
+        }        
+        *(base++) = '\0';
+    }
+    return 1;
+}
+
+// Translating UTF-16LE command-line parameters to UTF-8
 static bool argv_from_wargv(char ***p_argv, size_t argc, wchar_t **wargv)
 {
     char **argv;
-    if (!array_init(&argv, NULL, argc, sizeof(*argv), 0, ARRAY_STRICT).status) return 0;
-    size_t base_cnt = 0, i;
-    for (i = 0; i < argc; i++) // Determining total length and performing error checking
+    if (array_init(&argv, NULL, argc, sizeof(*argv), 0, ARRAY_STRICT).status)
     {
-        wchar_t *word = wargv[i];
-        uint32_t val;
-        uint8_t context = 0;
-        for (; *word; word++)
-        {
-            if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) break;
-            if (!context) base_cnt += utf8_len(val);
-        }
-        if (*word) break;
-        base_cnt++;
-    }
-    if (i == argc)
-    {
-        if (!argc) return 1;
         char *base;
-        if (array_init(&base, NULL, base_cnt, sizeof(*base), 0, ARRAY_STRICT).status)
+        size_t cnt;
+        if (wargv_cnt_impl(argc, wargv, &cnt) && array_init(&base, NULL, cnt, sizeof(*base), 0, ARRAY_STRICT).status)
         {
-            char *byte = base;
-            for (i = 0; i < argc; i++) // Performing translation
-            {
-                argv[i] = byte;
-                wchar_t *word = wargv[i];
-                uint32_t val;
-                uint8_t context = 0;
-                for (; *word; word++)
-                {
-                    if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) break;
-                    if (!context)
-                    {
-                        uint8_t len;
-                        utf8_encode(val, (uint8_t *) byte, &len);
-                        byte += len;
-                    }
-                }
-                if (*word) break;
-                *(byte++) = '\0';
-            }
-            if (i == argc)
+            if (wargv_to_argv_impl(argc, wargv, base, argv))
             {
                 *p_argv = argv;
                 return 1;
             }
             free(base);
         }
-    }
-    free(argv);
+        free(argv);
+    }    
     return 0;
 }
 
