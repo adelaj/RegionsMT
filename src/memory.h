@@ -35,6 +35,7 @@ enum array_error {
 
 void array_broadcast(void *, size_t, size_t, void *);
 
+struct array_result matrix_init(void *, size_t *restrict, size_t, size_t, size_t, size_t, size_t, enum array_flags);
 struct array_result array_init(void *, size_t *restrict, size_t, size_t, size_t, enum array_flags);
 struct array_result array_test_impl(void *, size_t *restrict, size_t, size_t, enum array_flags, size_t *restrict, size_t);
 

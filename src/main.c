@@ -578,7 +578,7 @@ static bool argv_from_wargv(char ***p_argv, size_t argc, wchar_t **wargv)
         size_t cnt;
         if (wargv_cnt_impl(argc, wargv, &cnt) && array_init(&base, NULL, cnt, sizeof(*base), 0, ARRAY_STRICT).status)
         {
-            if (wargv_to_argv_impl(argc, wargv, base, argv))
+            if (wargv_to_argv_impl(argc, wargv, base, argv)) // Never fails
             {
                 *p_argv = argv;
                 return 1;

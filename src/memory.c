@@ -17,10 +17,10 @@ void array_broadcast(void *arr, size_t cnt, size_t sz, void *val)
 // Total size = xdim * (ydim * sz + ydiff) + xdiff 
 struct array_result matrix_init(void *p_Src, size_t *restrict p_cap, size_t xdim, size_t ydim, size_t sz, size_t xdiff, size_t ydiff, enum array_flags flags)
 {
-    size_t xtot = xdim;
+    size_t xtot = ydim;
     if (!size_mul_add_test(&xtot, sz, ydiff)) return (struct array_result) { .error = ARRAY_OVERFLOW };
     struct array_result res = array_init(p_Src, p_cap, xdim, xtot, xdiff, flags);
-    if (res.status == ARRAY_SUCCESS) *p_cap *= ydim;
+    if (p_cap && res.status == ARRAY_SUCCESS) *p_cap *= ydim;
     return res;
 }
 

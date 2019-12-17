@@ -119,4 +119,4 @@ bool log_message_fopen(struct log *restrict, struct code_metric, enum message_ty
 bool log_message_fseek(struct log *restrict, struct code_metric, enum message_type, int64_t, const char *restrict);
 
 // Waning! Output has different senantics: 
-bool log_array(struct log *restrict, struct code_metric, struct array_result);
+bool array_assert(struct log *restrict, struct code_metric, struct array_result);
