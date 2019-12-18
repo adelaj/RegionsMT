@@ -522,6 +522,13 @@ size_t size_sub_sat(size_t a, size_t b)
     return bor ? 0 : res;
 }
 
+// Returns the sign of the a - b
+int size_sign(size_t a, size_t b)
+{
+    size_t bor, diff = size_sub(&bor, a, b);
+    return diff ? 1 - (int) (bor << 1) : 0;
+}
+
 #define DECLARE_STABLE_CMP_ASC(PREFIX, SUFFIX) \
     int PREFIX ## _stable_cmp_asc ## SUFFIX (const void *A, const void *B, void *thunk) \
     { \
@@ -537,8 +544,7 @@ size_t size_sub_sat(size_t a, size_t b)
 int size_stable_cmp_dsc(const void *A, const void *B, void *thunk)
 {
     (void) thunk;
-    size_t bor, diff = size_sub(&bor, *(size_t *) B, *(size_t *) A);
-    return diff ? 1 - (int) (bor << 1) : 0;
+    return size_sign(*(size_t *) B, *(size_t *) A);
 }
 
 DECLARE_STABLE_CMP_ASC(size, )

@@ -24,8 +24,7 @@ bool test_sort_generator_a_1(void *dst, size_t *p_context, struct log *log)
 {
     size_t context = *p_context, cnt = (size_t) 1 << context;
     size_t *arr;
-    if (!array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-    else
+    if (array_assert(log, CODE_METRIC, array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT)))
     {
         generator_impl(arr, cnt);
         *(struct test_sort_a *) dst = (struct test_sort_a) { .arr = arr, .cnt = cnt, .sz = sizeof(*arr) };
@@ -42,8 +41,7 @@ bool test_sort_generator_a_2(void *dst, size_t *p_context, struct log *log)
     (void) p_context;
     size_t cnt = ((QUICK_SORT_CUTOFF + 1) << 1) + 1, hcnt = cnt >> 1;
     size_t *arr;
-    if (!array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-    else
+    if (array_assert(log, CODE_METRIC, array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT)))
     {
         for (size_t i = 0; i < hcnt; i++) arr[i] = (SIZE_MAX >> 1) - i - 1;
         arr[hcnt] = 0;
@@ -78,16 +76,14 @@ bool test_sort_generator_a_3(void *dst, size_t *p_context, struct log *log)
 {
     size_t context = *p_context, cnt = (size_t) 1 << context;
     size_t *arr;
-    if (!array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-    else
+    if (array_assert(log, CODE_METRIC, array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT)))
     {
         size_t *tmp;
-        if (!array_init(&tmp, NULL, cnt, sizeof(*tmp), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-        else
+        if (array_assert(log, CODE_METRIC, array_init(&tmp, NULL, cnt, sizeof(*tmp), 0, ARRAY_STRICT)))
         {
             for (size_t i = 0; i < cnt; i++) tmp[i] = i, arr[i] = cnt - 1;
             struct sort_worst_case_context context_tmp = { .arr = arr, .gas = cnt - 1 };
-            quick_sort(tmp, cnt, sizeof(*tmp), quick_sort_worst_case_cmp, &context_tmp);
+            quick_sort(tmp, cnt, sizeof(*tmp), quick_sort_worst_case_cmp, &context_tmp, NULL, sizeof(*tmp));
             free(tmp);
             *(struct test_sort_a *) dst = (struct test_sort_a) { .arr = arr, .cnt = cnt, .sz = sizeof(*arr) };
             if (context < TEST_SORT_EXP) ++*p_context;
@@ -103,8 +99,7 @@ bool test_sort_generator_b_1(void *dst, size_t *p_context, struct log *log)
 {
     size_t context = *p_context, ucnt = context * context + context + 1, cnt = MAX(((size_t) 1 << context), ucnt);
     double *arr;
-    if (!array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-    else
+    if (array_assert(log, CODE_METRIC, array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT)))
     {
         for (size_t i = 0; i < cnt; i++) arr[i] = (double) (i % ucnt) + 1. / (double) (i % ucnt + 1);
         for (size_t i = 0; i < cnt - 1; i++)
@@ -127,8 +122,7 @@ bool test_sort_generator_c_1(void *dst, size_t *p_context, struct log *log)
 {
     size_t context = *p_context, cnt = ((size_t) 1 << context) - 1;
     size_t *arr;
-    if (!array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-    else
+    if (array_assert(log, CODE_METRIC, array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT)))
     {
         for (size_t i = 0, j = 0; i < cnt; i++)
         {
@@ -147,8 +141,7 @@ bool test_sort_generator_d_1(void *dst, size_t *p_context, struct log *log)
 {
     size_t context = *p_context, cnt = context + 1;
     uint64_t *arr;
-    if (!array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-    else
+    if (array_assert(log, CODE_METRIC, array_init(&arr, NULL, cnt, sizeof(*arr), 0, ARRAY_STRICT)))
     {
         for (size_t i = 0; i < cnt; i++) arr[i] = UINT64_C(1) << i;
         *(struct test_sort_d *) dst = (struct test_sort_d) { .arr = arr, .cnt = cnt };
@@ -190,12 +183,11 @@ bool test_sort_a(void *In, struct log *log)
     bool succ = 0;
     struct test_sort_a *in = In;
     size_t *arr;
-    if (!array_init(&arr, NULL, in->cnt, in->sz, 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-    else
+    if (array_assert(log, CODE_METRIC, array_init(&arr, NULL, in->cnt, in->sz, 0, ARRAY_STRICT)))
     {
         memcpy(arr, in->arr, in->cnt * in->sz);
         struct flt64_cmp_asc_test context = { .a = arr, .b = arr + in->cnt * in->sz - in->sz, .succ = 1 };
-        quick_sort(arr, in->cnt, in->sz, size_cmp_asc_test, &context);
+        quick_sort(arr, in->cnt, in->sz, size_cmp_asc_test, &context, NULL, in->sz);
         size_t ind = 1;
         for (; ind < in->cnt; ind++) if (arr[ind - 1] > arr[ind]) break;
         succ = (!in->cnt || ind == in->cnt) && context.succ;
@@ -210,8 +202,7 @@ bool test_sort_b_1(void *In, struct log *log)
     struct test_sort_b *in = In;
     size_t ucnt = in->cnt;
     uintptr_t *ord;
-    if (!orders_stable_unique(&ord, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-    else
+    if (array_assert(log, CODE_METRIC, orders_stable_unique(&ord, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL)))
     {
         if (ucnt == in->ucnt)
         {
@@ -230,16 +221,13 @@ bool test_sort_b_2(void *In, struct log *log)
     struct test_sort_b *in = In;
     size_t ucnt = in->cnt;
     uintptr_t *ord;
-    if (!orders_stable_unique(&ord, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-    else
+    if (array_assert(log, CODE_METRIC, orders_stable_unique(&ord, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL)))
     {
         double *arr;
-        if (!array_init(&arr, NULL, in->cnt, sizeof(*arr), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-        else
+        if (array_assert(log, CODE_METRIC, array_init(&arr, NULL, in->cnt, sizeof(*arr), 0, ARRAY_STRICT)))
         {
             memcpy(arr, in->arr, in->cnt * sizeof(*arr));
-            if (!orders_apply(ord, ucnt, sizeof(*arr), arr).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-            else
+            if (array_assert(log, CODE_METRIC, orders_apply(ord, ucnt, sizeof(*arr), arr, NULL, sizeof(*arr))))
             {
                 size_t ind = 1;
                 for (; ind < ucnt; ind++) if (in->arr[ord[ind]] != arr[ind]) break;

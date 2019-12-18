@@ -106,6 +106,7 @@ uint8_t uint8_bit_scan_reverse(uint8_t);
 uint8_t uint8_bit_scan_forward(uint8_t);
 size_t size_add_sat(size_t, size_t);
 size_t size_sub_sat(size_t, size_t);
+int size_sign(size_t, size_t);
 
 int size_stable_cmp_dsc(const void *, const void *, void *);
 int size_stable_cmp_asc(const void *, const void *, void *);

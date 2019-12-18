@@ -10,8 +10,7 @@
 
 struct sort_context {
     void *arr, *temp;
-    size_t cnt;
-    size_t sz;
+    size_t cnt, sz, stride;
     cmp_callback cmp;
     void *context;
 };
@@ -58,7 +57,7 @@ static bool sort_thread_proc(void *Args, void *Context)
 {
     struct sort_args *restrict args = Args;
     struct sort_context *restrict context = Context;
-    quick_sort((char *) context->arr + args->off * context->sz, args->len, context->sz, context->cmp, context->context);
+    quick_sort((char *) context->arr + args->off * context->sz, args->len, context->sz, context->cmp, context->context, NULL, context->stride);
     return 1;
 }
 

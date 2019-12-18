@@ -214,7 +214,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
                     supp->reg[k] = (double) (g == 1);
                     supp->reg[k + 1] = (double) (g == 2);
                 }
-                switch (dimx) // Checking consistency of the genotypes
+                switch (dimx) // Checking that genotype (with intercept) submatrix has the full rank
                 {
                 case 0:
                     continue;
@@ -419,9 +419,8 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
         if (utf8.val == ')')
         {
             context->buff->len = context->len;
-            if (!buff_append(context->buff, 0, 0, BUFFER_TERM).status ||
-                !str_pool_insert(&arg->pool, context->buff->str, context->len, &arg->term[arg->term_cnt - 1].off, 0, NULL).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-            else
+            if (array_assert(log, CODE_METRIC, buff_append(context->buff, 0, 0, BUFFER_TERM)) &&
+                array_assert(log, CODE_METRIC, str_pool_insert(&arg->pool, context->buff->str, context->len, &arg->term[arg->term_cnt - 1].off, 0, NULL)))
             {
                 context->st = LM_EXPR_OP;
                 return 1;
@@ -671,16 +670,15 @@ struct term_cmp_thunk {
     size_t blk0, blk;
 };
 
-static int term_cmp(const void *A, const void *B, void *Thunk)
+static bool term_cmp(const void *A, const void *B, void *Thunk)
 {
     struct term_cmp_thunk *thunk = Thunk;
     const size_t *a = A, *b = B;
     int cmp = 0;
     size_t i = 0;
-    for (; i < thunk->blk0 && !cmp; cmp = size_stable_cmp_asc(a + i, b + i, NULL), i++);
-    for (; i < thunk->blk && !cmp; i++)
-        cmp = size_stable_cmp_asc(&(size_t) { size_bit_scan_forward(~a[i] & b[i]) }, &(size_t) { size_bit_scan_forward(a[i] & ~b[i]) }, NULL);
-    return cmp;
+    for (; i < thunk->blk0 && !cmp; cmp = size_sign(a[i], b[i]), i++);
+    for (; i < thunk->blk && !cmp; cmp = size_sign(size_bit_scan_forward(~a[i] & b[i]), size_bit_scan_forward(a[i] & ~b[i])), i++);
+    return cmp > 0;
 }
 
 bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t cnt, struct log *log)
@@ -701,11 +699,9 @@ bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t
             if (term[i].sort & COV_SORT_FLAG_STR)
             {
                 *level = cov->dim;
-                if (!ranks_unique((size_t **) ptr, cov->off + ind * cov->dim, level, sizeof(*cov->off), str_off_cmp, cov->buff.str).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-                else continue;
+                if (array_assert(log, CODE_METRIC, ranks_unique((size_t **) ptr, cov->off + ind * cov->dim, level, sizeof(*cov->off), str_off_cmp, cov->buff.str))) continue;
             }
-            else if (!array_init(ptr, NULL, cov->dim, sizeof(double), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-            else
+            else if (array_assert(log, CODE_METRIC, array_init(ptr, NULL, cov->dim, sizeof(double), 0, ARRAY_STRICT)))
             {
                 for (size_t j = 0; j < cov->dim; j++)
                 {
@@ -783,7 +779,7 @@ static bool lm_cnt(size_t *data, size_t blk0, size_t blk, size_t *p_cnt)
 
 static void lm_term_expand(size_t *data, size_t blk0, size_t blk, size_t *edata, size_t *ind, size_t *p_off)
 {
-    size_t off = 0;
+    size_t off = *p_off;
     for (;;)
     {
         size_t i = 0;
@@ -814,10 +810,12 @@ bool lm_expand(size_t **p_data, size_t *p_cnt, size_t blk0, size_t blk, struct l
         {
             if (array_assert(log, CODE_METRIC, array_init(&ind, NULL, blk, sizeof(*ind), 0, ARRAY_STRICT | ARRAY_CLEAR)))
             {
-                size_t off = 0;
-                for (size_t i = 0; i < cnt; i++) lm_term_expand(data + i, blk0, blk, edata + off, ind, &off);
+                for (size_t i = 0, off = 0; i < cnt * blk; i += blk) lm_term_expand(data + i, blk0, blk, edata, ind, &off);
                 free(data);
+                size_t sz = blk * sizeof(*edata), ucnt = ecnt;
+                sort_unique(edata, &ucnt, sz, term_cmp, &(struct term_cmp_thunk) { .blk0 = blk0, .blk = blk }, ind, sz);
                 free(ind);
+                array_test(&edata, &ecnt, sz, 0, ARRAY_REDUCE, ucnt);
                 *p_data = edata;
                 *p_cnt = ecnt;
                 return 1;
@@ -979,23 +977,23 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     }
     */
 
-    uintptr_t *ord;
-    size_t ucnt = cnt;
-    if (!orders_stable_unique(&ord, data, &ucnt, blk * sizeof(*data), term_cmp, &(struct term_cmp_thunk) { .blk = blk, .blk0 = blk0 }).status) return 0;
+    //uintptr_t *ord;
+    //size_t ucnt = cnt;
+    //if (!orders_stable_unique(&ord, data, &ucnt, blk * sizeof(*data), term_cmp, &(struct term_cmp_thunk) { .blk = blk, .blk0 = blk0 }).status) return 0;
         
     size_t dimy = 0;
-    for (size_t i = 0; i < ucnt; i++)
-        dimy += par_term[ord[i]];
+    for (size_t i = 0; i < cnt; i++)
+        dimy += par_term[i];
     
     double *reg;
     if (!array_init(&reg, NULL, dimy * cov.dim, sizeof(*reg), 0, ARRAY_STRICT).status) return 0;
     
     for (size_t x = 0, pos = 0; x < cov.dim; x++)
     {
-        for (size_t i = 0; i < ucnt; i++)
+        for (size_t i = 0; i < cnt; i++)
         {
-            size_t ind = ord[i], off = 0, mul = 1, j = 0;
-            for (; j < blk0; j++) if (size_bit_test(data + blk * ind + blk0, j))
+            size_t off = 0, mul = 1, j = 0;
+            for (; j < blk0; j++) if (size_bit_test(data + blk * i + blk0, j))
             {
                 size_t val = ((size_t *) cov.ord[j])[x];
                 if (!val) break;
@@ -1004,20 +1002,20 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             }
             if (j < blk0)
             {
-                array_broadcast(reg + pos, par_term[ind], sizeof(*reg), &(double) { 0. });
-                pos += par_term[ind];
+                array_broadcast(reg + pos, par_term[i], sizeof(*reg), &(double) { 0. });
+                pos += par_term[i];
                 continue;
             }
             double pr = 1.;
-            for (j = 0; j < blk0; j++) if (data[j + blk * ind])
+            for (j = 0; j < blk0; j++) if (data[j + blk * i])
             {
                 double val = j % COV_SORT_CNT ? (double) ((size_t *) cov.ord[j])[x] : ((double *) cov.ord[j])[x];
-                pr *= pow(val, (double) data[j + blk * ind]);
+                pr *= pow(val, (double) data[j + blk * i]);
             }
             array_broadcast(reg + pos, off, sizeof(*reg), &(double) { 0. });
             reg[pos + off] = pr;
-            array_broadcast(reg + pos + off + 1, size_sub_sat(par_term[ind], off + 1), sizeof(*reg), &(double) { 0. });
-            pos += par_term[ind];
+            array_broadcast(reg + pos + off + 1, size_sub_sat(par_term[i], off + 1), sizeof(*reg), &(double) { 0. });
+            pos += par_term[i];
         }
     }
 
@@ -1057,7 +1055,6 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     free(gen);
     free(data);
     free(par_term);
-    free(ord);
     cov_close(&cov);
     lm_expr_arg_close(&arg);    
     return 1;

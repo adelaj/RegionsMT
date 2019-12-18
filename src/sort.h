@@ -22,12 +22,13 @@ void ranks_from_pointers_inplace_impl(uintptr_t *restrict, uintptr_t, size_t, si
 struct array_result ranks_from_pointers_inplace(uintptr_t *restrict, uintptr_t, size_t, size_t);
 struct array_result ranks_from_orders_inplace(uintptr_t *restrict, size_t);
 struct array_result ranks_stable(size_t **, const void *, size_t, size_t, stable_cmp_callback, void *);
-void orders_apply_impl(uintptr_t *restrict, size_t, size_t, void *restrict, uint8_t *restrict, void *restrict);
-struct array_result orders_apply(uintptr_t *restrict, size_t, size_t, void *restrict);
+void orders_apply_impl(uintptr_t *restrict, size_t, size_t, void *restrict, uint8_t *restrict, void *restrict, size_t);
+struct array_result orders_apply(uintptr_t *restrict, size_t, size_t, void *restrict, void *restrict, size_t);
 
 #define QUICK_SORT_CUTOFF 20 // The actual quick sort is applied only for arrays of counts, greater than this value
 #define QUICK_SORT_CACHED // Enables the more optimal utilization of the CPU caches
-void quick_sort(void *restrict, size_t, size_t, cmp_callback, void *);
+void quick_sort(void *restrict, size_t, size_t, cmp_callback, void *, void *restrict, size_t);
+void sort_unique(void *restrict, size_t *, size_t, cmp_callback, void *, void *restrict, size_t);
 
 enum binary_search_flags {
     BINARY_SEARCH_RIGHTMOST = 1, // Searches for the rightmost occurrence of the key

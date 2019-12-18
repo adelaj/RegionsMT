@@ -230,26 +230,26 @@ enum {
 struct array_result str_pool_insert(struct str_pool *pool, const char *str, size_t len, size_t *p_off, size_t szv, void *p_val)
 {
     size_t h = str_x33_hash(str, NULL), cnt = pool->tbl.cnt;
-    struct array_result res = hash_table_alloc(&pool->tbl, &h, str, sizeof(size_t), szv, str_off_x33_hash, str_off_str_eq, pool->buff.str);
-    if (!res.status) return res;
-    if (res.status & HASH_PRESENT)
+    struct array_result res0 = hash_table_alloc(&pool->tbl, &h, str, sizeof(size_t), szv, str_off_x33_hash, str_off_str_eq, pool->buff.str);
+    if (!res0.status) return res0;
+    if (res0.status & HASH_PRESENT)
     {
         if (p_off) *p_off = *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t));
         if (p_val) *(void **) p_val = hash_table_fetch_val(&pool->tbl, h, szv);
-        return res;
+        return res0;
     }
     // Position should be saved before the buffer update
     size_t off = pool->buff.len + (len && cnt);
-    struct array_result res0 = buff_append(&pool->buff, str, len, cnt ? BUFFER_INIT | BUFFER_TERM : BUFFER_TERM);
-    if (!res0.status)
+    struct array_result res1 = buff_append(&pool->buff, str, len, cnt ? BUFFER_INIT | BUFFER_TERM : BUFFER_TERM);
+    if (!res1.status)
     {
         hash_table_dealloc(&pool->tbl, h);
-        return res0;
+        return res1;
     }
     *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t)) = off;
     if (p_off) *p_off = off;
     if (p_val) *(void **) p_val = hash_table_fetch_val(&pool->tbl, h, szv);
-    return (struct array_result) { .status = res.status & res0.status, .tot = size_add_sat(res.tot, res0.tot) };
+    return (struct array_result) { .status = res0.status & res1.status, .tot = size_add_sat(res0.tot, res1.tot) };
 }
 
 bool str_pool_fetch(struct str_pool *pool, const char *str, size_t szv, void *p_val)
