@@ -21,7 +21,7 @@ enum {
     AGGR_DROP
 };
 
-typedef unsigned (*task_callback)(void *, void *);
+typedef unsigned (*task_callback)(void *, void *, void *);
 typedef unsigned (*condition_callback)(volatile void *, const void *);
 typedef void (*aggregator_callback)(volatile void *, const void *, unsigned);
 

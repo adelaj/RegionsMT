@@ -62,7 +62,7 @@ struct persistent_array {
     size_t off, bck, cap;
 };
 
-struct array_result persistent_array_init(struct persistent_array *, size_t, size_t);
+struct array_result persistent_array_init(struct persistent_array *, size_t, size_t, bool);
 void persistent_array_close(struct persistent_array *);
-struct array_result persistent_array_test(struct persistent_array *, size_t, size_t);
+struct array_result persistent_array_test(struct persistent_array *, size_t, size_t, bool);
 void *persistent_array_fetch(struct persistent_array *, size_t, size_t);

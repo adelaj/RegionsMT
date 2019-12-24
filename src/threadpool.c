@@ -80,16 +80,30 @@ struct thread_pool {
 };
 */
 
+/*
 struct thread_data {
     thread_handle handle;
     void *storage, *volatile ptr;
 };
+*/
+
+struct thread_data {
+    struct thread_pool *pool; // Parrent thread pool
+    mutex_handle mutex;
+    condition_handle condition;
+    size_t id, counter;
+    void *storage;
+    volatile struct task task;
+    volatile unsigned state;
+};
 
 struct thread_pool {
-    spinlock_handle queue_lock;
-    struct queue queue;
+    // semaphore_handle semaphore;
+    mutex_handle mutex1, mutex2;
+    struct queue queue1, queue2;
     size_t cnt;
-    struct persistent_array thread_data;
+    struct thread_data **data; // Warning! Theads should not access this array directly
+    
     /*spinlock_handle spinlock, startuplock;
     mutex_handle mutex;
     condition_handle condition;
@@ -294,10 +308,66 @@ struct thread_arg {
     void *volatile *ptr;
     struct thread_pool *pool;
 };
+*/
+
+enum thread_state {
+    THREAD_STATE_IDLE = 0,
+    THREAD_STATE_UPDATE,
+    THREAD_STATE_
+};
+
+struct thread_arg {
+    struct thread_pool *pool; 
+    volatile void *task;
+    void *tls;
+    mutex_handle *mutex;
+    condition_handle *condition;
+    size_t id;
+    unsigned state;    
+};
 
 static thread_return thread_callback_convention thread_proc(void *Arg)
 {
-    struct thread_arg *arg = Thread_data;
+    struct thread_arg *arg = Arg;
+    
+    /*mutex_acquire(arg->mutex);
+    for (;;)
+    {
+        switch (arg->state)
+        {
+        case THREAD_STATE_IDLE:
+            condition_sleep(arg->condition, arg->mutex);
+            continue;
+        case THREAD_STATE_UPDATE:
+
+        }
+
+        
+        struct task *task = ptr_interlocked_compare_exchange(&arg->task, NULL, NULL);
+        if (task)
+        {
+            unsigned res = task->callback(task->arg, task->context, arg->tls);
+            if (res == TASK_YIELD)
+            {
+                mutex_acquire(arg->pool->mutex2);
+                // Return task to the secondary queue 
+                mutex_release(arg->pool->mutex2);
+            }
+
+            // if yield then task to secondary queue
+            // else continue
+            // semaphore_inc
+        }
+        else
+        {
+            mutex_acquire(arg->mutex);
+
+            condition_sleep(arg->condition, arg->mutex);
+
+            mutex_release(arg->mutex);
+        }
+    }
+
     for (;;)
     {
         struct task *tsk = ptr_load_acquire(thread_data->ptr);
@@ -311,9 +381,9 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
             if (tsk->a_fail) tsk->a_fail(tsk->a_fail_mem, tsk->a_fail_arg);
         }
         ptr_store_release(thread_data->ptr, NULL);
-    }
+    }*/
 }
-
+/*
 void thread_pool_schedule(struct thread_pool *pool)
 {
     for (size_t i = 0; i < pool->queue->cnt)

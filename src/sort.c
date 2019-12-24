@@ -18,13 +18,13 @@ static bool generic_cmp(const void *A, const void *B, void *Thunk)
     return thunk->cmp(*(const void **) A, *(const void **) B, thunk->context);
 }
 
-struct array_result pointers(uintptr_t **p_ptr, const void *arr, size_t cnt, size_t sz, cmp_callback cmp, void *context)
+struct array_result pointers(uintptr_t **p_ptr, const void *arr, size_t cnt, size_t stride, cmp_callback cmp, void *context)
 {
     uintptr_t *ptr;
     struct array_result res = array_init(&ptr, NULL, cnt, sizeof(*ptr), 0, ARRAY_STRICT);
     if (!res.status) return res;
-    for (size_t i = 0; i < cnt; ptr[i] = (uintptr_t) arr + i * sz, i++);
-    quick_sort(ptr, cnt, sizeof(*ptr), generic_cmp, &(struct generic_cmp_thunk) { .cmp = cmp, .context = context }, NULL, sz);
+    for (size_t i = 0, j = 0; i < cnt; ptr[i] = (uintptr_t) arr + j, i++, j += stride);
+    quick_sort(ptr, cnt, sizeof(*ptr), generic_cmp, &(struct generic_cmp_thunk) { .cmp = cmp, .context = context }, NULL, sizeof(*ptr));
     *p_ptr = ptr;
     return res;
 }
@@ -43,44 +43,47 @@ static bool generic_cmp_stable(const void *A, const void *B, void *Thunk)
     return 0;
 }
 
-struct array_result pointers_stable(uintptr_t **p_ptr, const void *arr, size_t cnt, size_t sz, stable_cmp_callback cmp, void *context)
+struct array_result pointers_stable(uintptr_t **p_ptr, const void *arr, size_t cnt, size_t stride, stable_cmp_callback cmp, void *context)
 {
     uintptr_t *ptr;
     struct array_result res = array_init(&ptr, NULL, cnt, sizeof(*ptr), 0, ARRAY_STRICT);
     if (!res.status) return res;
-    for (size_t i = 0; i < cnt; ptr[i] = (uintptr_t) arr + i * sz, i++);
-    quick_sort(ptr, cnt, sizeof(*ptr), generic_cmp_stable, &(struct generic_cmp_stable_thunk) { .cmp = cmp, .context = context }, NULL, sz);
+    for (size_t i = 0, j = 0; i < cnt; ptr[i] = (uintptr_t) arr + j, i++, j += stride);
+    quick_sort(ptr, cnt, sizeof(*ptr), generic_cmp_stable, &(struct generic_cmp_stable_thunk) { .cmp = cmp, .context = context }, NULL, sizeof(*ptr));
     *p_ptr = ptr;
     return res;
 }
 
-void orders_from_pointers_inplace(uintptr_t *ptr, uintptr_t base, size_t cnt, size_t sz)
+void orders_from_pointers_inplace(uintptr_t *ptr, uintptr_t base, size_t cnt, size_t stride)
 {
-    for (size_t i = 0; i < cnt; ptr[i] = (ptr[i] - base) / sz, i++);
+    for (size_t i = 0; i < cnt; ptr[i] = (ptr[i] - base) / stride, i++);
 }
 
-struct array_result orders_stable(uintptr_t **p_ord, const void *arr, size_t cnt, size_t sz, stable_cmp_callback cmp, void *context)
+struct array_result orders_stable(uintptr_t **p_ord, const void *arr, size_t cnt, size_t stride, stable_cmp_callback cmp, void *context)
 {
     uintptr_t *ord;
-    struct array_result res = pointers_stable(&ord, arr, cnt, sz, cmp, context);
+    struct array_result res = pointers_stable(&ord, arr, cnt, stride, cmp, context);
     if (!res.status) return res;
-    orders_from_pointers_inplace(ord, (uintptr_t) arr, cnt, sz);
+    orders_from_pointers_inplace(ord, (uintptr_t) arr, cnt, stride);
     *p_ord = ord;
     return res;
 }
 
-struct array_result orders_stable_unique(uintptr_t **p_ord, const void *arr, size_t *p_cnt, size_t sz, stable_cmp_callback cmp, void *context)
+struct array_result orders_stable_unique(uintptr_t **p_ord, const void *arr, size_t *p_cnt, size_t stride, stable_cmp_callback cmp, void *context)
 {
     size_t cnt = *p_cnt;
     uintptr_t *ord;
-    struct array_result res = pointers_stable(&ord, arr, cnt, sz, cmp, context);
+    struct array_result res = pointers_stable(&ord, arr, cnt, stride, cmp, context);
     if (!res.status) return res;
 
     uintptr_t tmp = 0;
     size_t ucnt = 0;    
-    if (cnt) tmp = ord[0], ord[ucnt++] = (tmp - (uintptr_t) arr) / sz;
-    for (size_t i = 1; i < cnt; i++)
-        if (cmp((const void *) ord[i], (const void *) tmp, context) > 0) tmp = ord[i], ord[ucnt++] = (tmp - (uintptr_t) arr) / sz;
+    if (cnt) tmp = ord[0], ord[ucnt++] = (tmp - (uintptr_t) arr) / stride;
+    for (size_t i = 1; i < cnt; i++) if (cmp((const void *) ord[i], (const void *) tmp, context) > 0)
+    {
+        tmp = ord[i];
+        ord[ucnt++] = (tmp - (uintptr_t) arr) / stride;
+    }
     
     // Even if the operation fails, the result is still valid
     array_test(&ord, &ucnt, sizeof(*ord), 0, ARRAY_REDUCE, ucnt);
@@ -89,17 +92,17 @@ struct array_result orders_stable_unique(uintptr_t **p_ord, const void *arr, siz
     return res;
 }
 
-void ranks_from_pointers_impl(size_t *rnk, const uintptr_t *ptr, uintptr_t base, size_t cnt, size_t sz)
+void ranks_from_pointers_impl(size_t *rnk, const uintptr_t *ptr, uintptr_t base, size_t cnt, size_t stride)
 {
-    for (size_t i = 0; i < cnt; rnk[(ptr[i] - base) / sz] = i, i++);
+    for (size_t i = 0; i < cnt; rnk[(ptr[i] - base) / stride] = i, i++);
 }
 
-struct array_result ranks_from_pointers(size_t **p_rnk, const uintptr_t *ptr, uintptr_t base, size_t cnt, size_t sz)
+struct array_result ranks_from_pointers(size_t **p_rnk, const uintptr_t *ptr, uintptr_t base, size_t cnt, size_t stride)
 {
     size_t *rnk;
     struct array_result res = array_init(&rnk, NULL, cnt, sizeof(*rnk), 0, ARRAY_STRICT);
     if (!res.status) return res;
-    ranks_from_pointers_impl(rnk, ptr, base, cnt, sz);
+    ranks_from_pointers_impl(rnk, ptr, base, cnt, stride);
     *p_rnk = rnk;
     return res;
 }
@@ -109,14 +112,14 @@ struct array_result ranks_from_orders(size_t **p_rnk, const uintptr_t *ord, size
     return ranks_from_pointers(p_rnk, ord, 0, cnt, 1);
 }
 
-struct array_result ranks_unique(size_t **p_rnk, const void *arr, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
+struct array_result ranks_unique(size_t **p_rnk, const void *arr, size_t *p_cnt, size_t stride, cmp_callback cmp, void *context)
 {
     bool succ = 0;
     size_t *rnk;
     uintptr_t *ptr = NULL;
-    struct array_result res = pointers(&ptr, arr, *p_cnt, sz, cmp, context);
+    struct array_result res = pointers(&ptr, arr, *p_cnt, stride, cmp, context);
     if (!res.status) return res;
-    res = ranks_unique_from_pointers(&rnk, ptr, (uintptr_t) arr, p_cnt, sz, cmp, context);
+    res = ranks_unique_from_pointers(&rnk, ptr, (uintptr_t) arr, p_cnt, stride, cmp, context);
     if (res.status)
     {
         *p_rnk = rnk;
@@ -127,7 +130,7 @@ struct array_result ranks_unique(size_t **p_rnk, const void *arr, size_t *p_cnt,
 }
 
 // Warning! 'ptr' may contain pointers to the 'rnk' array (i. e. 'rnk' = 'base').
-void ranks_unique_from_pointers_impl(size_t *rnk, const uintptr_t *ptr, uintptr_t base, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
+void ranks_unique_from_pointers_impl(size_t *rnk, const uintptr_t *ptr, uintptr_t base, size_t *p_cnt, size_t stride, cmp_callback cmp, void *context)
 {
     size_t cnt = *p_cnt;
     if (!cnt) return;
@@ -136,18 +139,18 @@ void ranks_unique_from_pointers_impl(size_t *rnk, const uintptr_t *ptr, uintptr_
     {
         size_t tmp = ucnt;
         if (cmp((void *) ptr[i + 1], (void *) ptr[i], context)) ucnt++;
-        rnk[(ptr[i] - base) / sz] = tmp;
+        rnk[(ptr[i] - base) / stride] = tmp;
     }
-    rnk[(ptr[cnt - 1] - base) / sz] = ucnt;
+    rnk[(ptr[cnt - 1] - base) / stride] = ucnt;
     *p_cnt = ucnt + 1;
 }
 
-struct array_result ranks_unique_from_pointers(size_t **p_rnk, const uintptr_t *ptr, uintptr_t base, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
+struct array_result ranks_unique_from_pointers(size_t **p_rnk, const uintptr_t *ptr, uintptr_t base, size_t *p_cnt, size_t stride, cmp_callback cmp, void *context)
 {
     size_t *rnk;
     struct array_result res = array_init(&rnk, NULL, *p_cnt, sizeof(*rnk), 0, ARRAY_STRICT);
     if (!res.status) return res;
-    ranks_unique_from_pointers_impl(rnk, ptr, base, p_cnt, sz, cmp, context);
+    ranks_unique_from_pointers_impl(rnk, ptr, base, p_cnt, stride, cmp, context);
     *p_rnk = rnk;
     return res;
 }
@@ -155,30 +158,30 @@ struct array_result ranks_unique_from_pointers(size_t **p_rnk, const uintptr_t *
 struct cmp_helper_thunk {
     cmp_callback cmp;
     const void *arr;
-    size_t sz;
+    size_t stride;
     void *context;
 };
 
 static bool cmp_helper(const void *a, const void *b, void *Context)
 {
     struct cmp_helper_thunk *context = Context;
-    return context->cmp((char *) context->arr + (uintptr_t) a * context->sz, (char *) context->arr + (uintptr_t) b * context->sz, context->context);
+    return context->cmp((char *) context->arr + (uintptr_t) a * context->stride, (char *) context->arr + (uintptr_t) b * context->stride, context->context);
 }
 
-struct array_result ranks_unique_from_orders(size_t **p_rnk, const uintptr_t *ord, const void *arr, size_t *p_cnt, size_t sz, cmp_callback cmp, void *context)
+struct array_result ranks_unique_from_orders(size_t **p_rnk, const uintptr_t *ord, const void *arr, size_t *p_cnt, size_t stride, cmp_callback cmp, void *context)
 {
-    return ranks_unique_from_pointers(p_rnk, ord, 0, p_cnt, 1, cmp_helper, &(struct cmp_helper_thunk) { .cmp = cmp, .arr = arr, .sz = sz, .context = context });
+    return ranks_unique_from_pointers(p_rnk, ord, 0, p_cnt, 1, cmp_helper, &(struct cmp_helper_thunk) { .cmp = cmp, .arr = arr, .stride = stride, .context = context });
 }
 
-void ranks_from_pointers_inplace_impl(uintptr_t *restrict ptr, uintptr_t base, size_t cnt, size_t sz, uint8_t *restrict bits)
+void ranks_from_pointers_inplace_impl(uintptr_t *restrict ptr, uintptr_t base, size_t cnt, size_t stride, uint8_t *restrict bits)
 {
     for (size_t i = 0; i < cnt; i++)
     {
         size_t j = i;
-        uintptr_t k = (ptr[i] - base) / sz;
+        uintptr_t k = (ptr[i] - base) / stride;
         while (!uint8_bit_test(bits, j))
         {
-            uintptr_t l = (ptr[k] - base) / sz;
+            uintptr_t l = (ptr[k] - base) / stride;
             uint8_bit_set(bits, j);
             ptr[k] = j;
             j = k;
@@ -187,12 +190,12 @@ void ranks_from_pointers_inplace_impl(uintptr_t *restrict ptr, uintptr_t base, s
     }
 }
 
-struct array_result ranks_from_pointers_inplace(uintptr_t *restrict ptr, uintptr_t base, size_t cnt, size_t sz)
+struct array_result ranks_from_pointers_inplace(uintptr_t *restrict ptr, uintptr_t base, size_t cnt, size_t stride)
 {
     uint8_t *bits = NULL;
     struct array_result res = array_init(&bits, NULL, UINT8_CNT(cnt), sizeof(*bits), 0, ARRAY_STRICT | ARRAY_CLEAR);
     if (!res.status) return res;
-    ranks_from_pointers_inplace_impl(ptr, base, cnt, sz, bits);
+    ranks_from_pointers_inplace_impl(ptr, base, cnt, stride, bits);
     free(bits);
     return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
 }
@@ -202,12 +205,12 @@ struct array_result ranks_from_orders_inplace(uintptr_t *restrict ord, size_t cn
     return ranks_from_pointers_inplace(ord, 0, cnt, 1);
 }
 
-struct array_result ranks_stable(uintptr_t **p_rnk, const void *arr, size_t cnt, size_t sz, stable_cmp_callback cmp, void *context)
+struct array_result ranks_stable(uintptr_t **p_rnk, const void *arr, size_t cnt, size_t stride, stable_cmp_callback cmp, void *context)
 {
     uintptr_t *rnk;
-    struct array_result res0 = pointers_stable(&rnk, arr, cnt, sz, cmp, context);
+    struct array_result res0 = pointers_stable(&rnk, arr, cnt, stride, cmp, context);
     if (!res0.status) return res0;
-    struct array_result res1 = ranks_from_pointers_inplace(rnk, (uintptr_t) arr, cnt, sz);
+    struct array_result res1 = ranks_from_pointers_inplace(rnk, (uintptr_t) arr, cnt, stride);
     if (res1.status)
     {
         *p_rnk = rnk;

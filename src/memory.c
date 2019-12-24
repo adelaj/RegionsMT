@@ -221,15 +221,15 @@ void queue_dequeue(struct queue *queue, size_t offset, size_t sz)
     if (queue->begin == queue->cap) queue->begin = 0;
 }
 
-struct array_result persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz)
+struct array_result persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz, bool semi)
 {
     if (!cnt)
     {
         memset(arr, 0, sizeof(*arr));
-        return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
+        return semi ? (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED } : array_init(&arr->ptr, &arr->cap, SIZE_BIT, sizeof(*arr->ptr), 0, 0);
     }
     size_t off = arr->off = size_log2(cnt, 0);
-    struct array_result res = array_init(&arr->ptr, &arr->cap, arr->bck = 1, sizeof(*arr->ptr), 0, 0);
+    struct array_result res = array_init(&arr->ptr, &arr->cap, arr->bck = semi ? 1 : SIZE_BIT - off, sizeof(*arr->ptr), 0, 0);
     if (!res.status) return res;
     size_t tot = res.tot;
     res = array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT);
@@ -244,18 +244,21 @@ void persistent_array_close(struct persistent_array *arr)
     free(arr->ptr);
 }
 
-struct array_result persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz)
+struct array_result persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz, bool semi)
 {
     size_t cap = (size_t) 1 << arr->bck << arr->off;
     if (cnt < cap) return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
-    if (!arr->bck) return persistent_array_init(arr, cnt, sz);
-    size_t bck = size_log2(cnt + 1, 1) - arr->off;
-    struct array_result res = array_test(&arr->ptr, &arr->cap, sizeof(*arr->ptr), 0, 0, bck);
-    if (!res.status) return res;
-    size_t tot = res.tot;
+    if (!arr->bck) return persistent_array_init(arr, cnt, sz, semi);
+    size_t bck = size_log2(cnt + 1, 1) - arr->off, tot = 0;
+    if (semi)
+    {
+        struct array_result res = array_test(&arr->ptr, &arr->cap, sizeof(*arr->ptr), 0, 0, bck);
+        if (!res.status) return res;
+        tot = res.tot;
+    }
     for (size_t i = arr->bck; i < bck; i++, cap <<= 1)
     {
-        res = array_init(arr->ptr + i, NULL, cap, sz, 0, ARRAY_STRICT);
+        struct array_result res = array_init(arr->ptr + i, NULL, cap, sz, 0, ARRAY_STRICT);
         if (!res.status)
         {
             arr->bck = i;
