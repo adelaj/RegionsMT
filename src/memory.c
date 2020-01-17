@@ -35,7 +35,7 @@ struct array_result array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, 
         size_t bor, tmp = size_sub(&bor, cnt, *p_cap);
         if (bor) // cnt < *p_cap
         {
-            if (!(flags & ARRAY_REDUCE)) return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
+            if (!(flags & ARRAY_REDUCE)) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
             size_t tot = cnt * sz + diff; // No checks for overflows
             void *res = realloc(src, tot); // Array shrinking
             if (tot && !res) return (struct array_result) { .error = ARRAY_OUT_OF_MEMORY, .tot = tot };
@@ -43,7 +43,7 @@ struct array_result array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, 
             *p_src = res;
             return (struct array_result) { .status = ARRAY_SUCCESS, .tot = tot };
         }
-        else if (!tmp) return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED }; // cnt == cap            
+        else if (!tmp) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED }; // cnt == cap            
     }
     if (!(flags & ARRAY_STRICT) && cnt)
     {
@@ -226,7 +226,7 @@ struct array_result persistent_array_init(struct persistent_array *arr, size_t c
     if (!cnt)
     {
         memset(arr, 0, sizeof(*arr));
-        return semi ? (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED } : array_init(&arr->ptr, &arr->cap, SIZE_BIT, sizeof(*arr->ptr), 0, 0);
+        return semi ? (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED } : array_init(&arr->ptr, &arr->cap, SIZE_BIT, sizeof(*arr->ptr), 0, 0);
     }
     size_t off = arr->off = size_log2(cnt, 0);
     struct array_result res = array_init(&arr->ptr, &arr->cap, arr->bck = semi ? 1 : SIZE_BIT - off, sizeof(*arr->ptr), 0, 0);
@@ -246,8 +246,8 @@ void persistent_array_close(struct persistent_array *arr)
 
 struct array_result persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz, bool semi)
 {
-    size_t cap = (size_t) 1 << arr->bck << arr->off;
-    if (cnt < cap) return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
+    size_t cap1 = (size_t) 1 << arr->bck << arr->off; // Actual capacity minus one
+    if (cnt < cap1) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
     if (!arr->bck) return persistent_array_init(arr, cnt, sz, semi);
     size_t bck = size_log2(cnt + 1, 1) - arr->off, tot = 0;
     if (semi)
@@ -256,9 +256,9 @@ struct array_result persistent_array_test(struct persistent_array *arr, size_t c
         if (!res.status) return res;
         tot = res.tot;
     }
-    for (size_t i = arr->bck; i < bck; i++, cap <<= 1)
+    for (size_t i = arr->bck; i < bck; i++, cap1 <<= 1)
     {
-        struct array_result res = array_init(arr->ptr + i, NULL, cap, sz, 0, ARRAY_STRICT);
+        struct array_result res = array_init(arr->ptr + i, NULL, cap1, sz, 0, ARRAY_STRICT);
         if (!res.status)
         {
             arr->bck = i;

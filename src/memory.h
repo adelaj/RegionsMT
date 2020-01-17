@@ -23,8 +23,9 @@ struct array_result {
 
 enum array_status {
     ARRAY_FAILURE = 0,
-    ARRAY_SUCCESS,
-    ARRAY_UNTOUCHED,
+    ARRAY_SUCCESS = 1,
+    ARRAY_UNTOUCHED = 2,
+    ARRAY_SUCCESS_UNTOUCHED = ARRAY_SUCCESS | ARRAY_UNTOUCHED
 };
 
 enum array_error {

@@ -14,7 +14,7 @@
 
 #include <string.h>
 
-#include <gsl/gsl_multifit.h>
+#include "gslsupp.h"
 #include <gsl/gsl_cdf.h>
 #include <gsl/gsl_blas.h>
 
@@ -28,6 +28,8 @@ enum cov_sort {
 #define COV_SORT_CNT 5
 #define COV_SORT_IND(FLAG) ((FLAG) & COV_SORT_FLAG_STR ? 1 + (((FLAG) & (COV_SORT_FLAG_NAT | COV_SORT_FLAG_DSC)) >> 1) : 0)
 
+#define LM_TOL 1e-9
+
 struct lm_term {
     size_t off, deg;
     enum cov_sort sort;
@@ -35,7 +37,7 @@ struct lm_term {
 
 struct lm_supp {
     size_t *filter;
-    double *obs, *reg, *par, *cov;
+    double *obs, *reg, *par;
     gsl_multifit_linear_workspace *workspace;
 };
 
@@ -45,7 +47,7 @@ void lm_close(struct lm_supp *supp)
     free(supp->obs);
     free(supp->reg);
     free(supp->par);
-    free(supp->cov);
+    //free(supp->cov);
     gsl_multifit_linear_free(supp->workspace);
 }
 
@@ -57,7 +59,7 @@ bool lm_init(struct lm_supp *supp, size_t phen_cnt, size_t reg_cnt)
 
     if (supp->workspace &&
         //array_init(&supp->reg_vect_len, NULL, term_max_len, sizeof(*supp->reg_vect_len), 0, ARRAY_STRICT) &&
-        array_init(&supp->cov, NULL, (reg_cnt + 3) * (reg_cnt + 3), sizeof(*supp->cov), 0, ARRAY_STRICT).status &&
+        //array_init(&supp->cov, NULL, (reg_cnt + 3) * (reg_cnt + 3), sizeof(*supp->cov), 0, ARRAY_STRICT).status &&
         array_init(&supp->par, NULL, reg_cnt + 3, sizeof(*supp->par), 0, ARRAY_STRICT).status &&
         array_init(&supp->reg, NULL, (reg_cnt + 3) * phen_cnt, 2 * sizeof(*supp->reg), 0, ARRAY_STRICT).status &&
         array_init(&supp->obs, NULL, phen_cnt, 2 * sizeof(*supp->obs), 0, ARRAY_STRICT).status &&
@@ -92,65 +94,90 @@ void tensor_prod(size_t cnt, double *restrict vect, size_t *restrict vect_len, d
     }
 }
 
-// Perform Gram-Schmidt ortogonalization for small matrices
-// All rows are assumed to contain non-zero values
-bool check_matrix_full_rank(double *matrix, double *dot, double *norm, size_t dimx, size_t dimy0, size_t dimy, double tol)
+// Performs Gaussian elimination with full pivot and returns the number of linearly independent columns
+struct array_result gauss_col(double *m, size_t dimx, size_t *p_rky, size_t tda, double tol)
 {
-    size_t rk = 1, rkmax = MIN(dimx, dimy0);
-    if (rk >= rkmax) return 1;
-    for (size_t i = 1; i < dimx; i++)
-    {
-        gsl_vector_view a = gsl_vector_view_array(matrix + i * dimy, dimy0);
-        for (size_t j = 0; j < i - 1; j++)
-        {
-            gsl_vector_view b = gsl_vector_view_array(matrix + j * dimy, dimy0);
-            gsl_blas_ddot(&a.vector, &b.vector, dot + j);
-        }
-        gsl_vector_view b = gsl_vector_view_array(matrix + (i - 1) * dimy, dimy0);
-        gsl_blas_ddot(&a.vector, &b.vector, dot + i - 1);
-        gsl_blas_ddot(&b.vector, &b.vector, norm + i - 1);
-        
-        double proj = 0.;
-        for (size_t k = 0; k < dimy0; k++)
-        {
-            double ort = matrix[k + i * dimy];
-            for (size_t j = 0; j < i; j++) ort -= matrix[k + j * dimy] * dot[j] / norm[j];
-            proj += ort * ort;
-        }
-        if (proj * proj > tol) rk++;
-        if (rk >= rkmax) return 1;
-    }
-    return 0;
-}
+    size_t dimy = *p_rky, dim = MIN(dimx, dimy);
 
-/*
-void gauss(double *m, bool *piv, size_t dimx, size_t dimy, size_t tda)
-{
-    size_t dim = MAX(dimx, dimy);
-    memset(piv, 0, dim * sizeof(*piv));
-    for (size_t i = 0; i < dimx; i++)
+    // Finding global maximum
+    size_t maxx = 0, maxy = 0;    
+    double max = 0., amax = 0.; // Preventing compiler complaints
+    if (dim)
     {
-        size_t x = 0, y = 0;
-        double max = m[0];
-        for (size_t j = 1; j < dimx; j++) if (!piv[j])
+        amax = fabs(max = m[0]);
+        for (size_t j = 0, k = 0; j < dimx; j++, k += tda) for (size_t l = 0; l < dimy; l++)
         {
-            for (size_t k = 0; k < dimy; k++) if (!piv[k])
+            double tmp = m[l + k], atmp = fabs(tmp);
+            if (atmp <= amax) continue;
+            maxx = j;
+            maxy = l;
+            amax = atmp;
+            max = tmp;
+        }
+        if (max == 0.) dim = 0;
+    }
+    if (!dim)
+    {
+        *p_rky = 0;
+        return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
+    }
+    
+    uint8_t *pivx;
+    struct array_result res = array_init(&pivx, NULL, UINT8_CNT(dimx), sizeof(*pivx), 0, ARRAY_STRICT | ARRAY_CLEAR);
+    if (!res.status) return res;
+
+    size_t rky = 1;
+    tol *= amax;
+    for (size_t i = 0; i < dim; i++, rky++)
+    {
+        // Finding pivot (except for the first column)
+        if (i)
+        {
+            maxx = 0;
+            maxy = i;
+            amax = fabs(max = m[i]);
+            for (size_t j = 0, k = 0; j < dimx; j++, k += tda) if (!uint8_bit_test(pivx, j)) for (size_t l = i; l < dimy; l++)
             {
-                double tmp = m[k + j * tda];
-                if (fabs(tmp) <= max) continue;
-                x = j;
-                y = k;
+                double tmp = m[l + k], atmp = fabs(tmp);
+                if (atmp <= amax) continue;
+                maxx = j;
+                maxy = l;
+                amax = atmp;
                 max = tmp;
             }
+            if (max < tol) break;
         }
-        piv[y] = 1;
+        uint8_bit_set(pivx, maxx);
+        maxx *= tda;
 
+        // Swapping columns
+        if (i != maxy) for (size_t j = 0, k = i, l = maxy; j < dimx; j++, k += tda, l += tda)
+        {
+            double tmp = m[k];
+            m[k] = m[l];
+            m[l] = tmp;
+        }
+
+        // Performing Gaussian elimination
+        double maxinv = 1. / max;
+        size_t cnty = i + 1;
+        for (size_t l = cnty; l < dimy; l++)
+        {
+            double c = m[l + maxx] * maxinv;
+            size_t cntx = 0;
+            for (size_t j = 0, k = 0; j < dimx; j++, k += tda)
+                if (fabs(m[l + k] -= c * m[i + k]) < tol) cntx++;
+            if (cntx == dimx) cnty++;
+        }
+        if (cnty == dimy) break;
     }
+    free(pivx);
+    *p_rky = rky;
+    return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
 }
-*/
 
 // 'phen' is actually a double pointer
-struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double *phen, size_t phen_cnt, size_t reg_cnt, enum categorical_flags flags)
+struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double *phen, size_t phen_cnt, size_t reg_cnt, size_t reg_tda, enum categorical_flags flags)
 {
     struct categorical_res res;
     array_broadcast(res.nlpv, countof(res.nlpv), sizeof(*res.nlpv), &(double) { nan(__func__) });
@@ -166,7 +193,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
     // BASELINE MODEL
     //
     size_t rk;
-    double s_h, tol = 1e-9, chisq;
+    double s_h, tol = LM_TOL, chisq;
     {
         size_t dimx = cnt, dimy = 1 + reg_cnt;
         
@@ -175,7 +202,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
         {
             supp->obs[j] = phen[supp->filter[j]];
             supp->reg[k] = 1.;
-            memcpy(supp->reg + k + 1, reg + reg_cnt * supp->filter[j], reg_cnt * sizeof(*supp->reg));
+            memcpy(supp->reg + k + 1, reg + reg_tda * supp->filter[j], reg_cnt * sizeof(*supp->reg));
         }
         if (flags & TEST_TYPE_ALLELIC)
         {
@@ -184,10 +211,10 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
         }
 
         // Fit BASELINE model
-        gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + 2, dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
+        gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + 2, dimx, dimy, tda);// C = gsl_matrix_view_array(supp->cov, dimy, dimy);
         gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
                 
-        gsl_multifit_linear_tsvd(&R.matrix, &O.vector, tol, &P.vector, &C.matrix, &s_h, &rk, supp->workspace);
+        multifit_linear_tsvd(&R.matrix, &O.vector, tol, &P.vector, &s_h, &rk, supp->workspace);
     }
 
     // Performing computations for each alternative
@@ -284,10 +311,10 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
             
             // Fit model for 'TEST'
             
-            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + (i != 0), dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
+            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + (i != 0), dimx, dimy, tda); // C = gsl_matrix_view_array(supp->cov, dimy, dimy);
             gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
-            gsl_multifit_linear_tsvd(&R.matrix, &O.vector, tol, &P.vector, &C.matrix, &ss_e, &df_e, supp->workspace);
+            multifit_linear_tsvd(&R.matrix, &O.vector, tol, &P.vector, &ss_e, &df_e, supp->workspace);
             df_e = dimx - df_e;
         }
 
@@ -308,10 +335,10 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
 
             // Fit model for 'QAS'
             
-            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + 1, dimx, dimy, tda), C = gsl_matrix_view_array(supp->cov, dimy, dimy);
+            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + 1, dimx, dimy, tda); // C = gsl_matrix_view_array(supp->cov, dimy, dimy);
             gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
-            gsl_multifit_linear_tsvd(&R.matrix, &O.vector, tol, &P.vector, &C.matrix, &chisq, &rk, supp->workspace);
+            multifit_linear_tsvd(&R.matrix, &O.vector, tol, &P.vector, &chisq, &rk, supp->workspace);
         }
         res.qas[i] = supp->par[0]; // Parameter corresponding to genotype
     }
@@ -766,10 +793,10 @@ static bool lm_cnt(size_t *data, size_t blk0, size_t blk, size_t *p_cnt)
     if (!cnt) return 1;
     size_t ecnt;
     if (!lm_term_cnt(data, blk0, blk, &ecnt)) return 0;
-    for (size_t i = 1; i < cnt; i++)
+    for (size_t i = 1, j = blk; i < cnt; i++, j += blk)
     {
         size_t car, tmp = ecnt;
-        if (!lm_term_cnt(data + i, blk0, blk, &ecnt)) return 0;
+        if (!lm_term_cnt(data + j, blk0, blk, &ecnt)) return 0;
         ecnt = size_add(&car, ecnt, tmp);
         if (car) return 0;
     }
@@ -1019,8 +1046,11 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
         }
     }
 
+    size_t rky = dimy;
+    gauss_col(reg, cov.dim, &rky, dimy, LM_TOL);
+
     struct lm_supp supp;
-    if (!lm_init(&supp, cov.dim, dimy)) return 0;
+    if (!lm_init(&supp, cov.dim, rky)) return 0;
 
     struct lm_term phen = { .off = 0, .deg = 1, .sort = 0 };
     if (!cov_querry(&cov, &(struct buff) { .str = (char *) phen_name }, &phen, 1, log)) return 0;
@@ -1034,8 +1064,8 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     
     for (size_t i = 0; i < snp_cnt; i++)
     {
-        //uint64_t t = get_time();
-        struct categorical_res x = lm_impl(&supp, gen + i * cov.dim, reg, cov.ord[phen.off], cov.dim, dimy, 15);
+        uint64_t t = get_time();
+        struct categorical_res x = lm_impl(&supp, gen + i * cov.dim, reg, cov.ord[phen.off], cov.dim, rky, dimy, 15);
         fprintf(f,
             "%zu,%.15e,%.15e\n"
             "%zu,%.15e,%.15e\n"
@@ -1046,7 +1076,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             4 * i + 3, x.nlpv[2], x.qas[2],
             4 * i + 4, x.nlpv[3], x.qas[3]);
         fflush(f);
-        //log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Computation of linear model for snp no. %~uz took %~T.\n", i + 1, t, get_time());
+        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Computation of linear model for snp no. %~uz took %~T.\n", i + 1, t, get_time());
     }
     fclose(f);
     lm_close(&supp);

@@ -197,7 +197,7 @@ struct array_result ranks_from_pointers_inplace(uintptr_t *restrict ptr, uintptr
     if (!res.status) return res;
     ranks_from_pointers_inplace_impl(ptr, base, cnt, stride, bits);
     free(bits);
-    return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
+    return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
 }
 
 struct array_result ranks_from_orders_inplace(uintptr_t *restrict ord, size_t cnt)
@@ -259,7 +259,7 @@ struct array_result orders_apply(uintptr_t *restrict ord, size_t cnt, size_t sz,
     if (!swp) swp = Alloca(sz);
     orders_apply_impl(ord, cnt, sz, arr, bits, swp, stride);
     free(bits);
-    return (struct array_result) { .status = ARRAY_SUCCESS | ARRAY_UNTOUCHED };
+    return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
 }
 
 static void swap(void *restrict a, void *restrict b, void *restrict swp, size_t sz)
