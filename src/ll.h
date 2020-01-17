@@ -44,6 +44,7 @@ uint16_t uint16_interlocked_or(volatile uint16_t *, uint16_t);
 uint8_t uint8_interlocked_and(volatile uint8_t *, uint8_t);
 uint16_t uint16_interlocked_and(volatile uint16_t *, uint16_t);
 void *ptr_interlocked_compare_exchange(void *volatile *dst, void *cmp, void *xchg);
+void *ptr_interlocked_exchange(void *volatile *dst, void *xchg);
 
 size_t size_add(size_t *, size_t, size_t);
 size_t size_sub(size_t *, size_t, size_t);

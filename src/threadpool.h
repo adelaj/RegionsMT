@@ -45,6 +45,14 @@ struct task {
     volatile void *cond_mem, *aggr_mem;
 };
 
+struct dispatched_task {
+    task_callback callback;
+    aggregator_callback aggr;
+    void *arg, *context, *aggr_arg;
+    volatile void *aggr_mem;
+    volatile unsigned garbage;
+};
+
 // Opaque structure with OS-dependent implementation
 struct thread_pool;
 

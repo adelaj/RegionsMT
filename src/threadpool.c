@@ -101,8 +101,10 @@ struct thread_pool {
     // semaphore_handle semaphore;
     mutex_handle mutex1, mutex2;
     struct queue queue1, queue2;
-    size_t cnt;
-    struct thread_data **data; // Warning! Theads should not access this array directly
+    volatile size_t cnt;
+    //volatile size_t task_cnt;
+    struct persistent_array task;
+    struct persistent_array data; // Warning! Theads should not access this array directly
     
     /*spinlock_handle spinlock, startuplock;
     mutex_handle mutex;
@@ -311,14 +313,15 @@ struct thread_arg {
 */
 
 enum thread_state {
-    THREAD_STATE_IDLE = 0,
-    THREAD_STATE_UPDATE,
-    THREAD_STATE_
+    THREAD_ACTIVE = 0,
+    THREAD_IDLE,
+    THREAD_SHUTDOWN_QUERY,
+    THREAD_SHUTDOWN
 };
 
 struct thread_arg {
-    struct thread_pool *pool; 
-    volatile void *task;
+    struct thread_pool *pool;
+    void *volatile task;
     void *tls;
     mutex_handle *mutex;
     condition_handle *condition;
@@ -328,60 +331,44 @@ struct thread_arg {
 
 static thread_return thread_callback_convention thread_proc(void *Arg)
 {
-    struct thread_arg *arg = Arg;
-    
-    /*mutex_acquire(arg->mutex);
+    struct thread_arg *arg = Arg;    
     for (;;)
     {
-        switch (arg->state)
+        struct dispatched_task *task = ptr_interlocked_exchange(&arg->task, NULL);        
+        if (!task) // No task for the current thread
         {
-        case THREAD_STATE_IDLE:
-            condition_sleep(arg->condition, arg->mutex);
-            continue;
-        case THREAD_STATE_UPDATE:
-
-        }
-
-        
-        struct task *task = ptr_interlocked_compare_exchange(&arg->task, NULL, NULL);
-        if (task)
-        {
-            unsigned res = task->callback(task->arg, task->context, arg->tls);
-            if (res == TASK_YIELD)
+            // At first, try to steal task from a different thread
+            size_t cnt = arg->pool->cnt; // acquire semantics
+            for (size_t i = 0; i < cnt; i++)
             {
-                mutex_acquire(arg->pool->mutex2);
-                // Return task to the secondary queue 
-                mutex_release(arg->pool->mutex2);
+                struct thread_arg *other = persistent_array_fetch(&arg->pool->data, i, sizeof(*other));
+                task = ptr_interlocked_exchange(&other->task, NULL);
+                if (task) break;
             }
-
-            // if yield then task to secondary queue
-            // else continue
-            // semaphore_inc
+            // If no task found go the sleep state
+            if (!task)
+            {
+                mutex_acquire(arg->mutex);
+                if (arg->state == THREAD_SHUTDOWN_QUERY)
+                {
+                    arg->state = THREAD_SHUTDOWN;
+                    mutex_release(arg->mutex);
+                    return (thread_return) 0;
+                }
+                arg->state = THREAD_IDLE;
+                condition_sleep(arg->condition, arg->mutex);
+                arg->state = THREAD_ACTIVE;
+                mutex_release(arg->mutex);
+                continue;
+            }
         }
-        else
-        {
-            mutex_acquire(arg->mutex);
 
-            condition_sleep(arg->condition, arg->mutex);
-
-            mutex_release(arg->mutex);
-        }
+        // Execute the task
+        unsigned res = task->callback(task->arg, task->context, arg->tls);
+        if (res == TASK_YIELD) continue;
+        task->aggr(task->aggr_mem, task->aggr_arg, res);
+        task->garbage = 1; // release semantics
     }
-
-    for (;;)
-    {
-        struct task *tsk = ptr_load_acquire(thread_data->ptr);
-        for (; !tsk ; tsk = ptr_load_acquire(thread_data->ptr)) _mm_pause();
-        if (!tsk->callback || tsk->callback(tsk->arg, tsk->context))
-        {
-            if (tsk->a_succ) tsk->a_succ(tsk->a_succ_mem, tsk->a_succ_arg);
-        }
-        else
-        {
-            if (tsk->a_fail) tsk->a_fail(tsk->a_fail_mem, tsk->a_fail_arg);
-        }
-        ptr_store_release(thread_data->ptr, NULL);
-    }*/
 }
 /*
 void thread_pool_schedule(struct thread_pool *pool)

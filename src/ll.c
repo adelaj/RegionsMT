@@ -26,9 +26,9 @@
         }
 
 #   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND) \
-        TYPE PREFIX ## _interlocked_ ## SUFFIX(TYPE volatile *dst, TYPE msk) \
+        TYPE PREFIX ## _interlocked_ ## SUFFIX(TYPE volatile *dst, TYPE arg) \
         { \
-            return BACKEND(dst, msk, __ATOMIC_ACQ_REL); \
+            return BACKEND(dst, arg, __ATOMIC_ACQ_REL); \
         }
 
 static DECLARE_LOAD_ACQUIRE(int, spinlock)
@@ -45,6 +45,7 @@ DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, __atomic_fetch_or)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, __atomic_fetch_or)
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, and, __atomic_fetch_and)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, __atomic_fetch_and)
+DECLARE_INTERLOCKED_OP(void *, ptr, exchange, __atomic_exchange_n)
 
 void size_inc_interlocked(volatile size_t *mem)
 {
@@ -116,9 +117,9 @@ size_t size_pop_cnt(size_t x)
         }
 
 #   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND_CAST, BACKEND) \
-        TYPE PREFIX ## _interlocked_ ## SUFFIX(TYPE volatile *dst, TYPE msk) \
+        TYPE PREFIX ## _interlocked_ ## SUFFIX(TYPE volatile *dst, TYPE arg) \
         { \
-            return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, msk); \
+            return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, arg); \
         }
 
 static DECLARE_LOAD_ACQUIRE(long, spinlock)
@@ -135,6 +136,7 @@ DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, char, _InterlockedOr8)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, short, _InterlockedOr16)
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, and, char, _InterlockedAnd8)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, short, _InterlockedAnd16)
+DECLARE_INTERLOCKED_OP(void *, ptr, exchange, void *, _InterlockedExchangePointer)
 
 uint32_t uint32_bit_scan_reverse(uint32_t x)
 {
