@@ -12,6 +12,9 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "np.h"
+#include "log.h"
+
 #if (defined _WIN32 || defined _WIN64) && !defined FORCE_POSIX_THREADS
 
 #   include <windows.h>
@@ -19,7 +22,7 @@
 
 #define thread_callback_convention __stdcall
 typedef _beginthreadex_proc_type thread_callback;
-typedef HANDLE thread_handle;
+typedef uintptr_t thread_handle;
 typedef unsigned thread_return;
 typedef CRITICAL_SECTION mutex_handle;
 typedef CONDITION_VARIABLE condition_handle;
@@ -39,9 +42,12 @@ typedef pthread_key_t tls_handle;
 
 #endif
 
-bool thread_init(thread_handle *, thread_callback, void *);
+// To print an error status of the listed functions, except of 'thread_init', 'thread_assert' should be used
+bool thread_assert(struct log *, struct code_metric, bool);
+
+bool thread_init(thread_handle *, thread_callback, void *); // Use 'crt_assert' to get an error status 
 //void thread_terminate(thread_handle *);
-void thread_wait(thread_handle *, thread_return *);
+bool thread_wait(thread_handle *, thread_return *);
 void thread_close(thread_handle *);
 
 bool mutex_init(mutex_handle *);
@@ -55,7 +61,7 @@ void condition_broadcast(condition_handle *);
 void condition_sleep(condition_handle *, mutex_handle *);
 void condition_close(condition_handle *);
 
-bool tls_init(tls_handle *ptls);
-void tls_assign(tls_handle *ptls, void *ptr);
-void *tls_fetch(tls_handle *ptls);
-void tls_close(tls_handle *ptls);
+bool tls_init(tls_handle *);
+void tls_assign(tls_handle *, void *);
+void *tls_fetch(tls_handle *);
+bool tls_close(tls_handle *);

@@ -58,12 +58,19 @@ struct array_result queue_enqueue(struct queue *restrict, bool, void *restrict, 
 struct array_result queue_enqueue_yield(struct queue *restrict, bool, generator_callback, void *, size_t, size_t);
 void queue_dequeue(struct queue *, size_t, size_t);
 
+// 'PERSISTENT_ARRAY_WEAK': elements still can be accessed by pointers in volatile contexts,
+// however access through 'persistent_array_fetch' may lead to undefined behavior
+enum persistent_array_flags {
+    PERSISTENT_ARRAY_CLEAR = ARRAY_CLEAR,
+    PERSISTENT_ARRAY_WEAK = PERSISTENT_ARRAY_CLEAR << 1,
+};
+
 struct persistent_array {
     void **ptr;
     size_t off, bck, cap;
 };
 
-struct array_result persistent_array_init(struct persistent_array *, size_t, size_t, bool);
+struct array_result persistent_array_init(struct persistent_array *, size_t, size_t, enum persistent_array_flags);
 void persistent_array_close(struct persistent_array *);
-struct array_result persistent_array_test(struct persistent_array *, size_t, size_t, bool);
+struct array_result persistent_array_test(struct persistent_array *, size_t, size_t, enum persistent_array_flags);
 void *persistent_array_fetch(struct persistent_array *, size_t, size_t);

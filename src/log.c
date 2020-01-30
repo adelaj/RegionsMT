@@ -415,7 +415,7 @@ static bool fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_f
 static void fmt_execute_str(size_t len, enum fmt_arg_mode mode, char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
     bool ptr = flags & FMT_EXE_FLAG_PTR;
-    const char *str = ARG_FETCH_STR(ptr, p_arg);
+    const char *str = ARG_FETCH_PTR(ptr, p_arg);
     if (mode == ARG_FETCH) len = ARG_FETCH(ptr, p_arg, size_t, Size_dom_t);
     if (!(flags & FMT_EXE_FLAG_PHONY)) print(buff, p_cnt, str, mode == ARG_DEFAULT ? Strnlen(str, *p_cnt) : len, 1);
 }
@@ -466,7 +466,7 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, const struct sty
     const void *p_arg_list = NULL;
     void *p_arg_sub = NULL;
     bool ptr = flags & FMT_EXE_FLAG_PTR, list_ptr = 0;
-    const char *fmt = ARG_FETCH_STR(ptr, p_arg);
+    const char *fmt = ARG_FETCH_PTR(ptr, p_arg);
     if (!fmt)
     {
         if (!(flags & FMT_EXE_FLAG_PHONY)) *p_cnt = 0;
@@ -500,14 +500,14 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, const struct sty
         list_ptr = res.flags & FMT_LIST_PTR;
         if (list_ptr)
         {
-            p_arg_list = ARG_FETCH(ptr, p_arg, const void *, const void *);
+            p_arg_list = ARG_FETCH_PTR(ptr, p_arg);
             p_arg_sub = &p_arg_list; // Here MSVC promts warning that should be dismissed
             tf |= FMT_EXE_FLAG_PTR;
             list_ptr = list_ptr || ptr;
         }
         else if (res.flags & FMT_ARG_PTR)
         {
-            Va_copy(arg_sub, *ARG_FETCH(ptr, p_arg, Va_list *, Va_list *));
+            Va_copy(arg_sub, *(Va_list *) ARG_FETCH_PTR(ptr, p_arg));
             p_arg_sub = &arg_sub;
         }
         else
@@ -516,7 +516,7 @@ static bool fmt_execute(char *buff, size_t *p_cnt, void *p_arg, const struct sty
             list_ptr = ptr;
         }
         if ((res.flags & FMT_CONDITIONAL) && !ARG_FETCH(list_ptr, p_arg_sub, bool, int)) tf |= FMT_EXE_FLAG_PHONY;
-        if (res.flags & FMT_ENV_USER) env = ARG_FETCH(list_ptr, p_arg_sub, const struct env *, const struct env *);
+        if (res.flags & FMT_ENV_USER) env = ARG_FETCH_PTR(list_ptr, p_arg_sub);
         else if (style && (res.flags & FMT_ENV)) switch (res.type)
         {
         case TYPE_INT:
@@ -809,7 +809,7 @@ bool log_message_fseek(struct log *restrict log, struct code_metric code_metric,
     return log_message_fmt(log, code_metric, type, "Unable to seek into the position %~uq of the file %~P!\n", offset, path);
 }
 
-bool array_assert(struct log *restrict log, struct code_metric code_metric, struct array_result res)
+bool array_assert(struct log *log, struct code_metric code_metric, struct array_result res)
 {
     switch (res.error)
     {
@@ -824,3 +824,74 @@ bool array_assert(struct log *restrict log, struct code_metric code_metric, stru
     }
     return res.status;
 }
+
+bool crt_assert(struct log *log, struct code_metric code_metric, bool res)
+{
+    if (!res) log_message_fmt(log, code_metric, MESSAGE_ERROR, "%C!\n", errno);
+    return res;
+}
+
+#ifdef _WIN32
+
+#   include <windows.h>
+
+static bool fmt_execute_wstr(char *buff, size_t *p_cnt, void *p_arg, const struct env *env, enum fmt_execute_flags flags)
+{
+    (void) env;
+    bool ptr = flags & FMT_EXE_FLAG_PTR;
+    const wchar_t *wstr = ARG_FETCH_PTR(ptr, p_arg);
+    size_t wlen = ARG_FETCH(ptr, p_arg, size_t, Size_dom_t);
+    if (flags & FMT_EXE_FLAG_PHONY) return 1;
+    uint32_t val;
+    uint8_t context = 0;
+    uint8_t str[UTF8_COUNT];
+    size_t len = 0, cnt = *p_cnt;
+    for (size_t i = 0; i < wlen; i++)
+    {
+        if (!utf16_decode((uint16_t) wstr[i], &val, NULL, NULL, &context)) return 0;
+        if (context) continue;
+        uint8_t ulen;
+        utf8_encode(val, str, &ulen);
+        size_t tmp = cnt;
+        print(buff + len, &tmp, (char *) str, ulen, 0);
+        len = size_add_sat(len, tmp);
+        cnt = size_sub_sat(cnt, tmp);
+        if (!cnt) break;
+    }
+    if (context) return 0;
+    *p_cnt = len;
+    return 1;
+}
+
+static bool fmt_execute_wapi(char *buff, size_t *p_cnt, void *p_arg, const struct env *env, enum fmt_execute_flags flags)
+{
+    (void) env;
+    uint32_t err = ARG_FETCH(flags & FMT_EXE_FLAG_PTR, p_arg, uint32_t, Uint32_dom_t);
+    if (flags & FMT_EXE_FLAG_PHONY) return 1;
+    wchar_t *wstr = NULL;
+    size_t wlen = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, (DWORD) err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPWSTR) &wstr, 0, NULL);
+    if (!wstr) return 0;
+    bool res = print_fmt(buff, p_cnt, NULL, "%&", fmt_execute_wstr, wstr, size_sub_sat(wlen, lengthof(".\r\n"))); // Cutting ".\r\n" at the end of the string
+    LocalFree(wstr);
+    return res;
+}
+
+bool wapi_assert(struct log *log, struct code_metric code_metric, bool res)
+{
+    if (!res) log_message_fmt(log, code_metric, MESSAGE_ERROR, "%&!\n", fmt_execute_wapi, (uint32_t) GetLastError());
+    return res;
+}
+
+#else
+
+bool wapi_assert(struct log *log, struct code_metric code_metric, bool res)
+{
+    log_message_fmt(log, code_metric, MESSAGE_RESERVED, "Function %~~s* should be called only when %s*_WIN32%s* macro is defined!\n",
+        &log->style->type_char,
+        STRC(__func__),
+        STRL(log->style->type_char.begin),
+        STRL(log->style->type_char.end));
+    return res;
+}
+
+#endif

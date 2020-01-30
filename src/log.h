@@ -5,8 +5,13 @@
 #include "strproc.h"
 #include "utf8.h"
 
+#define ARG_FETCH_PTR(FLAG, ARG) \
+    ((FLAG) ? *(*(void ***) (ARG))++ : Va_arg(*(Va_list *) (ARG), void *))
+
+/*
 #define ARG_FETCH_STR(FLAG, ARG) \
     ((FLAG) ? (const char *) *(*(void ***) (ARG))++ : Va_arg(*(Va_list *) (ARG), const char *))
+*/
 
 #define ARG_FETCH(FLAG, ARG, TYPE, TYPE_DOM) \
     ((FLAG) ? *(TYPE *) *(*(void ***) (ARG))++ : Va_arg(*(Va_list *) (ARG), TYPE_DOM))
@@ -118,4 +123,6 @@ bool log_message_crt(struct log *restrict, struct code_metric, enum message_type
 bool log_message_fopen(struct log *restrict, struct code_metric, enum message_type, const char *restrict, Errno_t);
 bool log_message_fseek(struct log *restrict, struct code_metric, enum message_type, int64_t, const char *restrict);
 
-bool array_assert(struct log *restrict, struct code_metric, struct array_result);
+bool array_assert(struct log *, struct code_metric, struct array_result);
+bool crt_assert(struct log *, struct code_metric, bool);
+bool wapi_assert(struct log *, struct code_metric, bool);

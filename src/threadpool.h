@@ -50,7 +50,7 @@ struct dispatched_task {
     aggregator_callback aggr;
     void *arg, *context, *aggr_arg;
     volatile void *aggr_mem;
-    volatile unsigned garbage;
+    volatile bool ngarbage, norphan;
 };
 
 // Opaque structure with OS-dependent implementation

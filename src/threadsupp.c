@@ -2,9 +2,17 @@
 
 #if (defined _WIN32 || defined _WIN64) && !defined FORCE_POSIX_THREADS
 
+bool thread_assert(struct log *log, struct code_metric code_metric, bool res)
+{
+    return wapi_assert(log, code_metric, res);
+}
+
 bool thread_init(thread_handle *p_thread, thread_callback callback, void *args)
 {
-    return (*p_thread = (HANDLE) _beginthreadex(NULL, 0, callback, args, 0, NULL)) != INVALID_HANDLE_VALUE;
+    thread_handle res = _beginthreadex(NULL, 0, callback, args, 0, NULL);
+    if (!res || res == (thread_handle) INVALID_HANDLE_VALUE) return 0;
+    *p_thread = res;
+    return 1;
 }
 
 /*void thread_terminate(thread_handle *p_thread)
@@ -12,20 +20,19 @@ bool thread_init(thread_handle *p_thread, thread_callback callback, void *args)
     TerminateThread(*p_thread, 0);
 }*/
 
-void thread_wait(thread_handle *p_thread, thread_return *p_out)
+bool thread_wait(thread_handle *p_thread, thread_return *p_out)
 {
-    WaitForSingleObject(*p_thread, INFINITE);
-    GetExitCodeThread(*p_thread, (LPDWORD) p_out);
+    return WaitForSingleObject((HANDLE) *p_thread, INFINITE) && GetExitCodeThread((HANDLE) *p_thread, (LPDWORD) p_out);
 }
 
 void thread_close(thread_handle *p_thread)
 {
-    if (p_thread) (void) CloseHandle(*p_thread);
+    if (p_thread) CloseHandle((HANDLE) *p_thread);
 }
 
 bool mutex_init(mutex_handle *p_mutex)
 {
-    return InitializeCriticalSectionAndSpinCount(p_mutex, 0);
+    return InitializeCriticalSectionAndSpinCount(p_mutex, 16);
 }
 
 void mutex_acquire(mutex_handle *p_mutex)
@@ -71,7 +78,10 @@ void condition_close(condition_handle *p_condition)
 
 bool tls_init(tls_handle *p_tls)
 {
-    return (*p_tls = TlsAlloc()) != TLS_OUT_OF_INDEXES;
+    tls_handle res = TlsAlloc();
+    if (res == TLS_OUT_OF_INDEXES) return 0;
+    *p_tls = res;
+    return 1;
 }
 
 void tls_assign(tls_handle *p_tls, void *ptr)
@@ -84,12 +94,17 @@ void *tls_fetch(tls_handle *p_tls)
     return TlsGetValue(*p_tls);
 }
 
-void tls_close(tls_handle *p_tls)
+bool tls_close(tls_handle *p_tls)
 {
-    TlsFree(*p_tls);
+    return TlsFree(*p_tls);
 }
 
 #elif defined __unix__ || defined __APPLE__ || ((defined _WIN32 || defined _WIN64) && defined FORCE_POSIX_THREADS)
+
+bool thread_assert(struct log *log, struct code_metric code_metric, bool res)
+{
+    return crt_assert(log, code_metric, res);
+}
 
 bool thread_init(thread_handle *p_thread, thread_callback callback, void *args)
 {
@@ -102,9 +117,9 @@ bool thread_init(thread_handle *p_thread, thread_callback callback, void *args)
     pthread_join(*p_thread, NULL);
 }*/
 
-void thread_wait(thread_handle *p_thread, thread_return *p_out)
+bool thread_wait(thread_handle *p_thread, thread_return *p_out)
 {
-    pthread_join(*p_thread, p_out);
+    return !pthread_join(*p_thread, p_out);
 }
 
 void thread_close(thread_handle *p_thread)

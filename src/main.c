@@ -403,7 +403,7 @@ static int Main(int argc, char **argv)
     bool succ = 1;
     struct ttl_style ttl_style = {
         .time_stamp = ENV_INIT_COL(FG_BR_BLACK),
-        .header = { ENV_INIT_COL(FG_GREEN), ENV_INIT_COL(FG_RED), ENV_INIT_COL(FG_YELLOW), ENV_INIT_COL(FG_MAGENTA), ENV_INIT_COL(FG_CYAN) },
+        .header = { ENV_INIT_COL(FG_GREEN), ENV_INIT_COL(FG_RED), ENV_INIT_COL(FG_YELLOW), ENV_INIT_COL(FG_MAGENTA), ENV_INIT_COL(FG_CYAN), ENV_INIT_COL(FG_BR_BLACK) },
         .code_metric = ENV_INIT_COL(FG_BR_BLACK)
     };
 
@@ -420,8 +420,10 @@ static int Main(int argc, char **argv)
     struct log log;
     if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, NULL))
     {
-        //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~~#*%~#*", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, 12041241241ull);
+        log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "012345678901%~~-sAA%!-s1;%1;C%$F", &(struct env) ENV_INIT_COL(FG_BR_CYAN), "X", "BB", "%$E", "D" }, "G%%%~~#*%~#*%#x394%~#921", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, 12041241241ull);
         //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~#*%~#*.\n", 0x393, 920);
+        wapi_assert(&log, CODE_METRIC, 0);
+        wapi_assert(&log, CODE_METRIC, 0);
         
         size_t pos_cnt;
         char **pos_arr;
@@ -542,6 +544,7 @@ static bool wargv_cnt_impl(size_t argc, wchar_t **wargv, size_t *p_cnt)
             cnt = size_add(&car, cnt, utf8_len(val));
             if (car) return 0;
         }
+        if (context) return 0;
     }
     *p_cnt = cnt;
     return 1;
@@ -562,7 +565,8 @@ static bool wargv_to_argv_impl(size_t argc, wchar_t **wargv, char *base, char **
             uint8_t len;
             utf8_encode(val, (uint8_t *) base, &len);
             base += len;
-        }        
+        }
+        if (context) return 0;
         *(base++) = '\0';
     }
     return 1;

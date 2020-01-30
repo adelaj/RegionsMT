@@ -34,11 +34,15 @@ _Static_assert((BIT_TEST2_MASK01 | BIT_TEST2_MASK10) == UINT8_MAX, "Wrong consta
 #define UINT32_BIT (sizeof(uint32_t) * CHAR_BIT)
 #define UINT64_BIT (sizeof(uint64_t) * CHAR_BIT)
 
+bool bool_load_acquire(volatile bool *);
+void bool_store_release(volatile bool *, bool);
 uint8_t uint8_load_acquire(volatile uint8_t *);
 uint16_t uint16_load_acquire(volatile uint16_t *);
 uint32_t uint32_load_acquire(volatile uint32_t *);
 uint64_t uint64_load_acquire(volatile uint64_t *);
 size_t size_load_acquire(volatile size_t *);
+void size_store_release(volatile size_t *, size_t);
+
 uint8_t uint8_interlocked_or(volatile uint8_t *, uint8_t);
 uint16_t uint16_interlocked_or(volatile uint16_t *, uint16_t);
 uint8_t uint8_interlocked_and(volatile uint8_t *, uint8_t);

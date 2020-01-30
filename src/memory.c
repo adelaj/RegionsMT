@@ -137,7 +137,7 @@ void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, size_t c
     queue->cnt += cnt;
 }
 
-void queue_enqueue_yield_lo(struct queue *restrict queue, generator_callback genetator, void *context, size_t cnt, size_t sz)
+void queue_enqueue_yield_lo(struct queue *restrict queue, generator_callback generator, void *context, size_t cnt, size_t sz)
 {
     size_t bor, left = size_sub(&bor, queue->begin, queue->cap - queue->cnt);
     if (bor) left += queue->cap;
@@ -146,10 +146,10 @@ void queue_enqueue_yield_lo(struct queue *restrict queue, generator_callback gen
     if (!bor2 && diff2) // cnt > queue->cap - left
     {
         size_t ind = 0;
-        for (size_t i = left * sz; ind < diff; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
-        for (size_t i = 0; ind < cnt; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
+        for (size_t i = left * sz; ind < diff; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
+        for (size_t i = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
     }
-    else for (size_t i = left * sz, ind = 0; ind < cnt; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
+    else for (size_t i = left * sz, ind = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
     queue->cnt += cnt;
 }
 
@@ -173,20 +173,20 @@ void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, size_t c
     queue->cnt += cnt;
 }
 
-static void queue_enqueue_yield_hi(struct queue *restrict queue, generator_callback genetator, void *context, size_t cnt, size_t sz)
+static void queue_enqueue_yield_hi(struct queue *restrict queue, generator_callback generator, void *context, size_t cnt, size_t sz)
 {
     size_t bor, diff = size_sub(&bor, queue->begin, cnt);
     if (bor && diff) // cnt > queue->begin
     {
         diff = 0 - diff;
         size_t left = queue->cap - diff, ind = 0;
-        for (size_t i = left; ind < diff; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
-        for (size_t i = 0; ind < cnt; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
+        for (size_t i = left; ind < diff; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
+        for (size_t i = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
         queue->begin = left;
     }
     else
     {
-        for (size_t i = diff, ind = 0; ind < cnt; i += sz, ind++) genetator((char *) queue->arr + i, ind, context);
+        for (size_t i = diff, ind = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
         queue->begin = diff;
     }
     queue->cnt += cnt;
@@ -200,11 +200,11 @@ struct array_result queue_enqueue(struct queue *restrict queue, bool hi, void *r
     return res;
 }
 
-struct array_result queue_enqueue_yield(struct queue *restrict queue, bool hi, generator_callback genetator, void *context, size_t cnt, size_t sz)
+struct array_result queue_enqueue_yield(struct queue *restrict queue, bool hi, generator_callback generator, void *context, size_t cnt, size_t sz)
 {
     struct array_result res = queue_test(queue, cnt, sz);
     if (!res.status) return res;
-    (hi ? queue_enqueue_yield_hi : queue_enqueue_yield_lo)(queue, genetator, context, cnt, sz);
+    (hi ? queue_enqueue_yield_hi : queue_enqueue_yield_lo)(queue, generator, context, cnt, sz);
     return res;
 }
 
@@ -221,18 +221,20 @@ void queue_dequeue(struct queue *queue, size_t offset, size_t sz)
     if (queue->begin == queue->cap) queue->begin = 0;
 }
 
-struct array_result persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz, bool semi)
+struct array_result persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz, enum persistent_array_flags flags)
 {
     if (!cnt)
     {
         memset(arr, 0, sizeof(*arr));
-        return semi ? (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED } : array_init(&arr->ptr, &arr->cap, SIZE_BIT, sizeof(*arr->ptr), 0, 0);
+        return flags & PERSISTENT_ARRAY_WEAK ? 
+            (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED } : 
+            array_init(&arr->ptr, &arr->cap, SIZE_BIT, sizeof(*arr->ptr), 0, 0);
     }
     size_t off = arr->off = size_log2(cnt, 0);
-    struct array_result res = array_init(&arr->ptr, &arr->cap, arr->bck = semi ? 1 : SIZE_BIT - off, sizeof(*arr->ptr), 0, 0);
+    struct array_result res = array_init(&arr->ptr, &arr->cap, arr->bck = flags & PERSISTENT_ARRAY_WEAK ? 1 : SIZE_BIT - off, sizeof(*arr->ptr), 0, 0);
     if (!res.status) return res;
     size_t tot = res.tot;
-    res = array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT);
+    res = array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT | (flags & PERSISTENT_ARRAY_CLEAR));
     if (res.status) return (struct array_result) { .status = ARRAY_SUCCESS, .tot = size_add_sat(tot, res.tot) };
     free(arr->ptr);
     return res;
@@ -244,13 +246,13 @@ void persistent_array_close(struct persistent_array *arr)
     free(arr->ptr);
 }
 
-struct array_result persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz, bool semi)
+struct array_result persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz, enum persistent_array_flags flags)
 {
     size_t cap1 = (size_t) 1 << arr->bck << arr->off; // Actual capacity minus one
     if (cnt < cap1) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
-    if (!arr->bck) return persistent_array_init(arr, cnt, sz, semi);
+    if (!arr->bck) return persistent_array_init(arr, cnt, sz, flags);
     size_t bck = size_log2(cnt + 1, 1) - arr->off, tot = 0;
-    if (semi)
+    if (flags & PERSISTENT_ARRAY_WEAK)
     {
         struct array_result res = array_test(&arr->ptr, &arr->cap, sizeof(*arr->ptr), 0, 0, bck);
         if (!res.status) return res;
@@ -258,7 +260,7 @@ struct array_result persistent_array_test(struct persistent_array *arr, size_t c
     }
     for (size_t i = arr->bck; i < bck; i++, cap1 <<= 1)
     {
-        struct array_result res = array_init(arr->ptr + i, NULL, cap1, sz, 0, ARRAY_STRICT);
+        struct array_result res = array_init(arr->ptr + i, NULL, cap1, sz, 0, ARRAY_STRICT | (flags & PERSISTENT_ARRAY_CLEAR));
         if (!res.status)
         {
             arr->bck = i;

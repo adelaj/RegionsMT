@@ -11,7 +11,7 @@
         { \
             return __atomic_load_n(src, __ATOMIC_ACQUIRE); \
         }
-
+  
 #   define DECLARE_STORE_RELEASE(TYPE, PREFIX) \
         void PREFIX ## _store_release(TYPE volatile *dst, TYPE val) \
         { \
@@ -20,6 +20,13 @@
 
 #   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX) \
         TYPE PREFIX ## _interlocked_compare_exchange(TYPE volatile *dst, TYPE cmp, TYPE xchg) \
+        { \
+            __atomic_compare_exchange_n(dst, &cmp, xchg, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE); \
+            return cmp;\
+        }
+
+#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE_ACQUIRE(TYPE, PREFIX) \
+        TYPE PREFIX ## _interlocked_compare_exchange_acquire(TYPE volatile *dst, TYPE cmp, TYPE xchg) \
         { \
             __atomic_compare_exchange_n(dst, &cmp, xchg, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED); \
             return cmp;\
@@ -33,13 +40,9 @@
 
 static DECLARE_LOAD_ACQUIRE(int, spinlock)
 static DECLARE_STORE_RELEASE(int, spinlock)
-static DECLARE_INTERLOCKED_COMPARE_EXCHANGE(int, spinlock)
+static DECLARE_INTERLOCKED_COMPARE_EXCHANGE_ACQUIRE(int, spinlock)
 
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr)
-
-DECLARE_LOAD_ACQUIRE(uint8_t, uint8)
-DECLARE_LOAD_ACQUIRE(uint16_t, uint16)
-DECLARE_LOAD_ACQUIRE(uint32_t, uint32)
 
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, __atomic_fetch_or)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, __atomic_fetch_or)
@@ -75,7 +78,6 @@ uint32_t uint32_pop_cnt(uint32_t x)
 #   ifdef __x86_64__
 
 DECLARE_LOAD_ACQUIRE(uint64_t, uint64)
-DECLARE_LOAD_ACQUIRE(size_t, size)
 
 size_t size_bit_scan_reverse(size_t x)
 {
@@ -110,8 +112,8 @@ size_t size_pop_cnt(size_t x)
             *dst = val; \
         }
 
-#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX, BACKEND_CAST, BACKEND) \
-        TYPE PREFIX ## _interlocked_compare_exchange(TYPE volatile *dst, TYPE cmp, TYPE xchg) \
+#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX, BACKEND_CAST, BACKEND, SUFFIX) \
+        TYPE PREFIX ## _interlocked_compare_exchange ## SUFFIX(TYPE volatile *dst, TYPE cmp, TYPE xchg) \
         { \
             return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, xchg, cmp);\
         }
@@ -124,13 +126,9 @@ size_t size_pop_cnt(size_t x)
 
 static DECLARE_LOAD_ACQUIRE(long, spinlock)
 static DECLARE_STORE_RELEASE(long, spinlock)
-static DECLARE_INTERLOCKED_COMPARE_EXCHANGE(long, spinlock, long, _InterlockedCompareExchange)
+static DECLARE_INTERLOCKED_COMPARE_EXCHANGE(long, spinlock, long, _InterlockedCompareExchange, _acquire)
 
-DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, void *, _InterlockedCompareExchangePointer)
-
-DECLARE_LOAD_ACQUIRE(uint8_t, uint8)
-DECLARE_LOAD_ACQUIRE(uint16_t, uint16)
-DECLARE_LOAD_ACQUIRE(uint32_t, uint32)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, void *, _InterlockedCompareExchangePointer,)
 
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, char, _InterlockedOr8)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, short, _InterlockedOr16)
@@ -158,7 +156,6 @@ uint32_t uint32_pop_cnt(uint32_t x)
 #   ifdef _M_X64
 
 DECLARE_LOAD_ACQUIRE(uint64_t, uint64)
-DECLARE_LOAD_ACQUIRE(size_t, size)
 
 void size_inc_interlocked(volatile size_t *mem)
 {
@@ -255,6 +252,14 @@ size_t size_sub(size_t *p_bor, size_t x, size_t y)
 
 #endif
 
+DECLARE_LOAD_ACQUIRE(bool, bool)
+DECLARE_STORE_RELEASE(bool, bool)
+DECLARE_LOAD_ACQUIRE(uint8_t, uint8)
+DECLARE_LOAD_ACQUIRE(uint16_t, uint16)
+DECLARE_LOAD_ACQUIRE(uint32_t, uint32)
+DECLARE_LOAD_ACQUIRE(size_t, size)
+DECLARE_STORE_RELEASE(size_t, size)
+
 size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
 {
     if (!args_cnt)
@@ -271,7 +276,7 @@ size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
 #define DECLARE_UINT_LOG10(TYPE, PREFIX, MAX, ...) \
     TYPE PREFIX ## _log10(TYPE x, bool ceil) \
     { \
-        static const TYPE arr[] = { __VA_ARGS__ }; \
+        const TYPE arr[] = { __VA_ARGS__ }; \
         if (!x) return (MAX); \
         uint8_t left = 0, right = countof(arr) - 1; \
         while (left < right) \
@@ -282,12 +287,13 @@ size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
             else if (x < t) right = mid - !ceil; \
             else return mid; \
         } \
-        return ceil && left == countof(arr) - 1 ? countof(arr) : left; \
+        return ceil && left == countof(arr) - 1 && x > arr[left] ? countof(arr) : left; \
     }
 
 #define TEN5(X) 1 ## X, 10 ## X, 100 ## X, 1000 ## X, 10000 ## X
 #define TEN10(X) TEN5(X), TEN5(00000 ## X)
 #define TEN20(X) TEN10(X), TEN10(0000000000 ## X)
+DECLARE_UINT_LOG10(uint16_t, uint16, UINT16_MAX, TEN5(u))
 DECLARE_UINT_LOG10(uint32_t, uint32, UINT32_MAX, TEN10(u))
 DECLARE_UINT_LOG10(uint64_t, uint64, UINT64_MAX, TEN20(u))
 
@@ -409,7 +415,7 @@ size_t m128i_byte_scan_forward(__m128i a)
 
 void spinlock_acquire(spinlock_handle *p_spinlock)
 {
-    while (spinlock_interlocked_compare_exchange(p_spinlock, 0, 1)) while (spinlock_load_acquire(p_spinlock)) _mm_pause();
+    while (spinlock_interlocked_compare_exchange_acquire(p_spinlock, 0, 1)) while (spinlock_load_acquire(p_spinlock)) _mm_pause();
 }
 
 void spinlock_release(spinlock_handle *p_spinlock)
@@ -423,7 +429,7 @@ void *double_lock_execute(spinlock_handle *p_spinlock, double_lock_callback init
     switch (spinlock_load_acquire(p_spinlock))
     {
     case 0:
-        if (!spinlock_interlocked_compare_exchange(p_spinlock, 0, 1))
+        if (!spinlock_interlocked_compare_exchange_acquire(p_spinlock, 0, 1))
         {
             if (init) res = init(init_args);
             spinlock_store_release(p_spinlock, 2);
