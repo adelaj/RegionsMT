@@ -703,6 +703,20 @@ bool size_mul_add_test(size_t *p_res, size_t m, size_t a)
         arr[pos / (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1))] &= ~(msk << (pos % (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1)) << ((STRIDE) - 1))); \
     }
 
+#define DECLARE_ROL(TYPE, PREFIX) \
+    TYPE PREFIX ## _rol(TYPE x, TYPE y) \
+    { \
+        y %= CHAR_BIT * sizeof(TYPE); \
+        return (x << y) | (x >> (CHAR_BIT * sizeof(TYPE) - y)); \
+    }
+
+#define DECLARE_ROR(TYPE, PREFIX) \
+    TYPE PREFIX ## _ror(TYPE x, TYPE y) \
+    { \
+        y %= CHAR_BIT * sizeof(TYPE); \
+        return (x >> y) | (x << (CHAR_BIT * sizeof(TYPE) - y)); \
+    }
+
 DECLARE_BIT_TEST(uint8_t, uint8)
 DECLARE_BIT_TEST_SET(uint8_t, uint8)
 DECLARE_BIT_TEST_RESET(uint8_t, uint8)
@@ -720,3 +734,8 @@ DECLARE_BIT_TEST_SET(size_t, size)
 DECLARE_BIT_TEST_RESET(size_t, size)
 DECLARE_BIT_SET(size_t, size)
 DECLARE_BIT_RESET(size_t, size)
+
+DECLARE_ROL(uint8_t, uint8)
+DECLARE_ROL(uint16_t, uint16)
+DECLARE_ROL(uint32_t, uint32)
+DECLARE_ROL(uint64_t, uint64)

@@ -64,35 +64,11 @@ enum message_type {
 };
 
 struct style {
-    struct env type_int, type_char, type_path, type_str, type_flt, type_time_diff, type_time_stamp, type_utf;
+    struct env type_int, type_char, type_path, type_str, type_flt, type_time_diff, type_time_stamp, type_code_metric, type_utf;
 };
 
 struct ttl_style {
     struct env time_stamp, header[MESSAGE_CNT], code_metric;
-};
-
-typedef bool (*fmt_callback)(char *, size_t *, void *, const struct env *, enum fmt_execute_flags);
-
-void print(char *, size_t *, const char *, size_t, bool);
-bool print_fmt(char *, size_t *, const struct style *, ...);
-bool print_time_diff(char *, size_t *, uint64_t, uint64_t, const struct env *);
-void print_time_stamp(char *, size_t *);
-
-struct log {
-    FILE *file;
-    char *buff;
-    const struct ttl_style *ttl_style;
-    const struct style *style;
-    size_t cnt, cap, lim;
-    uint64_t tot; // File size is 64-bit always!
-};
-
-typedef bool (*message_callback)(char *, size_t *, void *, const struct style *);
-typedef bool (*message_callback_var)(char *, size_t *, void *, const struct style *, Va_list);
-
-union message_callback {
-    message_callback ord;
-    message_callback_var var;
 };
 
 struct code_metric {
@@ -100,8 +76,41 @@ struct code_metric {
     size_t line;
 };
 
+struct message_result {
+    unsigned status;
+    struct code_metric metric;
+};
+
 #define CODE_METRIC \
     (struct code_metric) { .path = STRI(__FILE__), .func = STRI(__func__), .line = (__LINE__) }
+
+#define MESSAGE_SUCCESS (struct message_result) { .status = 1 }
+#define MESSAGE_FAILURE (struct message_result) { .status = 0, .metric = CODE_METRIC }
+
+typedef struct message_result (*fmt_callback)(char *, size_t *, void *, const struct env *, enum fmt_execute_flags);
+
+void print(char *, size_t *, const char *, size_t, bool);
+struct message_result print_fmt(char *, size_t *, const struct style *, ...);
+struct message_result print_time_diff(char *, size_t *, uint64_t, uint64_t, const struct env *);
+void print_time_stamp(char *, size_t *);
+
+struct log {
+    FILE *file;
+    char *buff;
+    const struct ttl_style *ttl_style;
+    const struct style *style;
+    struct log *fallback;
+    size_t cnt, cap, lim;
+    uint64_t tot; // File size is 64-bit always!
+};
+
+typedef struct message_result (*message_callback)(char *, size_t *, void *, const struct style *);
+typedef struct message_result (*message_callback_var)(char *, size_t *, void *, const struct style *, Va_list);
+
+union message_callback {
+    message_callback ord;
+    message_callback_var var;
+};
 
 enum log_flags {
     LOG_APPEND = 1,
@@ -109,11 +118,12 @@ enum log_flags {
     LOG_FORCE_TTY = 4
 };
 
-bool log_init(struct log *restrict, char *restrict, size_t, enum log_flags, const struct ttl_style *restrict, const struct style *restrict, struct log *restrict);
+bool log_init(struct log *restrict, const char *restrict, size_t, enum log_flags, const struct ttl_style *restrict, const struct style *restrict, struct log *restrict);
 void log_close(struct log *restrict);
 bool log_multiple_init(struct log *restrict, size_t, char *restrict, size_t, enum log_flags, const struct ttl_style *restrict, const struct style *restrict, struct log *restrict);
 void log_multiple_close(struct log *restrict, size_t);
 bool log_flush(struct log *restrict);
+
 bool log_message(struct log *restrict, struct code_metric, enum message_type, message_callback, void *);
 bool log_message_var(struct log *restrict, struct code_metric, enum message_type, message_callback_var, void *, ...);
 
@@ -123,6 +133,7 @@ bool log_message_crt(struct log *restrict, struct code_metric, enum message_type
 bool log_message_fopen(struct log *restrict, struct code_metric, enum message_type, const char *restrict, Errno_t);
 bool log_message_fseek(struct log *restrict, struct code_metric, enum message_type, int64_t, const char *restrict);
 
+bool fopen_assert(struct log *restrict, struct code_metric, const char *restrict, bool);
 bool array_assert(struct log *, struct code_metric, struct array_result);
 bool crt_assert(struct log *, struct code_metric, bool);
 bool wapi_assert(struct log *, struct code_metric, bool);

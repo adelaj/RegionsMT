@@ -146,3 +146,8 @@ bool size_bit_test_set(size_t *, size_t);
 bool size_bit_test_reset(size_t *, size_t);
 void size_bit_set(size_t *, size_t);
 void size_bit_reset(size_t *, size_t);
+
+uint8_t uint8_rol(uint8_t, uint8_t);
+uint16_t uint16_rol(uint16_t, uint16_t);
+uint32_t uint32_rol(uint32_t, uint32_t);
+uint64_t uint64_rol(uint64_t, uint64_t);

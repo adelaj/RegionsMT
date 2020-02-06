@@ -52,22 +52,6 @@ static bool log_message_warning_argv_utf(struct log *restrict log, struct code_m
     return log_message_warning_generic(log, code_metric, ind, "Unexpected UTF-8 continuation byte at the position %~uz within", pos + 1);
 }
 
-static bool utf8_decode_len(const char *str, size_t tot, size_t *p_len)
-{
-    uint32_t val; // Never used
-    uint8_t len = 0, context = 0;
-    size_t ind = 0;
-    for (; ind < tot; ind++)
-    {
-        if (!utf8_decode(str[ind], &val, NULL, &len, &context)) break;
-        if (context) continue;
-        *p_len = len;
-        return 1;
-    }
-    *p_len = ind;
-    return 0;
-}
-
 bool argv_parse(par_selector_callback selector, void *context, void *res, char **argv, size_t argc, char ***p_arr, size_t *p_cnt, struct log *log)
 {
     struct par par = { 0 };

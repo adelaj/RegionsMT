@@ -414,7 +414,7 @@ void thread_pool_schedule(struct thread_pool *pool)
             break;
         }
         
-        // Searching for an empty dispatch slot or for an orphaned task
+        // Searching for an empty dispatch slot or for an orphaned task. This search is failsafe
         bool garbage = 1, orphan = 0;
         struct dispatched_task *dispatched_task = NULL;
         for (size_t i = 0; i < pool->task_cnt; i++)
@@ -432,45 +432,51 @@ void thread_pool_schedule(struct thread_pool *pool)
                     garbage = 0;
                 }
             }
-            else if (!bool_load_acquire(dispatched_task->ngarbage)) break;           
+            else if (!bool_load_acquire(dispatched_task->ngarbage)) break;
         }
-                
-        if (dispatch)
-        {
-            dispatched_task->aggr = task->aggr;
-            dispatched_task->aggr_arg = task->aggr_arg;
-            dispatched_task->aggr_mem = task->aggr_mem;
-            dispatched_task->arg = task->arg;
-            dispatched_task->callback = task->callback;
-            dispatched_task->context = task->context;
-            bool_store_release(&dispatched_task->ngarbage, 1);
-            bool_store_release(&dispatched_task->norphan, 1);
-            size_inc_interlocked(&pool->task_hint);
-            queue_dequeue(&pool->queue, off, sizeof(*task));            
-        }
-        else if (orphan) bool_store_release(&dispatched_task->norphan, 1);
         
+        if (dispatched_task) // Always happens
+        {
+            if (dispatch)
+            {
+                dispatched_task->aggr = task->aggr;
+                dispatched_task->aggr_arg = task->aggr_arg;
+                dispatched_task->aggr_mem = task->aggr_mem;
+                dispatched_task->arg = task->arg;
+                dispatched_task->callback = task->callback;
+                dispatched_task->context = task->context;
+                bool_store_release(&dispatched_task->ngarbage, 1);
+                bool_store_release(&dispatched_task->norphan, 1);
+                size_inc_interlocked(&pool->task_hint);
+                queue_dequeue(&pool->queue, off, sizeof(*task));
+            }
+            else if (orphan) bool_store_release(&dispatched_task->norphan, 1);
+        }
+
         // Unlock the queue and the dispatch array
         spinlock_release(&pool->spinlock);
 
         // Dispatching task to a thread
-        if (dispatch || orphan)
+        if (dispatched_task)
         {
-            size_t cnt = size_load_acquire(&pool->cnt), ind = 0;
-            for (; ind < cnt; ind++)
+            if (dispatch || orphan)
             {
-                struct thread_arg *arg = persistent_array_fetch(&pool->data, ind, sizeof(struct thread_arg));
-                if (ptr_interlocked_compare_exchange(&arg->dispatched_task, NULL, dispatched_task)) continue;
-                mutex_acquire(&arg->mutex);
-                arg->flag = 1;
-                condition_signal(&arg->condition);
-                mutex_release(&arg->mutex);
-                break;
+                size_t cnt = size_load_acquire(&pool->cnt), ind = 0;
+                for (; ind < cnt; ind++)
+                {
+                    struct thread_arg *arg = persistent_array_fetch(&pool->data, ind, sizeof(struct thread_arg));
+                    if (ptr_interlocked_compare_exchange(&arg->dispatched_task, NULL, dispatched_task)) continue;
+                    mutex_acquire(&arg->mutex);
+                    arg->flag = 1;
+                    condition_signal(&arg->condition);
+                    mutex_release(&arg->mutex);
+                    break;
+                }
+                if (ind < cnt) continue;
+                bool_store_release(&dispatched_task->norphan, 0);
             }
-            if (ind < cnt) continue;
-            bool_store_release(&dispatched_task->norphan, 0);
+            else if (garbage && !pending) return;
         }
-        else if (garbage && !pending) return;
 
         // Go to the sleep state
         mutex_acquire(&pool->mutex);
@@ -490,8 +496,11 @@ bool thread_arg_init(struct thread_arg *arg, size_t tls_sz, struct log *log)
             {
 
             }
+            mutex_close(&arg->mutex);
         }
+        free(arg->tls);
     }
+    return 0;
 }
 /*
 struct thread_pool *thread_pool_create(size_t cnt, size_t tls_sz, struct log *log)

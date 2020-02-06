@@ -21,6 +21,8 @@
 
 #include "sort.h"
 
+//#include <windows.h>
+
 #ifndef TEST_DEACTIVATE
 
 #   include "test.h"
@@ -414,16 +416,20 @@ static int Main(int argc, char **argv)
         .type_str = ENV_INIT_COL_EXT(UTF8_LDQUO, FG_BR_MAGENTA, UTF8_RDQUO),
         .type_flt = ENV_INIT_COL(FG_BR_CYAN),
         .type_time_diff = ENV_INIT_COL(FG_BR_YELLOW),
+        .type_code_metric = ENV_INIT_COL(FG_BR_YELLOW),
         .type_utf = ENV_INIT_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO)      
     };
 
     struct log log;
     if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, NULL))
     {
-        log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "012345678901%~~-sAA%!-s1;%1;C%$F", &(struct env) ENV_INIT_COL(FG_BR_CYAN), "X", "BB", "%$E", "D" }, "G%%%~~#*%~#*%#x394%~#921", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, 12041241241ull);
+        /*struct log log1;
+        log_init(&log1, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, &log);
+        log_message_fmt(&log1, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "012345678901%~~-sAA%!-s1;%1;C%$F", &(struct env) ENV_INIT_COL(FG_BR_CYAN), "X", "BB", "%$E", "D" }, "G%%%~~#*%~#*%#x394%~#921", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, 12041241241ull);
         //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~#*%~#*.\n", 0x393, 920);
-        wapi_assert(&log, CODE_METRIC, 0);
-        wapi_assert(&log, CODE_METRIC, 0);
+        SetLastError(99999);
+        wapi_assert(&log1, CODE_METRIC, 0);
+        wapi_assert(&log1, CODE_METRIC, 0);*/
         
         size_t pos_cnt;
         char **pos_arr;
@@ -538,7 +544,7 @@ static bool wargv_cnt_impl(size_t argc, wchar_t **wargv, size_t *p_cnt)
         uint8_t context = 0;
         for (wchar_t *word = wargv[i]; *word; word++)
         {
-            if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) return 0;
+            if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context, 0)) return 0;
             if (context) continue;
             size_t car;
             cnt = size_add(&car, cnt, utf8_len(val));
@@ -560,7 +566,7 @@ static bool wargv_to_argv_impl(size_t argc, wchar_t **wargv, char *base, char **
         uint8_t context = 0;
         for (wchar_t *word = wargv[i]; *word; word++)
         {
-            if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context)) return 0;
+            if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context, 0)) return 0;
             if (context) continue;
             uint8_t len;
             utf8_encode(val, (uint8_t *) base, &len);
@@ -582,7 +588,7 @@ static bool argv_from_wargv(char ***p_argv, size_t argc, wchar_t **wargv)
         size_t cnt;
         if (wargv_cnt_impl(argc, wargv, &cnt) && array_init(&base, NULL, cnt, sizeof(*base), 0, ARRAY_STRICT).status)
         {
-            if (wargv_to_argv_impl(argc, wargv, base, argv)) // Never fails
+            if (wargv_to_argv_impl(argc, wargv, base, argv)) // Should never fail: all checks are done in the previous 'if' clause
             {
                 *p_argv = argv;
                 return 1;
@@ -622,7 +628,7 @@ static int Wmain(int argc, wchar_t **wargv)
         if (GetConsoleMode(ho, &mode)) SetConsoleMode(ho, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
     }
 
-    // Performing UTF-16LE to UTF-8 translation and executing main routine
+    // Performing UTF-16LE to UTF-8 translation and executing the main routine
     char **argv;
     if (!argv_from_wargv(&argv, argc, wargv)) return EXIT_FAILURE;
     int main_res = Main(argc, argv);

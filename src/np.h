@@ -59,7 +59,8 @@ void *Aligned_alloc(size_t, size_t);
 void Aligned_free(void *);
 
 // File operations
-int Fclose(FILE *); // Tolerant to the 'NULL' and 'std*' streams
+FILE *Fopen(const char *, const char *);
+int Fclose(FILE *); // Tolerant to the 'NULL' and 'std###' streams
 int Fseeki64(FILE *, int64_t, int);
 int64_t Ftelli64(FILE *);
 

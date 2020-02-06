@@ -1,5 +1,7 @@
 #include "np.h"
 #include "ll.h"
+#include "utf8.h"
+#include "memory.h"
 
 #include <string.h>
 #include <immintrin.h>
@@ -103,6 +105,46 @@ int Strnicmp(const char *a, const char *b, size_t len)
 #   include <windows.h>
 #   include <io.h>
 
+static bool utf8_str_to_wstr(const char *restrict str, wchar_t **p_wstr, size_t *p_wlen)
+{
+    uint32_t val;
+    uint8_t ulen = 0, context = 0;
+    size_t len = 0, wcnt = 1; // Space for the null-terminator
+    for (char ch = str[len]; ch; ch = str[++len])
+    {
+        if (!utf8_decode(ch, &val, NULL, &ulen, &context)) return 0;
+        if (context) continue;
+        size_t car;
+        wcnt = size_add(&car, wcnt, utf16_len(val));
+        if (car) return 0;
+    }
+    if (context) return 0;
+    wchar_t *wstr;
+    if (!array_init(&wstr, NULL, wcnt, sizeof(*wstr), 0, ARRAY_STRICT).status) return 0;
+    for (size_t i = 0, j = 0; i < len; i++)
+    {
+        utf8_decode(str[i], &val, NULL, NULL, &context); // No checks are required
+        if (context) continue;
+        uint8_t tmp;
+        utf16_encode(val, wstr + j, &tmp, 0);
+        j += tmp;
+    }
+    wstr[wcnt - 1] = L'\0';
+    *p_wstr = wstr;
+    if (p_wlen) *p_wlen = wcnt - 1;
+    return 1;
+}
+
+FILE *Fopen(const char *path, const char *mode)
+{
+    FILE *f = NULL;
+    wchar_t *wpath = NULL, *wmode = NULL;
+    if (utf8_str_to_wstr(path, &wpath, NULL) && utf8_str_to_wstr(mode, &wmode, NULL)) f = _wfopen(wpath, wmode);
+    free(wpath);
+    free(wmode);
+    return f;
+}
+
 bool file_is_tty(FILE *f)
 {
     return _isatty(_fileno(f));
@@ -145,6 +187,11 @@ uint64_t get_time()
 
 #   include <sys/time.h>
 #   include <unistd.h>
+
+FILE *Fopen(const char *path, const char *mode)
+{
+    return fopen(path, mode);
+}
 
 bool file_is_tty(FILE *f)
 {

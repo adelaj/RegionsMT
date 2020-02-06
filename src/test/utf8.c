@@ -103,7 +103,7 @@ bool test_utf16_encode(void *In, struct log *log)
     {
         uint16_t word[UTF16_COUNT];
         uint8_t len;
-        utf16_encode(in->val, word, &len);
+        utf16_encode(in->val, word, &len, 0);
         if (len != in->utf16_len) log_message_error_utf8_test(log, CODE_METRIC, UTF8_TEST_OBITUARY_UTF16_LEN);
         else
         {
@@ -127,7 +127,7 @@ bool test_utf16_decode(void *In, struct log *log)
         uint8_t context = 0, len = 0, ind = 0;
         uint32_t val = 0;
         for (; ind < in->utf16_len; ind++)
-            if (!utf16_decode(in->utf16[ind], &val, word, &len, &context)) break;
+            if (!utf16_decode(in->utf16[ind], &val, word, &len, &context, 0)) break;
         if (ind < in->utf16_len) log_message_error_utf8_test(log, CODE_METRIC, UTF8_TEST_OBITUARY_UTF16_INTERNAL);
         else
         {

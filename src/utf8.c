@@ -165,30 +165,54 @@ bool utf8_decode(uint8_t byte, uint32_t *restrict p_utf8_val, uint8_t *restrict 
     return 0;
 }
 
-void utf16_encode(uint32_t utf16_val, uint16_t *restrict utf16_word, uint8_t *restrict p_utf16_len)
+bool utf8_decode_len(const char *restrict str, size_t len, size_t *restrict p_len)
+{
+    uint32_t val; // Never used
+    uint8_t ulen = 0, context = 0;
+    size_t ind = 0;
+    for (; ind < len; ind++)
+    {
+        if (!utf8_decode(str[ind], &val, NULL, &ulen, &context)) break;
+        if (context) continue;
+        *p_len = ulen;
+        return 1;
+    }
+    *p_len = ind;
+    return 0;
+}
+
+uint8_t utf16_len(uint32_t utf16_val)
+{
+    return 1 + (utf16_val >= 0x10000);
+}
+
+void utf16_encode(uint32_t utf16_val, uint16_t *restrict utf16_word, uint8_t *restrict p_utf16_len, bool be)
 {
     if (utf16_val < 0x10000)
     {
         if (p_utf16_len) *p_utf16_len = 1;
-        utf16_word[0] = (uint16_t) utf16_val;
+        uint16_t w0 = (uint16_t) utf16_val;
+        utf16_word[0] = be ? uint16_rol(w0, 8) : w0;
     }
     else
     {
         if (p_utf16_len) *p_utf16_len = 2;
         utf16_val -= 0x10000;
-        utf16_word[0] = (uint16_t) (0xd800 | ((utf16_val >> 10) & 0x3ff));
-        utf16_word[1] = (uint16_t) (0xdc00 | (utf16_val & 0x3ff));
+        uint16_t w0 = (uint16_t) (0xd800 | ((utf16_val >> 10) & 0x3ff)), w1 = (uint16_t) (0xdc00 | (utf16_val & 0x3ff));
+        if (be) utf16_word[0] = uint16_rol(w0, 8), utf16_word[1] = uint16_rol(w1, 8);
+        else utf16_word[0] = w0, utf16_word[1] = w1;
     }
 }
 
-bool utf16_decode(uint16_t word, uint32_t *restrict p_utf16_val, uint16_t *restrict utf16_word, uint8_t *restrict p_utf16_len, uint8_t *restrict p_utf16_context)
+bool utf16_decode(uint16_t word, uint32_t *restrict p_utf16_val, uint16_t *restrict utf16_word, uint8_t *restrict p_utf16_len, uint8_t *restrict p_utf16_context, bool be)
 {
+    uint16_t wordle = be ? uint16_rol(word, 8) : word;
     if (*p_utf16_context)
     {
-        if (0xdc00 <= word && word <= 0xdfff)
+        if (0xdc00 <= wordle && wordle <= 0xdfff)
         {
             uint32_t utf16_val = *p_utf16_val;
-            utf16_val |= word & 0x3ff;
+            utf16_val |= wordle & 0x3ff;
             utf16_val += 0x10000;
             *p_utf16_val = utf16_val;
             *p_utf16_context = 0;
@@ -198,18 +222,18 @@ bool utf16_decode(uint16_t word, uint32_t *restrict p_utf16_val, uint16_t *restr
     }
     else
     {
-        if (word < 0xd800 || 0xdfff < word)
+        if (wordle < 0xd800 || 0xdfff < wordle)
         {
             *p_utf16_context = 0;
-            *p_utf16_val = word;
+            *p_utf16_val = wordle;
             if (p_utf16_len) *p_utf16_len = 1;
             if (utf16_word) utf16_word[0] = word;
             return 1;
         }
-        else if (0xd800 <= word && word <= 0xdbff)
+        else if (0xd800 <= wordle && wordle <= 0xdbff)
         {
             *p_utf16_context = 1;
-            *p_utf16_val = (uint32_t) (word & 0x3ff) << 10;
+            *p_utf16_val = (uint32_t) (wordle & 0x3ff) << 10;
             if (p_utf16_len) *p_utf16_len = 2;
             if (utf16_word) utf16_word[0] = word;
             return 1;
