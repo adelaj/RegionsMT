@@ -105,6 +105,8 @@ int Strnicmp(const char *a, const char *b, size_t len)
 #   include <windows.h>
 #   include <io.h>
 
+_Static_assert(sizeof(wchar_t) == sizeof(uint16_t), "Incorrect 'wchar_t'!");
+
 static bool utf8_str_to_wstr(const char *restrict str, wchar_t **p_wstr, size_t *p_wlen)
 {
     uint32_t val;
@@ -126,7 +128,7 @@ static bool utf8_str_to_wstr(const char *restrict str, wchar_t **p_wstr, size_t 
         utf8_decode(str[i], &val, NULL, NULL, &context); // No checks are required
         if (context) continue;
         uint8_t tmp;
-        utf16_encode(val, wstr + j, &tmp, 0);
+        utf16_encode(val, (uint16_t *) wstr + j, &tmp, 0);
         j += tmp;
     }
     wstr[wcnt - 1] = L'\0';

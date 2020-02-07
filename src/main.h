@@ -25,5 +25,3 @@ struct main_args {
 
 struct main_args main_args_default(void);
 struct main_args main_args_override(struct main_args, struct main_args);
-
-void log_message_fallback_impl(struct code_metric metric);

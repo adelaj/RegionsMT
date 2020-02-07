@@ -112,9 +112,12 @@ enum fmt_flags {
     FMT_OVERPRINT =  2,
     FMT_ENV = 4,
     FMT_ENV_USER = 8,
-    FMT_LEFT_JUSTIFY = 16,
-    FMT_ARG_PTR = 32,
-    FMT_LIST_PTR = 64
+    FMT_QUOTE_SELECT = 16,
+    FMT_QUOTE_SINGLE = 32,
+    FMT_QUOTE_DOUBLE = 64,
+    FMT_LEFT_JUSTIFY = 128,
+    FMT_ARG_PTR = 256,
+    FMT_LIST_PTR = 512
 };
 
 enum fmt_arg_mode {
@@ -270,6 +273,12 @@ static struct message_result fmt_decode(struct fmt_result *res, const char *fmt,
             break;        
         case '~':
             tmp = res->flags & FMT_ENV ? res->flags & FMT_ENV_USER ? 0 : FMT_ENV_USER : FMT_ENV;
+            break;
+        case '\'':
+            tmp = res->flags & FMT_QUOTE_SELECT ? res->flags & FMT_QUOTE_SINGLE ? 0 : FMT_QUOTE_SINGLE : FMT_QUOTE_SELECT;
+            break;
+        case '\"':
+            tmp = FMT_QUOTE_DOUBLE;
             break;
         case '-':
             tmp = FMT_LEFT_JUSTIFY;
@@ -440,15 +449,7 @@ static struct message_result fmt_execute_code_metric(char *buff, size_t *p_cnt, 
     if (flags & FMT_EXE_FLAG_PHONY) return MESSAGE_SUCCESS;
     struct strl begin = { 0 }, end = { 0 };
     if (env) begin = env->begin, end = env->end;
-    return print_fmt(buff, p_cnt, NULL, "%s*" UTF8_LSQUO "%s*" UTF8_RSQUO "%s* @ %s*" UTF8_LDQUO "%s*" UTF8_RDQUO "%s*:%~~uz",
-        STRL(begin),
-        STRL(metric.func),
-        STRL(end),
-        STRL(begin),
-        STRL(metric.path),
-        STRL(end),
-        env,
-        metric.line);
+    return print_fmt(buff, p_cnt, NULL, "%~~''s* @ %~~\"s*:%~~uz", env, STRL(metric.func), env, STRL(metric.path), env, metric.line);
 }
 
 static void fmt_execute_crt(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
@@ -575,6 +576,12 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
             env = NULL;
         }
         else env = NULL;
+        int quote = -1;
+        if (res.flags & FMT_QUOTE_SINGLE) quote = 0;
+        else if (res.flags & FMT_QUOTE_DOUBLE) quote = 1;
+        else if (res.flags & FMT_QUOTE_SELECT) quote = ARG_FETCH(list_ptr, p_arg_sub, int, int);
+        const struct strl lquote[] = { STRI(UTF8_LSQUO), STRI(UTF8_LDQUO) }, rquote[] = { STRI(UTF8_RSQUO), STRI(UTF8_RDQUO) };
+        quote = CLAMP(quote, -1, (int) MIN(countof(lquote), countof(rquote)));
         switch (res.type)
         {
         case TYPE_FMT:
@@ -614,17 +621,23 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
         default:
             for (size_t j = 0; ++j;) switch (j)
             {
-            case 1:
-                if (env && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(env->begin), 0);
-                else j++;
-                break;
             case 2:
-            case 4:            
+            case 4:
+            case 6:
+            case 8:
                 cnt = size_add_sat(cnt, len);
                 tmp = len = size_sub_sat(tmp, len);
                 if (!tmp) j = SIZE_MAX;
                 break;            
+            case 1:
+                if (env && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(env->begin), 0);
+                else j++;
+                break;
             case 3:
+                if (quote >= 0 && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(lquote[quote]), 0);
+                else j++;
+                break;
+            case 5:
                 switch (res.type)
                 {
                 case TYPE_INT:
@@ -659,14 +672,18 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
                 if (!message_res.status) j = SIZE_MAX; // Exit on error
                 else if (tf & FMT_EXE_FLAG_PHONY) j++;
                 break;
-            case 5:
+            case 7:
+                if (quote >= 0 && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(rquote[quote]), 0);
+                else j++;
+                break;
+            case 9:
                 if (env && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(env->end), 0);
                 else j++;
                 break;
-            case 6:
+            case 10:
                 cnt = size_add_sat(cnt, len);
                 tmp = len = size_sub_sat(tmp, len);
-            case 7:
+            case 11:
                 j = SIZE_MAX;
             } 
         }
@@ -701,10 +718,7 @@ struct message_result print_fmt(char *buff, size_t *p_cnt, const struct style *s
 // Last argument may be 'NULL'
 bool log_init(struct log *restrict log, const char *restrict path, size_t lim, enum log_flags flags, const struct ttl_style *restrict ttl_style, const struct style *restrict style, struct log *restrict fallback)
 {
-    static const struct ttl_style def_ttl_style = { { { 0 } } };
-    static const struct style def_style = { .type_str = ENV_INIT(UTF8_LDQUO, UTF8_RDQUO), .type_char = ENV_INIT(UTF8_LSQUO, UTF8_RSQUO) };
-
-    FILE *f = path ? fopen(path, flags & LOG_APPEND ? "a" : "w") : stderr;
+    FILE *f = path ? Fopen(path, flags & LOG_APPEND ? "a" : "w") : stderr;
     if (fopen_assert(fallback, CODE_METRIC, path, f))
     {
         bool tty = (flags & (LOG_FORCE_TTY)) || file_is_tty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
@@ -713,8 +727,8 @@ bool log_init(struct log *restrict log, const char *restrict path, size_t lim, e
         {
             if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
             else log->cnt = 0;
-            log->ttl_style = tty ? ttl_style : &def_ttl_style;
-            log->style = tty ? style : &def_style;
+            log->ttl_style = tty ? ttl_style : NULL;
+            log->style = tty ? style : NULL;
             log->lim = lim;
             log->file = f;
             log->tot = 0;
@@ -762,13 +776,15 @@ void log_multiple_close(struct log *restrict arr, size_t cnt)
 static struct message_result log_prefix(char *buff, size_t *p_cnt, struct code_metric metric, enum message_type type, const struct ttl_style *ttl_style)
 {
     const struct strl ttl[] = { STRI("MESSAGE"), STRI("ERROR"), STRI("WARNING"), STRI("NOTE"), STRI("INFO"), STRI("DAMNATION") };
-    return print_fmt(buff, p_cnt, NULL, "%s*[%D]%s* %~~s* %s*(%M):%s* ",
-        STRL(ttl_style->time_stamp.begin),
-        STRL(ttl_style->time_stamp.end),
-        ttl_style->header + type, STRL(ttl[type]),
-        STRL(ttl_style->code_metric.begin),
-        metric, 
-        STRL(ttl_style->code_metric.end));
+    return ttl_style ?
+        print_fmt(buff, p_cnt, NULL, "%s*[%D]%s* %~~s* %s*(%M):%s* ",
+            STRL(ttl_style->time_stamp.begin),
+            STRL(ttl_style->time_stamp.end),
+            ttl_style->header + type, STRL(ttl[type]),
+            STRL(ttl_style->code_metric.begin),
+            metric,
+            STRL(ttl_style->code_metric.end)) :
+        print_fmt(buff, p_cnt, NULL, "[%D] %s* (%M): ", STRL(ttl[type]), metric);
 }
 
 static bool log_fallback(struct log *log, struct code_metric metric_src, struct code_metric metric_dst)
@@ -932,11 +948,7 @@ bool wapi_assert(struct log *log, struct code_metric code_metric, bool res)
 
 bool wapi_assert(struct log *log, struct code_metric code_metric, bool res)
 {
-    log_message_fmt(log, code_metric, MESSAGE_RESERVED, "Function %~~s* should be called only when %s*_WIN32%s* macro is defined!\n",
-        &log->style->type_char,
-        STRC(__func__),
-        STRL(log->style->type_char.begin),
-        STRL(log->style->type_char.end));
+    log_message_fmt(log, code_metric, MESSAGE_RESERVED, "Function %~''s* should be called only when %~''s* macro is defined!\n", STRC(__func__), STRC("_WIN32"));
     return res;
 }
 
