@@ -20,11 +20,11 @@ static bool generic_cmp(const void *A, const void *B, void *Thunk)
 
 struct array_result pointers(uintptr_t **p_ptr, const void *arr, size_t cnt, size_t stride, cmp_callback cmp, void *context)
 {
-    uintptr_t *ptr;
+    uintptr_t *ptr, swp;
     struct array_result res = array_init(&ptr, NULL, cnt, sizeof(*ptr), 0, ARRAY_STRICT);
     if (!res.status) return res;
     for (size_t i = 0, j = 0; i < cnt; ptr[i] = (uintptr_t) arr + j, i++, j += stride);
-    quick_sort(ptr, cnt, sizeof(*ptr), generic_cmp, &(struct generic_cmp_thunk) { .cmp = cmp, .context = context }, NULL, sizeof(*ptr));
+    quick_sort(ptr, cnt, sizeof(*ptr), generic_cmp, &(struct generic_cmp_thunk) { .cmp = cmp, .context = context }, &swp, sizeof(*ptr));
     *p_ptr = ptr;
     return res;
 }
@@ -45,11 +45,11 @@ static bool generic_cmp_stable(const void *A, const void *B, void *Thunk)
 
 struct array_result pointers_stable(uintptr_t **p_ptr, const void *arr, size_t cnt, size_t stride, stable_cmp_callback cmp, void *context)
 {
-    uintptr_t *ptr;
+    uintptr_t *ptr, swp;
     struct array_result res = array_init(&ptr, NULL, cnt, sizeof(*ptr), 0, ARRAY_STRICT);
     if (!res.status) return res;
     for (size_t i = 0, j = 0; i < cnt; ptr[i] = (uintptr_t) arr + j, i++, j += stride);
-    quick_sort(ptr, cnt, sizeof(*ptr), generic_cmp_stable, &(struct generic_cmp_stable_thunk) { .cmp = cmp, .context = context }, NULL, sizeof(*ptr));
+    quick_sort(ptr, cnt, sizeof(*ptr), generic_cmp_stable, &(struct generic_cmp_stable_thunk) { .cmp = cmp, .context = context }, &swp, sizeof(*ptr));
     *p_ptr = ptr;
     return res;
 }
@@ -256,7 +256,6 @@ struct array_result orders_apply(uintptr_t *restrict ord, size_t cnt, size_t sz,
     uint8_t *bits = NULL;
     struct array_result res = array_init(&bits, NULL, UINT8_CNT(cnt), sizeof(*bits), 0, ARRAY_STRICT | ARRAY_CLEAR);
     if (!res.status) return res;
-    if (!swp) swp = Alloca(sz);
     orders_apply_impl(ord, cnt, sz, arr, bits, swp, stride);
     free(bits);
     return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
@@ -390,7 +389,6 @@ static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callb
 void quick_sort(void *restrict arr, size_t cnt, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t stride)
 {
     if (cnt < 2) return;
-    if (!swp) swp = Alloca(sz);
     if (cnt > 2)
     {
         size_t tot = cnt * stride;

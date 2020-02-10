@@ -102,11 +102,11 @@ struct thread_pool {
     spinlock_handle spinlock;
     mutex_handle mutex;
     condition_handle condition;
-    volatile struct queue queue;
+    struct queue queue;
     volatile size_t cnt, task_cnt, task_hint;
-    volatile struct persistent_array dispatched_task;
+    struct persistent_array dispatched_task;
     struct persistent_array data;
-    volatile bool flag;
+    bool flag;
     /*spinlock_handle spinlock, startuplock;
     mutex_handle mutex;
     condition_handle condition;
@@ -251,7 +251,7 @@ bool thread_pool_enqueue_tasks(struct thread_pool *pool, struct task *tasks, siz
 
 size_t thread_pool_get_count(struct thread_pool *pool)
 {
-    //return pool->cnt;
+    return size_load_acquire(&pool->cnt);
 }
 
 // Determines current thread identifier. Returns '-1' for the main thread.
@@ -261,57 +261,6 @@ size_t thread_pool_get_thread_id(struct thread_pool *pool)
     //if (p_storage) return (*p_storage)->id;
     return SIZE_MAX;
 }
-
-// Returns pointer to the thread-local data for the current thread. Returns 'NULL' for the main thread.
-void *thread_pool_get_thread_data(struct thread_pool *pool, size_t *p_thread_id, size_t *p_thread_data_sz)
-{
-    /*struct thread_storage **p_storage = tls_fetch(&pool->tls);
-    if (p_storage)
-    {
-        struct thread_storage *storage = *p_storage;
-        if (p_thread_id) *p_thread_id = storage->id;
-        if (p_thread_data_sz) *p_thread_data_sz = storage->data_sz;
-        return storage->data;
-    }
-    if (p_thread_id) *p_thread_id = SIZE_MAX;
-    if (p_thread_data_sz) *p_thread_data_sz = 0;*/
-    return NULL;
-}
-
-/*
-static inline size_t threadproc_startup(struct thread_pool *pool)
-{
-    size_t res = SIZE_MAX;    
-    spinlock_acquire(&pool->startuplock);
-
-    for (size_t i = 0; i < UINT8_CNT(pool->cnt); i++)
-    {
-        uint8_t j = uint8_bit_scan_forward(~pool->thread_bits[i]);
-        if ((uint8_t) ~j)
-        {
-            res = i * CHAR_BIT + j;
-            tls_assign(&pool->tls, &pool->storage[res]);
-            uint8_bit_set(pool->thread_bits, res);
-            break;
-        }
-    }
-
-    spinlock_release(&pool->startuplock);
-    return res;
-}
-
-static inline void threadproc_shutdown(struct thread_pool *pool, size_t id)
-{
-    spinlock_acquire(&pool->startuplock);
-    uint8_bit_reset(pool->thread_bits, id);
-    spinlock_release(&pool->startuplock);
-}
-
-struct thread_arg {
-    void *volatile *ptr;
-    struct thread_pool *pool;
-};
-*/
 
 enum thread_state {
     THREAD_ACTIVE = 0,
@@ -324,10 +273,10 @@ struct thread_arg {
     struct thread_pool *pool;
     struct dispatched_task *volatile dispatched_task;
     void *tls;
-    mutex_handle *mutex;
-    condition_handle *condition;
-    volatile unsigned state;
-    volatile bool flag;
+    mutex_handle mutex;
+    condition_handle condition;
+    unsigned state;
+    bool flag;
 };
 
 static thread_return thread_callback_convention thread_proc(void *Arg)
@@ -348,21 +297,21 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
             // If no task found, then go the sleep state
             if (!dispatched_task)
             {
-                mutex_acquire(arg->mutex);
+                mutex_acquire(&arg->mutex);
                 if (!arg->flag)
                 {
                     if (arg->state == THREAD_SHUTDOWN_QUERY)
                     {
                         arg->state = THREAD_SHUTDOWN;
-                        mutex_release(arg->mutex);
+                        mutex_release(&arg->mutex);
                         return (thread_return) 0;
                     }
                     arg->state = THREAD_IDLE;
-                    condition_sleep(arg->condition, arg->mutex);
+                    condition_sleep(&arg->condition, &arg->mutex);
                     arg->state = THREAD_ACTIVE;
                 }
                 arg->flag = 0;
-                mutex_release(arg->mutex);
+                mutex_release(&arg->mutex);
                 continue;
             }
         }
@@ -422,9 +371,9 @@ void thread_pool_schedule(struct thread_pool *pool)
             dispatched_task = persistent_array_fetch(&pool->dispatched_task, i, sizeof(*dispatched_task));
             if (!dispatch)
             {
-                if (bool_load_acquire(dispatched_task->ngarbage))
+                if (bool_load_acquire(&dispatched_task->ngarbage))
                 {
-                    if (!bool_load_acquire(dispatched_task->norphan))
+                    if (!bool_load_acquire(&dispatched_task->norphan))
                     {
                         orphan = 1;
                         break;
@@ -432,7 +381,7 @@ void thread_pool_schedule(struct thread_pool *pool)
                     garbage = 0;
                 }
             }
-            else if (!bool_load_acquire(dispatched_task->ngarbage)) break;
+            else if (!bool_load_acquire(&dispatched_task->ngarbage)) break;
         }
         
         if (dispatched_task) // Always happens

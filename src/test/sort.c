@@ -83,7 +83,8 @@ bool test_sort_generator_a_3(void *dst, size_t *p_context, struct log *log)
         {
             for (size_t i = 0; i < cnt; i++) tmp[i] = i, arr[i] = cnt - 1;
             struct sort_worst_case_context context_tmp = { .arr = arr, .gas = cnt - 1 };
-            quick_sort(tmp, cnt, sizeof(*tmp), quick_sort_worst_case_cmp, &context_tmp, NULL, sizeof(*tmp));
+            size_t swp;
+            quick_sort(tmp, cnt, sizeof(*tmp), quick_sort_worst_case_cmp, &context_tmp, &swp, sizeof(*tmp));
             free(tmp);
             *(struct test_sort_a *) dst = (struct test_sort_a) { .arr = arr, .cnt = cnt, .sz = sizeof(*arr) };
             if (context < TEST_SORT_EXP) ++*p_context;
@@ -187,7 +188,8 @@ bool test_sort_a(void *In, struct log *log)
     {
         memcpy(arr, in->arr, in->cnt * in->sz);
         struct flt64_cmp_asc_test context = { .a = arr, .b = arr + in->cnt * in->sz - in->sz, .succ = 1 };
-        quick_sort(arr, in->cnt, in->sz, size_cmp_asc_test, &context, NULL, in->sz);
+        size_t swp;
+        quick_sort(arr, in->cnt, in->sz, size_cmp_asc_test, &context, &swp, in->sz);
         size_t ind = 1;
         for (; ind < in->cnt; ind++) if (arr[ind - 1] > arr[ind]) break;
         succ = (!in->cnt || ind == in->cnt) && context.succ;
