@@ -43,25 +43,24 @@ typedef pthread_key_t tls_handle;
 #endif
 
 // To print an error status of the listed functions, except of 'thread_init', 'thread_assert' should be used
-bool thread_assert(struct log *, struct code_metric, bool);
+bool thread_assert(struct log *, struct code_metric, Errno_t);
 
-bool thread_init(thread_handle *, thread_callback, void *); // Use 'crt_assert' to get an error status 
-//void thread_terminate(thread_handle *);
-bool thread_wait(thread_handle *, thread_return *);
-void thread_close(thread_handle *);
+Errno_t thread_init(thread_handle *, thread_callback, void *); // Use 'crt_assert_impl' to get an error status 
+Errno_t thread_wait(thread_handle *, thread_return *);
+Errno_t thread_close(thread_handle *);
 
-bool mutex_init(mutex_handle *);
-void mutex_acquire(mutex_handle *);
-void mutex_release(mutex_handle *);
-void mutex_close(mutex_handle *);
+Errno_t mutex_init(mutex_handle *);
+Errno_t mutex_acquire(mutex_handle *);
+Errno_t mutex_release(mutex_handle *);
+Errno_t mutex_close(mutex_handle *);
 
-bool condition_init(condition_handle *);
-void condition_signal(condition_handle *);
-void condition_broadcast(condition_handle *);
-void condition_sleep(condition_handle *, mutex_handle *);
-void condition_close(condition_handle *);
+Errno_t condition_init(condition_handle *);
+Errno_t condition_signal(condition_handle *);
+Errno_t condition_broadcast(condition_handle *);
+Errno_t condition_sleep(condition_handle *, mutex_handle *);
+Errno_t condition_close(condition_handle *);
 
-bool tls_init(tls_handle *);
-void tls_assign(tls_handle *, void *);
+Errno_t tls_init(tls_handle *);
+Errno_t tls_assign(tls_handle *, void *);
 void *tls_fetch(tls_handle *);
-bool tls_close(tls_handle *);
+Errno_t tls_close(tls_handle *);

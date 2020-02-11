@@ -447,7 +447,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
         {
             context->buff->len = context->len;
             if (array_assert(log, CODE_METRIC, buff_append(context->buff, 0, 0, BUFFER_TERM)) &&
-                array_assert(log, CODE_METRIC, str_pool_insert(&arg->pool, context->buff->str, context->len, &arg->term[arg->term_cnt - 1].off, 0, NULL)))
+                array_assert(log, CODE_METRIC, str_pool_insert(&arg->pool, context->buff->str, context->len, &arg->term[arg->term_cnt - 1].off, 0, NULL, NULL)))
             {
                 context->st = LM_EXPR_OP;
                 return 1;
@@ -623,8 +623,8 @@ static bool cov_name_handler(const char *str, size_t len, void *res, void *Conte
         //cov->cnt++;
         //return 1;
     }*/   
-    size_t *p_ind;
-    unsigned r = str_pool_insert(&cov->pool, str, len, NULL, sizeof(size_t), &p_ind).status;
+    size_t *p_ind, swp;
+    unsigned r = str_pool_insert(&cov->pool, str, len, NULL, sizeof(size_t), &p_ind, &swp).status;
     if (!r) return 0;
     // if (r & HASH_PRESENT) return 0;
     *p_ind = cov->cnt++; // Just override column index with new one

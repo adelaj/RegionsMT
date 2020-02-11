@@ -227,10 +227,10 @@ enum {
 };
 
 // Warning! String 'str' should be null-terminated
-struct array_result str_pool_insert(struct str_pool *pool, const char *str, size_t len, size_t *p_off, size_t szv, void *p_val)
+struct array_result str_pool_insert(struct str_pool *pool, const char *str, size_t len, size_t *p_off, size_t szv, void *p_val, void *restrict swpv)
 {
-    size_t h = str_x33_hash(str, NULL), cnt = pool->tbl.cnt;
-    struct array_result res0 = hash_table_alloc(&pool->tbl, &h, str, sizeof(size_t), szv, str_off_x33_hash, str_off_str_eq, pool->buff.str);
+    size_t h = str_x33_hash(str, NULL), cnt = pool->tbl.cnt, swpk;
+    struct array_result res0 = hash_table_alloc(&pool->tbl, &h, str, sizeof(size_t), szv, str_off_x33_hash, str_off_str_eq, pool->buff.str, &swpk, swpv);
     if (!res0.status) return res0;
     if (res0.status & HASH_PRESENT)
     {

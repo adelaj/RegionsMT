@@ -540,9 +540,8 @@ void *hash_table_fetch_val(struct hash_table *tbl, size_t h, size_t szv)
     return (char *) tbl->val + h * szv;
 }
 
-static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context)
+static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context, void *restrict swpk, void *restrict swpv)
 {
-    void *restrict key = Alloca(szk), *restrict val = Alloca(szv);
     size_t cnt = (size_t) 1 << lcnt, msk = cnt - 1, cap = (size_t) 1 << tbl->lcap;
     uint8_t *flags;
     struct array_result res = array_init(&flags, NULL, NIBBLE_CNT(cnt), sizeof(*flags), 0, ARRAY_CLEAR | ARRAY_STRICT);
@@ -563,8 +562,8 @@ static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt
                 break;
             }            
             uint8_bit_set_burst2(tbl->flags, h, FLAG_REMOVED);
-            swap((char *) tbl->key + i * szk, (char *) tbl->key + h * szk, key, szk);
-            swap((char *) tbl->val + i * szv, (char *) tbl->val + h * szv, val, szv);
+            swap((char *) tbl->key + i * szk, (char *) tbl->key + h * szk, swpk, szk);
+            swap((char *) tbl->val + i * szv, (char *) tbl->val + h * szv, swpv, szv);
         }
     }
     free(tbl->flags);
@@ -575,7 +574,7 @@ static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt
     return res;
 }
 
-struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, size_t szv, hash_callback hash, cmp_callback eq, void *context)
+struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, size_t szv, hash_callback hash, cmp_callback eq, void *context, void *restrict swpk, void *restrict swpv)
 {
     struct array_result res = { .status = 1 };
     size_t cap = (size_t) 1 << tbl->lcap;
@@ -603,13 +602,13 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
                 if (!res.status) return res;
                 
                 tot = res.tot;
-                res = hash_table_rehash(tbl, lcnt, szk, szv, hash, context);
+                res = hash_table_rehash(tbl, lcnt, szk, szv, hash, context, swpk, swpv);
                 res.tot = size_add_sat(tot, res.tot);
                 if (!res.status) return res;                
             }
             else
             {
-                res = hash_table_rehash(tbl, lcnt, szk, szv, hash, context);
+                res = hash_table_rehash(tbl, lcnt, szk, szv, hash, context, swpk, swpv);
                 if (!res.status) return res;
                 
                 size_t tot = res.tot;

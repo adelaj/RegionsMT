@@ -61,5 +61,5 @@ bool hash_table_search(struct hash_table *, size_t *, const void *, size_t, cmp_
 bool hash_table_remove(struct hash_table *, size_t, const void *, size_t, cmp_callback, void *);
 void *hash_table_fetch_key(struct hash_table *, size_t, size_t);
 void *hash_table_fetch_val(struct hash_table *, size_t, size_t);
-struct array_result hash_table_alloc(struct hash_table *, size_t *, const void *, size_t, size_t, hash_callback, cmp_callback, void *);
+struct array_result hash_table_alloc(struct hash_table *, size_t *, const void *, size_t, size_t, hash_callback, cmp_callback, void *, void *restrict, void *restrict);
 void hash_table_dealloc(struct hash_table *, size_t);

@@ -40,6 +40,12 @@ struct array_result matrix_init(void *, size_t *restrict, size_t, size_t, size_t
 struct array_result array_init(void *, size_t *restrict, size_t, size_t, size_t, enum array_flags);
 struct array_result array_test_impl(void *, size_t *restrict, size_t, size_t, enum array_flags, size_t *restrict, size_t);
 
+// The correct values for 'cnt' and 'diff' used for structures with flexible array members 
+#define fam_countof(T, FAM, CNT) \
+    ((sizeof(T) - offsetof(T, FAM)) / sizeof(*((T *) 0)->FAM) >= (CNT) ? 0 : (CNT))
+#define fam_diffof(T, FAM, CNT) \
+    ((sizeof(T) - offsetof(T, FAM)) / sizeof(*((T *) 0)->FAM) >= (CNT) ? sizeof(T) : offsetof(T, FAM))
+
 #define array_test(ARR, P_CAP, SZ, DIFF, FLAGS, ...) \
     (array_test_impl((ARR), (P_CAP), (SZ), (DIFF), (FLAGS), ARG(size_t, __VA_ARGS__)))
 

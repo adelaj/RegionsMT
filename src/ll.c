@@ -367,11 +367,6 @@ size_t size_hash_inv(size_t x)
     return (size_t) uint32_hash_inv((uint32_t) x);
 }
 
-size_t size_load_acquire(volatile size_t *src)
-{
-    return (size_t) uint32_load_acquire((volatile uint32_t *) src);
-}
-
 size_t size_bit_scan_reverse(size_t x)
 {
     return (size_t) uint32_bit_scan_reverse((uint32_t) x);

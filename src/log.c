@@ -887,10 +887,15 @@ bool array_assert(struct log *log, struct code_metric code_metric, struct array_
     return res.status;
 }
 
+bool crt_assert_impl(struct log *log, struct code_metric code_metric, Errno_t err)
+{
+    if (err) log_message_fmt(log, code_metric, MESSAGE_ERROR, "%C!\n", err);
+    return !err;
+}
+
 bool crt_assert(struct log *log, struct code_metric code_metric, bool res)
 {
-    if (!res) log_message_fmt(log, code_metric, MESSAGE_ERROR, "%C!\n", errno);
-    return res;
+    return res || crt_assert_impl(log, code_metric, errno);
 }
 
 #ifdef _WIN32

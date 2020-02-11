@@ -384,7 +384,7 @@ void thread_pool_schedule(struct thread_pool *pool)
             else if (!bool_load_acquire(&dispatched_task->ngarbage)) break;
         }
         
-        if (dispatched_task) // Always happens
+        if (dispatched_task) // Always true
         {
             if (dispatch)
             {
@@ -405,7 +405,7 @@ void thread_pool_schedule(struct thread_pool *pool)
         // Unlock the queue and the dispatch array
         spinlock_release(&pool->spinlock);
 
-        // Dispatching task to a thread
+        // Dispatch task to a thread
         if (dispatched_task)
         {
             if (dispatch || orphan)
@@ -421,10 +421,10 @@ void thread_pool_schedule(struct thread_pool *pool)
                     mutex_release(&arg->mutex);
                     break;
                 }
-                if (ind < cnt) continue;
+                if (ind < cnt) continue; // Continue the outer loop
                 bool_store_release(&dispatched_task->norphan, 0);
             }
-            else if (garbage && !pending) return;
+            else if (garbage && !pending) return; // Return if there is nothing to be done
         }
 
         // Go to the sleep state
@@ -439,9 +439,9 @@ bool thread_arg_init(struct thread_arg *arg, size_t tls_sz, struct log *log)
 {
     if (array_assert(log, CODE_METRIC, array_init(&arg->tls, NULL, 1, tls_sz, 0, ARRAY_FAILSAFE | ARRAY_CLEAR)))
     {
-        if (mutex_init(&arg->mutex))
+        if (thread_assert(log, CODE_METRIC, mutex_init(&arg->mutex)))
         {
-            if (condition_init(&arg->condition))
+            if (thread_assert(log, CODE_METRIC, condition_init(&arg->condition)))
             {
 
             }
@@ -451,7 +451,7 @@ bool thread_arg_init(struct thread_arg *arg, size_t tls_sz, struct log *log)
     }
     return 0;
 }
-/*
+
 struct thread_pool *thread_pool_create(size_t cnt, size_t tls_sz, struct log *log)
 {
     size_t ind;
@@ -538,4 +538,3 @@ size_t thread_pool_dispose(struct thread_pool *pool, size_t *p_pend)
     free(pool);
     return res;
 }
-*/
