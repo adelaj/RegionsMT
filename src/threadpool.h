@@ -2,6 +2,8 @@
 
 #include "common.h"
 #include "ll.h"
+#include "log.h"
+#include "memory.h"
 
 enum {
     TASK_FAIL = 0,
@@ -37,6 +39,11 @@ bool bit_test2_range01_acquire_p(volatile void *, const void *);
 
 bool size_test_acquire_p(volatile void *, const void *);
 
+struct tls_base {
+    struct thread_pool *pool;
+    size_t tid, pid, inc;
+};
+
 struct task {
     task_callback callback;
     condition_callback cond;
@@ -56,10 +63,9 @@ struct dispatched_task {
 // Opaque structure with OS-dependent implementation
 struct thread_pool;
 
-size_t thread_pool_remove_tasks(struct thread_pool *, struct task *, size_t);
-bool thread_pool_enqueue_tasks(struct thread_pool *, struct task *, size_t, bool);
-struct thread_pool *thread_pool_create(size_t, size_t, size_t);
-size_t thread_pool_dispose(struct thread_pool *, size_t *);
+bool thread_pool_enqueue(struct thread_pool *, struct task *, size_t, bool, struct log *);
+bool thread_pool_enqueue_yield(struct thread_pool *, generator_callback, void *, size_t, bool, struct log *);
+struct thread_pool *thread_pool_create(size_t, size_t, size_t, struct log *);
+void thread_pool_dispose(struct thread_pool *);
 size_t thread_pool_get_count(struct thread_pool *);
-size_t thread_pool_get_thread_id(struct thread_pool *);
-void *thread_pool_get_thread_data(struct thread_pool *, size_t *, size_t *);
+

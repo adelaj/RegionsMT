@@ -135,6 +135,6 @@ bool log_message_fseek(struct log *restrict, struct code_metric, enum message_ty
 
 bool fopen_assert(struct log *restrict, struct code_metric, const char *restrict, bool);
 bool array_assert(struct log *, struct code_metric, struct array_result);
-bool crt_assert_impl(struct log *, struct code_metric, int);
+bool crt_assert_impl(struct log *, struct code_metric, Errno_t);
 bool crt_assert(struct log *, struct code_metric, bool);
 bool wapi_assert(struct log *, struct code_metric, bool);

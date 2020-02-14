@@ -80,7 +80,7 @@ struct array_result queue_init(struct queue *queue, size_t cnt, size_t sz)
 {
     size_t cap;
     struct array_result res = array_init(&queue->arr, &cap, cnt, sz, 0, 0);
-    if (!res.status) 
+    if (!res.status) return res;
     queue->cap = cap;
     queue->begin = queue->cnt = 0;
     return res;

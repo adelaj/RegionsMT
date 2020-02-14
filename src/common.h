@@ -31,6 +31,8 @@
 #include <stdint.h>
 #include <stddef.h>
 
+//_Static_assert((uintptr_t) NULL == 0, "Null pointer does not have zero representation!");
+
 #define MAX(a, b) \
     ((a) >= (b) ? (a) : (b))
 #define MIN(a, b) \
