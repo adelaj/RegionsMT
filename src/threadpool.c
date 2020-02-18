@@ -280,6 +280,7 @@ static bool thread_arg_init(struct thread_arg *arg, size_t tls_sz, struct log *l
                 mutex_acquire(&arg->mutex);
                 arg->state = THREAD_ACTIVE;
                 mutex_release(&arg->mutex);
+                ptr_store_release(&arg->dispatched_task, NULL);
                 return 1;
             }
             mutex_close(&arg->mutex);
@@ -349,19 +350,19 @@ static void thread_pool_finish_range(struct thread_pool *pool, size_t l, size_t 
 static size_t thread_pool_start_range(struct thread_pool *pool, size_t tls_sz, size_t l, size_t r, struct log *log)
 {
     tls_sz = MAX(sizeof(struct tls_base), tls_sz);
-    size_t i = l, pid = get_process_id();
-    for (; i < r; i++) // Initializing per-thread resources
+    size_t pid = get_process_id();
+    for (size_t i = l; i < r; i++) // Initializing per-thread resources
     {
         struct thread_arg *arg = persistent_array_fetch(&pool->arg, i, sizeof(*arg));
         if (thread_arg_init(arg, tls_sz, log))
         {
-            *(struct tls_base *) arg->tls = (struct tls_base){ .pool = pool, .tid = i, .pid = pid };
+            *(struct tls_base *) arg->tls = (struct tls_base) { .pool = pool, .tid = i, .pid = pid };
             if (crt_assert_impl(log, CODE_METRIC, thread_init(&arg->thread, thread_proc, arg))) continue;
             thread_arg_close(arg);
         }
-        break;
+        return i;
     }
-    return i;
+    return r;
 }
 
 static void thread_pool_close(struct thread_pool *pool)

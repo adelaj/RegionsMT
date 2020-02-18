@@ -5,6 +5,8 @@
 #include "memory.h"
 #include "utf8.h"
 
+#include "threadpool.h"
+
 #include "lm.h"
 
 #include "module/categorical.h"
@@ -433,6 +435,8 @@ static int Main(int argc, char **argv)
         //FILE *f = Fopen(argv[1], "w");
         //fwrite("2", 1, 1, f);
         //Fclose(f);
+
+        thread_pool_create(4, 0, 1, &log);
         
         size_t pos_cnt;
         char **pos_arr;

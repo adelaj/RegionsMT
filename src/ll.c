@@ -259,6 +259,7 @@ DECLARE_LOAD_ACQUIRE(uint16_t, uint16)
 DECLARE_LOAD_ACQUIRE(uint32_t, uint32)
 DECLARE_LOAD_ACQUIRE(size_t, size)
 DECLARE_STORE_RELEASE(size_t, size)
+DECLARE_STORE_RELEASE(void *, ptr)
 
 size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
 {

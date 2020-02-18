@@ -42,13 +42,14 @@ uint32_t uint32_load_acquire(volatile uint32_t *);
 uint64_t uint64_load_acquire(volatile uint64_t *);
 size_t size_load_acquire(volatile size_t *);
 void size_store_release(volatile size_t *, size_t);
+void ptr_store_release(void *volatile *, void *);
 
 uint8_t uint8_interlocked_or(volatile uint8_t *, uint8_t);
 uint16_t uint16_interlocked_or(volatile uint16_t *, uint16_t);
 uint8_t uint8_interlocked_and(volatile uint8_t *, uint8_t);
 uint16_t uint16_interlocked_and(volatile uint16_t *, uint16_t);
-void *ptr_interlocked_compare_exchange(void *volatile *dst, void *cmp, void *xchg);
-void *ptr_interlocked_exchange(void *volatile *dst, void *xchg);
+void *ptr_interlocked_compare_exchange(void *volatile *, void *, void *);
+void *ptr_interlocked_exchange(void *volatile *, void *);
 
 size_t size_add(size_t *, size_t, size_t);
 size_t size_sub(size_t *, size_t, size_t);
