@@ -483,7 +483,7 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
 
         for (size_t i = 0; i < ALT_CNT; i++) if (alt_rpl[i])
         {
-            if (density_perm[i] > density[i] * (double) density_perm_cnt[i]) qc[i]++;
+            if (density_perm[i] >= density[i] * (double) density_perm_cnt[i]) qc[i]++; // >
             qt[i]++;
         }
     }
@@ -493,7 +493,7 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
     {
         if (alt[i])
         {
-            res.nlpv[i] = (double) qc[i] / (double) qt[i];//log10((double) qt[i]) - log10((double) qc[i]);
+            res.nlpv[i] = (double) qc[i] / (double) qt[i]; // log10((double) qt[i]) - log10((double) qc[i]);
             res.rpl[i] = qt[i];
         }
         else

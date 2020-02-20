@@ -225,13 +225,14 @@ struct array_result persistent_array_init(struct persistent_array *arr, size_t c
 {
     if (!cnt)
     {
-        memset(arr, 0, sizeof(*arr));
+        *arr = (struct persistent_array) { 0 };
         return flags & PERSISTENT_ARRAY_WEAK ? 
             (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED } : 
             array_init(&arr->ptr, &arr->cap, SIZE_BIT, sizeof(*arr->ptr), 0, 0);
     }
     size_t off = arr->off = size_log2(cnt, 0);
-    struct array_result res = array_init(&arr->ptr, &arr->cap, arr->bck = flags & PERSISTENT_ARRAY_WEAK ? 1 : SIZE_BIT - off, sizeof(*arr->ptr), 0, 0);
+    arr->bck = 1;
+    struct array_result res = array_init(&arr->ptr, &arr->cap, flags & PERSISTENT_ARRAY_WEAK ? 1 : SIZE_BIT - off, sizeof(*arr->ptr), 0, 0);
     if (!res.status) return res;
     size_t tot = res.tot;
     res = array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT | (flags & PERSISTENT_ARRAY_CLEAR));
@@ -248,17 +249,17 @@ void persistent_array_close(struct persistent_array *arr)
 
 struct array_result persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz, enum persistent_array_flags flags)
 {
-    size_t cap1 = (size_t) 1 << arr->bck << arr->off; // 'cap1' equals to the actual capacity minus one
-    if (cnt < cap1) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
     if (!arr->bck) return persistent_array_init(arr, cnt, sz, flags);
-    size_t bck = size_log2(cnt + 1, 1) - arr->off, tot = 0;
+    size_t cap1 = (size_t) 2 << (arr->bck - 1) << arr->off; // 'cap1' equals to the actual capacity plus one
+    if (cnt <= cap1 - 1) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED }; // Do not replace condition with 'cnt < cap1'!
+    size_t bck = size_log2(size_add_sat(cnt, 1), 1) - arr->off, tot = 0;
     if (flags & PERSISTENT_ARRAY_WEAK)
     {
         struct array_result res = array_test(&arr->ptr, &arr->cap, sizeof(*arr->ptr), 0, 0, bck);
         if (!res.status) return res;
         tot = res.tot;
     }
-    for (size_t i = arr->bck; i < bck; i++, cap1 <<= 1)
+    for (size_t i = arr->bck; i < bck; i++, cap1 <<= 1) // 'cap1' is always non-zero!
     {
         struct array_result res = array_init(arr->ptr + i, NULL, cap1, sz, 0, ARRAY_STRICT | (flags & PERSISTENT_ARRAY_CLEAR));
         if (!res.status)

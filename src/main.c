@@ -430,13 +430,20 @@ static int Main(int argc, char **argv)
         log_message_fmt(&log1, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "012345678901%~~-sAA%!-s1;%1;C%$F", &(struct env) ENV_INIT_COL(FG_BR_CYAN), "X", "BB", "%$E", "D" }, "G%%%~~#*%~#*%#x394%~#921", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, 12041241241ull);
         //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~#*%~#*.\n", 0x393, 920);
         //SetLastError(99999);
-        wapi_assert(&log1, CODE_METRIC, 0);
-        wapi_assert(&log1, CODE_METRIC, 0);
+        //wapi_assert(&log1, CODE_METRIC, 0);
+        //wapi_assert(&log1, CODE_METRIC, 0);
         //FILE *f = Fopen(argv[1], "w");
         //fwrite("2", 1, 1, f);
         //Fclose(f);
 
-        thread_pool_create(4, 0, 1, &log);
+        //struct persistent_array a;
+        //persistent_array_init(&a, 1, 100, 0);
+        //persistent_array_test(&a, 3, 100, 0);
+        //void *z = persistent_array_fetch(&a, 0, 100);
+        //z = persistent_array_fetch(&a, 4, 100);
+
+        //struct thread_pool *pool = thread_pool_create(4, 0, 1, &log);
+        //thread_pool_schedule(pool);
         
         size_t pos_cnt;
         char **pos_arr;
