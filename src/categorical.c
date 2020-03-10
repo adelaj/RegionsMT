@@ -269,12 +269,12 @@ double stat_exact(size_t *tbl, size_t *xmar, size_t *ymar)
         a += hyp;
         if (hyp <= hyp_comp) b += hyp;
     }
-    return log10(a) - log10(b);
+    return b / a; //log10(a) - log10(b);
 }
 
-double qas_lor(size_t *tbl)
+double qas_or(size_t *tbl)
 {
-    return log10((double) tbl[0]) + log10((double) tbl[3]) - (log10((double) tbl[1]) + log10((double) tbl[2]));
+    return (double) (tbl[0] * tbl[3]) / (double) (tbl[1] * tbl[2]); // lor = log10((double) tbl[0]) + log10((double) tbl[3]) - (log10((double) tbl[1]) + log10((double) tbl[2]));
 }
 
 double stat_chisq(size_t *tbl, size_t *outer, size_t mar, size_t dimx, size_t dimy)
@@ -287,7 +287,7 @@ double stat_chisq(size_t *tbl, size_t *outer, size_t mar, size_t dimx, size_t di
         double diff = (double) out - (double) (tbl[i] * mar);
         stat += diff * diff / (double) (out * mar);
     }
-    return -log10(cdf_chisq_Q(stat, (double) (pr - dimx - dimy + 1)));
+    return cdf_chisq_Q(stat, (double) (pr - dimx - dimy + 1));
 }
 
 static void val_init(size_t *val, uint8_t *bits, size_t cnt)
@@ -310,7 +310,7 @@ double qas_fisher(size_t *tbl, size_t *xval, size_t *yval, size_t *xmar, size_t 
         s += m, s2 += xval[i] * m;
     }
     double a = (double) (st * mar) - (double) (s * t), b = sqrt(((double) (s2 * mar) - (double) (s * s)) * ((double) (t2 * mar) - (double) (t * t)));
-    return .5 * (log10(b + a) - log10(b - a));
+    return sqrt((b + a) / (b - a)); // lqas = .5 * (log10(b + a) - log10(b - a));
 }
 
 static void perm_init(size_t *perm, size_t cnt, gsl_rng *rng)
@@ -331,7 +331,7 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
     size_t gen_pop_cnt_alt[ALT_CNT] = { 0 };
     size_t gen_val[GEN_CNT];
 
-    array_broadcast(res.nlpv, countof(res.nlpv), sizeof(*res.nlpv), &(double) { nan(__func__) });
+    array_broadcast(res.pv, countof(res.pv), sizeof(*res.pv), &(double) { nan(__func__) });
     array_broadcast(res.qas, countof(res.qas), sizeof(*res.qas), &(double) { nan(__func__) });
 
     size_t table_disp = GEN_CNT * phen_ucnt;
@@ -366,13 +366,13 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
         mar_init(supp->tbl, gen_mar, supp->phen_mar, &mar, gen_pop_cnt, phen_pop_cnt);
 
         // Computing test statistic
-        res.nlpv[i] = 
+        res.pv[i] = 
             outer_combined_init(supp->outer, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt) ? 
             stat_chisq(supp->tbl, supp->outer, mar, gen_pop_cnt, phen_pop_cnt) : 
             stat_exact(supp->tbl, gen_mar, supp->phen_mar);
         
         // Computing qas
-        if (i && phen_ucnt == 2) res.qas[i] = qas_lor(supp->tbl);
+        if (i && phen_ucnt == 2) res.qas[i] = qas_or(supp->tbl);
         else
         {
             val_init(gen_val, gen_bits, GEN_CNT);
@@ -425,12 +425,12 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
             memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
             mar_init(supp->tbl, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, supp->snp_data[i].mar + j, gen_pop_cnt, phen_pop_cnt);
             outer_chisq_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-            density[j] += stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt);
+            density[j] += -log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt));
             density_cnt[j]++;            
         }
     }     
 
-    // Naive P-value for density = gsl_sf_gamma_inc_Q((double) density_cnt[i], density[i] / M_LOG10E)
+    // Naive P-value for density = gsl_sf_gamma_inc_Q((double) density_cnt[i], density[i] / 1. /* M_LOG10E */)
     bool alt[ALT_CNT];
     for (size_t i = 0; i < ALT_CNT; i++, flags >>= 1) alt[i] = (flags & 1) && isfinite(density[i] /= (double) density_cnt[i]);
 
@@ -493,12 +493,12 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
     {
         if (alt[i])
         {
-            res.nlpv[i] = (double) qc[i] / (double) qt[i]; // log10((double) qt[i]) - log10((double) qc[i]);
+            res.pv[i] = (double) qc[i] / (double) qt[i]; // nlpv = log10((double) qt[i]) - log10((double) qc[i]);
             res.rpl[i] = qt[i];
         }
         else
         {
-            res.nlpv[i] = nan(__func__);
+            res.pv[i] = nan(__func__);
             res.rpl[i] = 0;
         }
     }

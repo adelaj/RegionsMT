@@ -751,7 +751,7 @@ bool log_flush(struct log *restrict log)
     return crt_assert(log->fallback, CODE_METRIC, !fflush(log->file) && wr == cnt);
 }
 
-// May be used for 'log' allocated by 'calloc' (or filled with zeros statically)
+// May be used for 'log' filled with zeros manually
 void log_close(struct log *restrict log)
 {
     log_flush(log);

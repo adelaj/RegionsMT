@@ -180,7 +180,7 @@ struct array_result gauss_col(double *m, size_t dimx, size_t *p_rky, size_t tda,
 struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double *phen, size_t phen_cnt, size_t reg_cnt, size_t reg_tda, enum categorical_flags flags)
 {
     struct categorical_res res;
-    array_broadcast(res.nlpv, countof(res.nlpv), sizeof(*res.nlpv), &(double) { nan(__func__) });
+    array_broadcast(res.pv, countof(res.pv), sizeof(*res.pv), &(double) { nan(__func__) });
     array_broadcast(res.qas, countof(res.qas), sizeof(*res.qas), &(double) { nan(__func__) });
 
     // Initializing genotype filter
@@ -319,7 +319,7 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
         }
 
         size_t df_h = 1 + (i == 0);
-        res.nlpv[i] = gsl_cdf_fdist_Q((((i == 3 ? s_h + s_h : s_h) - ss_e) * (double) df_e) / (ss_e * (double) df_h), (double) df_h, (double) df_e);
+        res.pv[i] = gsl_cdf_fdist_Q((((i == 3 ? s_h + s_h : s_h) - ss_e) * (double) df_e) / (ss_e * (double) df_h), (double) df_h, (double) df_e);
 
         //
         // MODEL FOR QAS
@@ -1066,16 +1066,8 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     {
         uint64_t t = get_time();
         struct categorical_res x = lm_impl(&supp, gen + i * cov.dim, reg, cov.ord[phen.off], cov.dim, rky, dimy, 15);
-        fprintf(f,
-            "%zu,%.15e,%.15e\n"
-            "%zu,%.15e,%.15e\n"
-            "%zu,%.15e,%.15e\n"
-            "%zu,%.15e,%.15e\n",
-            4 * i + 1, x.nlpv[0], x.qas[0],
-            4 * i + 2, x.nlpv[1], x.qas[1],
-            4 * i + 3, x.nlpv[2], x.qas[2],
-            4 * i + 4, x.nlpv[3], x.qas[3]);
-        fflush(f);
+        print_cat(f, x);
+        //fflush(f);
         log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Computation of linear model for snp no. %~uz took %~T.\n", i + 1, t, get_time());
     }
     fclose(f);

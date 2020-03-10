@@ -118,17 +118,15 @@ bool append_out(const char *path_out, struct maver_adj_res res, struct log *log)
 }
 */
 
-struct categorical_res condition(struct categorical_res x)
+void print_cat(FILE *f, struct categorical_res x)
 {
-    struct categorical_res res;
     for (size_t i = 0; i < 4; i++)
     {
-        double a = pow(10, -x.nlpv[i]);
-        res.nlpv[i] = isfinite(a) ? a : -1.;
-        double qas = x.qas[i];
-        res.qas[i] = isfinite(qas) ? qas : qas < 0 ? -DBL_MAX : DBL_MAX;
+        if (isfinite(x.pv[i])) fprintf(f, "%.15e,", x.pv[i]);
+        else fprintf(f, "NA,");
+        if (isfinite(x.qas[i])) fprintf(f, "%.15e\n", x.qas[i]);
+        else fprintf(f, "NA\n");
     }
-    return res;
 }
 
 bool categorical_run_chisq(const char *path_phen, const char *path_gen, const char *path_out, struct log *log)
@@ -163,17 +161,9 @@ bool categorical_run_chisq(const char *path_phen, const char *path_gen, const ch
 
     for (size_t i = 0; i < snp_cnt; i++)
     {
-        struct categorical_res x = condition(categorical_impl(&supp, gen + i * phen_cnt, phen, phen_cnt, phen_ucnt, 15));
-        fprintf(f, 
-            "%zu,%.15e,%.15e\n"
-            "%zu,%.15e,%.15e\n"
-            "%zu,%.15e,%.15e\n"
-            "%zu,%.15e,%.15e\n",
-            4 * i + 1, x.nlpv[0], x.qas[0], 
-            4 * i + 2, x.nlpv[1], x.qas[1], 
-            4 * i + 3, x.nlpv[2], x.qas[2], 
-            4 * i + 4, x.nlpv[3], x.qas[3]);
-        fflush(f);
+        struct categorical_res x = categorical_impl(&supp, gen + i * phen_cnt, phen, phen_cnt, phen_ucnt, 15);
+        print_cat(f, x);
+        //fflush(f);
     }
 
 error:
@@ -229,7 +219,7 @@ bool categorical_run_adj(const char *path_phen, const char *path_gen, const char
         }
     }
 
-    f = fopen(path_out, "w");
+    f = Fopen(path_out, "w");
     for (;;)
     {
         if (!f) log_message_fopen(log, CODE_METRIC, MESSAGE_ERROR, path_out, errno);
@@ -253,10 +243,10 @@ bool categorical_run_adj(const char *path_phen, const char *path_gen, const char
         uint64_t t1 = get_time();
         log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation took %~T.\n", t0, t1);
 
-        int64_t diff = t1 - t0, mdq = diff / 60000000, mdr = diff % 60000000;
+        int64_t diff = t1 - t0, hdq = diff / 3600000000, hdr = diff % 3600000000, mdq = hdr / 60000000, mdr = hdr % 60000000;
         double sec = 1.e-6 * (double) mdr;
-        fprintf(f, "%zu,%.15e,%zu,%.15e,%zu,%.15e,%zu,%.15e,%zu,%" PRId64 " min,%.6f sec\n",
-            i + 1, x.nlpv[0], x.rpl[0], x.nlpv[1], x.rpl[1], x.nlpv[2], x.rpl[2], x.nlpv[3], x.rpl[3], mdq, sec);
+        fprintf(f, "%zu,%.15e,%zu,%.15e,%zu,%.15e,%zu,%.15e,%zu,%" PRId64 " hr %" PRId64 " min %.6f sec\n",
+            i + 1, x.pv[0], x.rpl[0], x.pv[1], x.rpl[1], x.pv[2], x.rpl[2], x.pv[3], x.rpl[3], hdq, mdq, sec);
         fflush(f);
     }
     

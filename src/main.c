@@ -425,9 +425,9 @@ static int Main(int argc, char **argv)
     struct log log;
     if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, NULL))
     {
-        struct log log1;
-        log_init(&log1, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, &log);
-        log_message_fmt(&log1, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "012345678901%~~-sAA%!-s1;%1;C%$F", &(struct env) ENV_INIT_COL(FG_BR_CYAN), "X", "BB", "%$E", "D" }, "G%%%~~#*%~#*%#x394%~#921", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, 12041241241ull);
+        //struct log log1;
+        //log_init(&log1, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, &log);
+        //log_message_fmt(&log1, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "012345678901%~~-sAA%!-s1;%1;C%$F", &(struct env) ENV_INIT_COL(FG_BR_CYAN), "X", "BB", "%$E", "D" }, "G%%%~~#*%~#*%#x394%~#921", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, 12041241241ull);
         //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~#*%~#*.\n", 0x393, 920);
         //SetLastError(99999);
         //wapi_assert(&log1, CODE_METRIC, 0);

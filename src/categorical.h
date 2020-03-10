@@ -20,7 +20,7 @@ struct categorical_supp {
 };
 
 struct categorical_res {
-    double nlpv[ALT_CNT], qas[ALT_CNT];
+    double pv[ALT_CNT], qas[ALT_CNT];
 };
 
 struct maver_adj_supp {
@@ -30,7 +30,7 @@ struct maver_adj_supp {
 };
 
 struct maver_adj_res {
-    double nlpv[ALT_CNT];
+    double pv[ALT_CNT];
     size_t rpl[ALT_CNT];
 };
 
@@ -41,7 +41,7 @@ void ymar_init(size_t *, size_t *, size_t, size_t);
 void outer_chisq_init(size_t *, size_t *, size_t *, size_t, size_t);
 bool outer_combined_init(size_t *, size_t *, size_t *, size_t, size_t, size_t);
 double stat_exact(size_t *, size_t *, size_t *);
-double qas_lor(size_t *);
+double qas_or(size_t *);
 double stat_chisq(size_t *, size_t *, size_t, size_t, size_t);
 double qas_fisher(size_t *, size_t *, size_t *, size_t *, size_t *, size_t, size_t, size_t);
 
