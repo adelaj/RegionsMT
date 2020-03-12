@@ -33,7 +33,7 @@ all($$1): $(EP2134)/$(CC_EXE)
 test($$1): $(EP2134)/$(CC_EXE))
 endef
 
-on_error = ([ -f $1 ] && (cat $1; mv $1 $(1:.log=.error); false))
+on_error = { [ -f $1 ] && { cat $1; mv $1 $(1:.log=.error); false; } }
 
 # Warning! 'CMAKE_C_LINK_EXECUTABLE' has no effect for 'mingw' toolchains
 define cc_cmake =
