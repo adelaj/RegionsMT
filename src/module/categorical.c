@@ -136,7 +136,7 @@ bool categorical_run_chisq(const char *path_phen, const char *path_gen, const ch
     size_t *phen = NULL;
     FILE *f = NULL;
     struct phen_context phen_context = { 0 };
-    size_t phen_skip = 0, phen_cnt = 0, phen_length = 0;
+    size_t phen_skip = 1, phen_cnt = 0, phen_length = 0;
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
 
     uintptr_t *phen_ptr;
