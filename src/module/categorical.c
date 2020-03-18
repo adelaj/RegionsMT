@@ -18,7 +18,7 @@ struct phen_context {
 
 static bool tbl_phen_selector(struct tbl_col *cl, size_t row, size_t col, void *tbl, void *Context)
 {
-    if (col != 2)
+    if (col != 1)
     {
         cl->handler.read = NULL;
         return 1;
