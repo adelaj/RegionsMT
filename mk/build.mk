@@ -1,4 +1,4 @@
-﻿# $env:MSYS2_ARG_CONV_EXCL=\*
+# $env:MSYS2_ARG_CONV_EXCL=\*
 # $env:MSYS2PATH=C:\msys32\usr\bin\bash.exe -c 'echo $PATH'
 # $env:MSYS2WD=C:\msys32\usr\bin\bash.exe -c 'pwd'
 # $env:MSYSTEM="MINGW32"

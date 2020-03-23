@@ -1,4 +1,4 @@
-﻿define cmakelists =
+define cmakelists =
 $(eval
 $$(PREFIX)/$$1/CMakeLists.txt: $$(ROOT)/contrib/$$1.cmake | $$(PREFIX)/$$1.log 
     cp $$< $$@
