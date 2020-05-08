@@ -23,13 +23,13 @@ build_script:
   - ps: |
         $env:CHERE_INVOKING="1"
         $env:GIT=C:\msys64\usr\bin\bash.exe -c '/usr/bin/which git'
-  - C:\msys64\usr\bin\bash.exe -lc "$MAKE --warn-undefined-variables -j all"
+  - C:\msys64\usr\bin\bash.exe -lc "$MAKE --warn-undefined-variables -R -j all"
 
 test_script:
-  - C:\msys64\usr\bin\bash.exe -lc "$MAKE --warn-undefined-variables -j -k test || true"
+  - C:\msys64\usr\bin\bash.exe -lc "$MAKE --warn-undefined-variables -R -j -k test || true"
             
 after_test:
-  - C:\msys64\usr\bin\bash.exe -lc "$MAKE --warn-undefined-variables -j CLEAN='all git(gsl) all(gsl) git(pthread-win32) all(pthread-win32)' clean"
+  - C:\msys64\usr\bin\bash.exe -lc "$MAKE --warn-undefined-variables -R -j CLEAN='all git(gsl) all(gsl) git(pthread-win32) all(pthread-win32)' clean"
 
 for:
   -

@@ -176,6 +176,13 @@ struct array_result gauss_col(double *m, size_t dimx, size_t *p_rky, size_t tda,
     return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
 }
 
+static size_t filter_init(size_t *filter, uint8_t *gen, double *phen, size_t phen_cnt)
+{
+    size_t cnt = 0;
+    for (size_t i = 0; i < phen_cnt; i++) if (gen[i] < GEN_CNT && !isnan(phen[i])) filter[cnt++] = i;
+    return cnt;
+}
+
 // 'phen' is actually a double pointer
 struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double *phen, size_t phen_cnt, size_t reg_cnt, size_t reg_tda, enum categorical_flags flags)
 {
@@ -183,8 +190,8 @@ struct categorical_res lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, 
     array_broadcast(res.pv, countof(res.pv), sizeof(*res.pv), &(double) { nan(__func__) });
     array_broadcast(res.qas, countof(res.qas), sizeof(*res.qas), &(double) { nan(__func__) });
 
-    // Initializing genotype filter
-    size_t cnt = filter_init(supp->filter, gen, phen_cnt);
+    // Initializing genotype/phenotype filter
+    size_t cnt = filter_init(supp->filter, gen, phen, phen_cnt);
     if (!cnt) return res;
 
     size_t tda = reg_cnt + 3;

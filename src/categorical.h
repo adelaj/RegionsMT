@@ -34,8 +34,6 @@ struct maver_adj_res {
     size_t rpl[ALT_CNT];
 };
 
-size_t filter_init(size_t *, uint8_t *, size_t);
-
 void mar_init(size_t *, size_t *, size_t *, size_t *, size_t, size_t);
 void ymar_init(size_t *, size_t *, size_t, size_t);
 void outer_chisq_init(size_t *, size_t *, size_t *, size_t, size_t);

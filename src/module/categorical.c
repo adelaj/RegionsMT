@@ -12,20 +12,42 @@
 #include <inttypes.h>
 
 struct phen_context {
+    const char *name;
     struct str_tbl_handler_context handler_context;
-    size_t cap;
+    size_t cap, col, cur;
 };
+
+
+static bool str_tbl_handler_na(const char *str, size_t len, void *p_Off, void *Context)
+{
+    if (strcmp(str, "NA")) str_tbl_handler(str, len, p_Off, Context);
+    else str_tbl_handler("", 0, p_Off, Context);
+}
+
+static bool phen_test(const char *str, size_t len, void *ptr, void *Context)
+{
+    (void) ptr;
+    struct phen_context *context = Context;
+    if (!strcmp(str, context->name)) context->col = context->cur;
+    return 1;
+}
 
 static bool tbl_phen_selector(struct tbl_col *cl, size_t row, size_t col, void *tbl, void *Context)
 {
-    if (col != 1)
+    struct phen_context *context = Context;
+    if (!row)
+    {
+        context->cur = col;
+        *cl = (struct tbl_col) { .handler = {.read = { phen_test } }, .context = context };
+        return 1;
+    }
+    if (context->col == SIZE_MAX || col != context->col)
     {
         cl->handler.read = NULL;
         return 1;
     }
-    struct phen_context *context = Context;
     if (!array_test(tbl, &context->cap, sizeof(size_t), 0, 0, row, 1).status) return 0;
-    *cl = (struct tbl_col) { .handler = { .read = str_tbl_handler }, .ptr = *(size_t **) tbl + row, .context = &context->handler_context };
+    *cl = (struct tbl_col) { .handler = { .read = str_tbl_handler_na }, .ptr = *(size_t **) tbl + row, .context = &context->handler_context };
     return 1;
 }
 
@@ -129,15 +151,22 @@ void print_cat(FILE *f, struct categorical_res x)
     }
 }
 
-bool categorical_run_chisq(const char *path_phen, const char *path_gen, const char *path_out, struct log *log)
+bool categorical_run_chisq(const char *phen_name, const char *path_phen, const char *path_gen, const char *path_out, struct log *log)
 {
+    bool succ = 0;
     struct categorical_supp supp = { 0 };
     uint8_t *gen = NULL;
     size_t *phen = NULL;
     FILE *f = NULL;
-    struct phen_context phen_context = { 0 };
-    size_t phen_skip = 1, phen_cnt = 0, phen_length = 0;
+    struct phen_context phen_context = { .col = SIZE_MAX };
+    size_t phen_skip = 0, phen_cnt = 0, phen_length = 0;
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
+
+    if (phen_context.col == SIZE_MAX)
+    {
+        log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Unable to find phenotype %~'\"s in the file %~'\"P!\n", phen_name, path_phen);
+        goto error;
+    }
 
     uintptr_t *phen_ptr;
     if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str).status) goto error;
@@ -165,6 +194,7 @@ bool categorical_run_chisq(const char *path_phen, const char *path_gen, const ch
         print_cat(f, x);
         //fflush(f);
     }
+    succ = 1;
 
 error:
     categorical_close(&supp);
@@ -172,10 +202,10 @@ error:
     free(phen_context.handler_context.str);
     free(phen);
     free(gen);
-    return 1;
+    return succ;
 }
 
-bool categorical_run_adj(const char *path_phen, const char *path_gen, const char *path_top_hit, const char *path_out, size_t rpl, uint64_t seed, struct log *log)
+bool categorical_run_adj(const char *phen_name, const char *path_phen, const char *path_gen, const char *path_top_hit, const char *path_out, size_t rpl, uint64_t seed, struct log *log)
 {
     struct maver_adj_supp supp = { 0 };
     uint8_t *gen = NULL;
@@ -183,7 +213,7 @@ bool categorical_run_adj(const char *path_phen, const char *path_gen, const char
     size_t *phen = NULL;
     FILE *f = NULL;
     struct interval *top_hit = NULL;
-    struct phen_context phen_context = { 0 };
+    struct phen_context phen_context = { .name = phen_name, 0 };
     size_t phen_skip = 1, phen_cnt = 0, phen_length = 0;
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
 

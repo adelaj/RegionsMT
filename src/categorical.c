@@ -181,10 +181,10 @@ void maver_adj_close(struct maver_adj_supp *supp)
     free(supp->tbl);
 }
 
-size_t filter_init(size_t *filter, uint8_t *gen, size_t phen_cnt)
+static size_t filter_init(size_t *filter, uint8_t *gen, size_t *phen, size_t phen_cnt)
 {
     size_t cnt = 0;
-    for (size_t i = 0; i < phen_cnt; i++) if (gen[i] < GEN_CNT) filter[cnt++] = i;
+    for (size_t i = 0; i < phen_cnt; i++) if (gen[i] < GEN_CNT && phen[i] != SIZE_MAX) filter[cnt++] = i;
     return cnt;
 }
 
@@ -237,7 +237,7 @@ void ymar_init(size_t *tbl, size_t *ymar, size_t dimx, size_t dimy)
     for (size_t i = 0; i < dimy; i++) for (size_t j = 0; j < dimx; ymar[i] += tbl[j + dimx * i], j++);
 }
 
-void outer_chisq_init(size_t *outer, size_t *xmar, size_t *ymar, size_t dimx, size_t dimy)
+void outer_init(size_t *outer, size_t *xmar, size_t *ymar, size_t dimx, size_t dimy)
 {
     for (size_t i = 0; i < dimy; i++) for (size_t j = 0; j < dimx; j++) outer[j + dimx * i] = xmar[j] * ymar[i];
 }
@@ -246,7 +246,7 @@ bool outer_combined_init(size_t *outer, size_t *xmar, size_t *ymar, size_t mar, 
 {
     if (dimx > 2 || dimy > 2)
     {
-        outer_chisq_init(outer, xmar, ymar, dimx, dimy);
+        outer_init(outer, xmar, ymar, dimx, dimy);
         return 1;
     }
     size_t lim = 5 * mar;
@@ -269,12 +269,12 @@ double stat_exact(size_t *tbl, size_t *xmar, size_t *ymar)
         a += hyp;
         if (hyp <= hyp_comp) b += hyp;
     }
-    return b / a; //log10(a) - log10(b);
+    return b / a; // nlpv = log10(a) - log10(b);
 }
 
 double qas_or(size_t *tbl)
 {
-    return (double) (tbl[0] * tbl[3]) / (double) (tbl[1] * tbl[2]); // lor = log10((double) tbl[0]) + log10((double) tbl[3]) - (log10((double) tbl[1]) + log10((double) tbl[2]));
+    return (double) (tbl[0] * tbl[3]) / (double) (tbl[1] * tbl[2]); // lor = log10((double) tbl[0]) + log10((double) tbl[3]) - (log10((double) tbl[1]) + log10((double) tbl[2]))
 }
 
 double stat_chisq(size_t *tbl, size_t *outer, size_t mar, size_t dimx, size_t dimy)
@@ -287,7 +287,7 @@ double stat_chisq(size_t *tbl, size_t *outer, size_t mar, size_t dimx, size_t di
         double diff = (double) out - (double) (tbl[i] * mar);
         stat += diff * diff / (double) (out * mar);
     }
-    return cdf_chisq_Q(stat, (double) (pr - dimx - dimy + 1));
+    return cdf_chisq_Q(stat, (double) (pr - dimx - dimy + 1)); // nlpv = -log10(...)
 }
 
 static void val_init(size_t *val, uint8_t *bits, size_t cnt)
@@ -310,7 +310,7 @@ double qas_fisher(size_t *tbl, size_t *xval, size_t *yval, size_t *xmar, size_t 
         s += m, s2 += xval[i] * m;
     }
     double a = (double) (st * mar) - (double) (s * t), b = sqrt(((double) (s2 * mar) - (double) (s * s)) * ((double) (t2 * mar) - (double) (t * t)));
-    return sqrt((b + a) / (b - a)); // lqas = .5 * (log10(b + a) - log10(b - a));
+    return sqrt((b + a) / (b - a)); // lqas = .5 * (log10(b + a) - log10(b - a))
 }
 
 static void perm_init(size_t *perm, size_t cnt, gsl_rng *rng)
@@ -336,8 +336,8 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
 
     size_t table_disp = GEN_CNT * phen_ucnt;
        
-    // Initializing genotype filter
-    size_t cnt = filter_init(supp->filter, gen, phen_cnt);
+    // Initializing genotype/phenotype filter
+    size_t cnt = filter_init(supp->filter, gen, phen, phen_cnt);
     if (!cnt) return res;
     
     // Counting unique genotypes
@@ -394,8 +394,8 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
 
     for (size_t i = 0, off = 0; i < snp_cnt; i++, off += phen_cnt)
     {
-        // Initializing genotype filter
-        size_t cnt = filter_init(supp->filter + off, gen + off, phen_cnt);
+        // Initializing genotype/phenotype filter
+        size_t cnt = filter_init(supp->filter + off, gen + off, phen, phen_cnt);
         if (!cnt) continue;
         supp->snp_data[i].cnt = cnt;
 
@@ -424,13 +424,13 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
             // Computing sums
             memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
             mar_init(supp->tbl, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, supp->snp_data[i].mar + j, gen_pop_cnt, phen_pop_cnt);
-            outer_chisq_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-            density[j] += -log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt));
+            outer_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
+            density[j] += -log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt)); /* -log10() */
             density_cnt[j]++;            
         }
     }     
 
-    // Naive P-value for density = gsl_sf_gamma_inc_Q((double) density_cnt[i], density[i] / 1. /* M_LOG10E */)
+    // Naive P-value for density = gsl_sf_gamma_inc_Q((double) density_cnt[i], density[i] /* / M_LOG10E */)
     bool alt[ALT_CNT];
     for (size_t i = 0; i < ALT_CNT; i++, flags >>= 1) alt[i] = (flags & 1) && isfinite(density[i] /= (double) density_cnt[i]);
 
@@ -475,7 +475,7 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
                 // Computing sums
                 memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
                 ymar_init(supp->tbl, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-                outer_chisq_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
+                outer_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
                 density_perm[j] += stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt);
                 density_perm_cnt[j]++;
             }

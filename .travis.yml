@@ -27,7 +27,7 @@ matrix:
           - TOOLCHAIN=clang:clang-8
           - MATRIX=`echo {clang,gcc}:{x86_64,i386}:{Debug,Release}`
         script:
-          - make --warn-undefined-variables -j all
-          - make --warn-undefined-variables -j -k test || true
+          - make --warn-undefined-variables -R -j all
+          - make --warn-undefined-variables -R -j -k test || true
         after_script:
-          - make --warn-undefined-variables -j CLEAN="all git(gsl) all(gsl)" clean
+          - make --warn-undefined-variables -R -j CLEAN="all git(gsl) all(gsl)" clean

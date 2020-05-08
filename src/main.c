@@ -479,11 +479,11 @@ static int Main(int argc, char **argv)
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CAT))
             {
-                if (pos_cnt >= 6)
+                if (pos_cnt >= 7)
                 {
-                    size_t rpl = (size_t) strtoull(pos_arr[4], NULL, 10);
-                    uint64_t seed = (uint64_t) strtoull(pos_arr[5], NULL, 10);
-                    categorical_run_adj(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], rpl, seed, &log);
+                    size_t rpl = (size_t) strtoull(pos_arr[5], NULL, 10);
+                    uint64_t seed = (uint64_t) strtoull(pos_arr[6], NULL, 10);
+                    succ = categorical_run_adj(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], pos_arr[4], rpl, seed, &log);
                 }
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LDE))
@@ -492,9 +492,9 @@ static int Main(int argc, char **argv)
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CHISQ))
             {
-                if (pos_cnt >= 3)
+                if (pos_cnt >= 4)
                 {
-                    categorical_run_chisq(pos_arr[0], pos_arr[1], pos_arr[2], &log);
+                    succ = categorical_run_chisq(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], &log);
                 }
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LM))
