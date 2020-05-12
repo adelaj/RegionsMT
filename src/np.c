@@ -247,7 +247,8 @@ size_t Strnlen(const char *str, size_t len)
     return end ? (size_t) (end - str) : len;
 }
 
-size_t Strchrnul(const char *str, int ch)
+// Similar to BSD 'strchrnul', but returns index instead of pointer. Index is set to length if character not found
+size_t Strchrnull(const char *str, int ch)
 {
     return strcspn(str, (const char [2]) { (char) ch });
 }

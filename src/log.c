@@ -505,7 +505,7 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
     for (size_t i = 0, len = *p_cnt, tmp = len, pos = 0, off = 0; ++i;) switch (i)
     {
     case 1:
-        off = Strchrnul(fmt + pos, '%');
+        off = Strchrnull(fmt + pos, '%');
         if (fmt[pos + off])
         {
             print(buff + cnt, &len, fmt + pos, off, 0);

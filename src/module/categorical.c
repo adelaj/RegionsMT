@@ -13,22 +13,31 @@
 
 struct phen_context {
     const char *name;
+    size_t name_len, name_base_len;
     struct str_tbl_handler_context handler_context;
-    size_t cap, col, cur;
+    size_t cap, col_phen, col_filter, col_cur;
+    uint8_t *filter;
 };
 
 
-static bool str_tbl_handler_na(const char *str, size_t len, void *p_Off, void *Context)
+static bool filter_handler(const char *str, size_t len, void *p_Off, void *Context)
 {
-    if (strcmp(str, "NA")) str_tbl_handler(str, len, p_Off, Context);
-    else str_tbl_handler("", 0, p_Off, Context);
+    (void) Context;
+    if (!len ||
+        STREQ(str, len, "0", strncmp) ||
+        STREQ(str, len, "na", Strnicmp) || 
+        STREQ(str, len, "false", Strnicmp)) *(uint8_t *) p_Off = 0;
+    return 1;
 }
 
 static bool phen_test(const char *str, size_t len, void *ptr, void *Context)
 {
     (void) ptr;
     struct phen_context *context = Context;
-    if (!strcmp(str, context->name)) context->col = context->cur;
+    if (STRNEQ(str, len, context->name, context->name_base_len, strncmp)) 
+        context->col_phen = context->col_cur;
+    else if (context->name[context->name_base_len] && STRNEQ(str, len, context->name + context->name_base_len + 1, context->name_len - context->name_base_len - 1, strncmp)) 
+        context->col_filter = context->col_cur;
     return 1;
 }
 
@@ -37,17 +46,23 @@ static bool tbl_phen_selector(struct tbl_col *cl, size_t row, size_t col, void *
     struct phen_context *context = Context;
     if (!row)
     {
-        context->cur = col;
-        *cl = (struct tbl_col) { .handler = {.read = { phen_test } }, .context = context };
+        context->col_cur = col;
+        *cl = (struct tbl_col) { .handler = { .read = { phen_test } }, .context = context };
         return 1;
     }
-    if (context->col == SIZE_MAX || col != context->col)
+    if ((context->col_phen != SIZE_MAX && context->col_phen == col) || 
+        (context->col_filter != SIZE_MAX && context->col_filter == col))
     {
-        cl->handler.read = NULL;
-        return 1;
+        struct array_result res = array_test(tbl, &context->cap, sizeof(size_t), 0, 0, row, 1);
+        if (!res.status) return 0;
+        if (res.status != ARRAY_UNTOUCHED && !array_init(&context->filter, NULL, row + 1, sizeof(*context->filter), 0, ARRAY_REALLOC | ARRAY_FAILSAFE).status) return 0;
+        context->filter[row] = 1;
+        if (context->col_phen == col) 
+            *cl = (struct tbl_col) { .handler = {.read = str_tbl_handler }, .ptr = *(size_t **) tbl + row, .context = &context->handler_context };
+        else 
+            *cl = (struct tbl_col) { .handler = {.read = filter_handler }, .ptr = context->filter + row };
     }
-    if (!array_test(tbl, &context->cap, sizeof(size_t), 0, 0, row, 1).status) return 0;
-    *cl = (struct tbl_col) { .handler = { .read = str_tbl_handler_na }, .ptr = *(size_t **) tbl + row, .context = &context->handler_context };
+    else cl->handler.read = NULL;
     return 1;
 }
 
@@ -158,11 +173,12 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
     uint8_t *gen = NULL;
     size_t *phen = NULL;
     FILE *f = NULL;
-    struct phen_context phen_context = { .col = SIZE_MAX };
+    size_t name_base_len = Strchrnull(phen_name, '|'), name_len = name_base_len + strlen(phen_name + name_base_len);
+    struct phen_context phen_context = { .col_phen = SIZE_MAX, .col_filter = SIZE_MAX, .name = phen_name, .name_len = name_len, .name_base_len = name_base_len };
     size_t phen_skip = 0, phen_cnt = 0, phen_length = 0;
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
 
-    if (phen_context.col == SIZE_MAX)
+    if (phen_context.col_phen == SIZE_MAX)
     {
         log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Unable to find phenotype %~'\"s in the file %~'\"P!\n", phen_name, path_phen);
         goto error;
@@ -187,6 +203,9 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
     }
 
     if (!categorical_init(&supp, phen_cnt, phen_ucnt)) goto error;
+
+    // Applying phenotype filter
+    for (size_t i = 0; i < phen_cnt; i++) if (!phen_context.filter[i]) phen[i] = SIZE_MAX;
 
     for (size_t i = 0; i < snp_cnt; i++)
     {
@@ -213,7 +232,8 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
     size_t *phen = NULL;
     FILE *f = NULL;
     struct interval *top_hit = NULL;
-    struct phen_context phen_context = { .name = phen_name, 0 };
+    size_t name_base_len = Strchrnull(phen_name, '|'), name_len = name_base_len + strlen(phen_name + name_base_len);
+    struct phen_context phen_context = { .col_phen = SIZE_MAX, .col_filter = SIZE_MAX, .name = phen_name, .name_len = name_len, .name_base_len = name_base_len };
     size_t phen_skip = 1, phen_cnt = 0, phen_length = 0;
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
 
@@ -258,6 +278,9 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
     }
 
     if (!maver_adj_init(&supp, wnd, phen_cnt, phen_ucnt)) goto error;
+
+    // Applying phenotype filter
+    for (size_t i = 0; i < phen_cnt; i++) if (!phen_context.filter[i]) phen[i] = SIZE_MAX;
 
     for (size_t i = 0; i < top_hit_cnt; i++)
     {

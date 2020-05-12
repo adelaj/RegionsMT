@@ -85,7 +85,7 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                     str = argv[i] + 2;
                     if (*str)
                     {
-                        len = Strchrnul(str, '=');
+                        len = Strchrnull(str, '=');
                         if (!selector(&par, str, len, res, context, 0)) log_message_warning_argv_name(log, CODE_METRIC, i, ARGV_INVALID_PAR, 0, str, len);
                         else
                         {
