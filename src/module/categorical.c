@@ -53,10 +53,10 @@ static bool tbl_phen_selector(struct tbl_col *cl, size_t row, size_t col, void *
     if ((context->col_phen != SIZE_MAX && context->col_phen == col) || 
         (context->col_filter != SIZE_MAX && context->col_filter == col))
     {
-        struct array_result res = array_test(tbl, &context->cap, sizeof(size_t), 0, 0, row, 1);
+        struct array_result res = array_test(tbl, &context->cap, sizeof(size_t), 0, 0, row);
         if (!res.status) return 0;
-        if (res.status != ARRAY_UNTOUCHED && !array_init(&context->filter, NULL, row + 1, sizeof(*context->filter), 0, ARRAY_REALLOC | ARRAY_FAILSAFE).status) return 0;
-        context->filter[row] = 1;
+        if (res.status != ARRAY_UNTOUCHED && !array_init(&context->filter, NULL, row, sizeof(*context->filter), 0, ARRAY_REALLOC | ARRAY_FAILSAFE).status) return 0;
+        context->filter[--row] = 1;
         if (context->col_phen == col) 
             *cl = (struct tbl_col) { .handler = {.read = str_tbl_handler }, .ptr = *(size_t **) tbl + row, .context = &context->handler_context };
         else 
@@ -177,6 +177,7 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
     struct phen_context phen_context = { .col_phen = SIZE_MAX, .col_filter = SIZE_MAX, .name = phen_name, .name_len = name_len, .name_base_len = name_base_len };
     size_t phen_skip = 0, phen_cnt = 0, phen_length = 0;
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
+    if (phen_cnt) --phen_cnt;
 
     if (phen_context.col_phen == SIZE_MAX)
     {
@@ -218,6 +219,7 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
 error:
     categorical_close(&supp);
     Fclose(f);
+    free(phen_context.filter);
     free(phen_context.handler_context.str);
     free(phen);
     free(gen);
@@ -236,6 +238,13 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
     struct phen_context phen_context = { .col_phen = SIZE_MAX, .col_filter = SIZE_MAX, .name = phen_name, .name_len = name_len, .name_base_len = name_base_len };
     size_t phen_skip = 1, phen_cnt = 0, phen_length = 0;
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
+    if (phen_cnt) --phen_cnt;
+
+    if (phen_context.col_phen == SIZE_MAX)
+    {
+        log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Unable to find phenotype %~'\"s in the file %~'\"P!\n", phen_name, path_phen);
+        goto error;
+    }
 
     uintptr_t *phen_ptr;
     if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str).status) goto error;
