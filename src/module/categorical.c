@@ -47,7 +47,7 @@ static bool tbl_phen_selector(struct tbl_col *cl, size_t row, size_t col, void *
     if (!row)
     {
         context->col_cur = col;
-        *cl = (struct tbl_col) { .handler = { .read = { phen_test } }, .context = context };
+        *cl = (struct tbl_col) { .handler = { .read = phen_test }, .context = context };
         return 1;
     }
     if ((context->col_phen != SIZE_MAX && context->col_phen == col) || 
@@ -58,9 +58,9 @@ static bool tbl_phen_selector(struct tbl_col *cl, size_t row, size_t col, void *
         if (res.status != ARRAY_UNTOUCHED && !array_init(&context->filter, NULL, row, sizeof(*context->filter), 0, ARRAY_REALLOC | ARRAY_FAILSAFE).status) return 0;
         context->filter[--row] = 1;
         if (context->col_phen == col) 
-            *cl = (struct tbl_col) { .handler = {.read = str_tbl_handler }, .ptr = *(size_t **) tbl + row, .context = &context->handler_context };
+            *cl = (struct tbl_col) { .handler = { .read = str_tbl_handler }, .ptr = *(size_t **) tbl + row, .context = &context->handler_context };
         else 
-            *cl = (struct tbl_col) { .handler = {.read = filter_handler }, .ptr = context->filter + row };
+            *cl = (struct tbl_col) { .handler = { .read = filter_handler }, .ptr = context->filter + row };
     }
     else cl->handler.read = NULL;
     return 1;
