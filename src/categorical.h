@@ -25,7 +25,7 @@ struct categorical_res {
 
 struct maver_adj_supp {
     uint8_t *phen_bits;
-    size_t *filter, *tbl, *phen_mar, *phen_perm, *outer;
+    size_t *filter, *tbl, *phen_mar, *phen_perm, *phen_filter, *outer;
     struct categorical_snp_data *snp_data;    
 };
 

@@ -594,6 +594,7 @@ DECLARE_STABLE_CMP_ASC(flt64, _abs)
 DECLARE_FLT64_STABLE_CMP_NAN(_dsc, _CMP_NLE_UQ)
 DECLARE_FLT64_STABLE_CMP_NAN(_asc, _CMP_NGE_UQ)
 
+// Returns zero for NaN!
 int flt64_sign(double x)
 {
     __m128i res = _mm_castpd_si128(_mm_cmpgt_pd(_mm_set_sd(x), _mm_set_pd(x, 0)));

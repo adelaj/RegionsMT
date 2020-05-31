@@ -159,6 +159,7 @@ bool maver_adj_init(struct maver_adj_supp *supp, size_t snp_cnt, size_t phen_cnt
 
     *supp = (struct maver_adj_supp) { 0 };
     if (array_init(&supp->phen_perm, NULL, phen_cnt, sizeof(*supp->phen_perm), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
+        array_init(&supp->phen_filter, NULL, phen_cnt, sizeof(*supp->phen_filter), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
         array_init(&supp->phen_mar, NULL, phen_cnt, sizeof(*supp->phen_mar), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
         array_init(&supp->phen_bits, NULL, UINT8_CNT(phen_ucnt), sizeof(*supp->phen_bits), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
         array_init(&supp->snp_data, NULL, snp_cnt, sizeof(*supp->snp_data), 0, ARRAY_STRICT).status &&
@@ -173,6 +174,7 @@ bool maver_adj_init(struct maver_adj_supp *supp, size_t snp_cnt, size_t phen_cnt
 void maver_adj_close(struct maver_adj_supp *supp)
 {
     free(supp->phen_perm);
+    free(supp->phen_filter);
     free(supp->phen_mar);
     free(supp->phen_bits);
     free(supp->snp_data);
@@ -184,7 +186,7 @@ void maver_adj_close(struct maver_adj_supp *supp)
 static size_t filter_init(size_t *filter, uint8_t *gen, size_t *phen, size_t phen_cnt)
 {
     size_t cnt = 0;
-    for (size_t i = 0; i < phen_cnt; i++) if (gen[i] < GEN_CNT && phen[i] != SIZE_MAX) filter[cnt++] = i;
+    for (size_t i = 0; i < phen_cnt; i++) if ((!gen || gen[i] < GEN_CNT) && phen[i] != SIZE_MAX) filter[cnt++] = i;
     return cnt;
 }
 
@@ -313,14 +315,14 @@ double qas_fisher(size_t *tbl, size_t *xval, size_t *yval, size_t *xmar, size_t 
     return sqrt((b + a) / (b - a)); // lqas = .5 * (log10(b + a) - log10(b - a))
 }
 
-static void perm_init(size_t *perm, size_t cnt, gsl_rng *rng)
+static void perm_init(size_t *perm, size_t *filter, size_t cnt, gsl_rng *rng)
 {
     for (size_t i = 0; i + 1 < cnt; i++) // Performing 'Knuth shuffle'
     {
-        size_t j = i + (size_t) floor(gsl_rng_uniform(rng) * (cnt - i));
-        size_t swp = perm[i];
-        perm[i] = perm[j];
-        perm[j] = swp;
+        size_t j = i + (size_t) floor(gsl_rng_uniform(rng) * (cnt - i)), fi = filter[i], fj = filter[j];
+        size_t swp = perm[fi];
+        perm[fi] = perm[fj];
+        perm[fj] = swp;
     }
 }
 
@@ -390,12 +392,12 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
 
     //  Initialization
     double density[ALT_CNT] = { 0. };
-    size_t density_cnt[ALT_CNT] = { 0 };
+    size_t density_cnt[ALT_CNT] = { 0 }, phen_filter_cnt = filter_init(supp->phen_filter, NULL, phen, phen_cnt);
 
     for (size_t i = 0, off = 0; i < snp_cnt; i++, off += phen_cnt)
     {
         // Initializing genotype/phenotype filter
-        size_t cnt = filter_init(supp->filter + off, gen + off, phen, phen_cnt);
+        size_t cnt = filter_init(supp->filter + off, gen + off, phen, phen_cnt); // 'supp->filter' is a subset of 'supp->phen_filter'
         if (!cnt) continue;
         supp->snp_data[i].cnt = cnt;
 
@@ -425,7 +427,9 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
             memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
             mar_init(supp->tbl, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, supp->snp_data[i].mar + j, gen_pop_cnt, phen_pop_cnt);
             outer_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-            density[j] += -log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt)); /* -log10() */
+            double st = log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt)); /* log10(...) */
+            if (isnan(st)) continue;
+            density[j] -= st;
             density_cnt[j]++;            
         }
     }     
@@ -443,8 +447,8 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
         if (!alt_any) break;
 
         // Generating random permutation
-        memcpy(supp->phen_perm, phen, phen_cnt * sizeof(*supp->phen_perm));
-        perm_init(supp->phen_perm, phen_cnt, rng);
+        for (size_t i = 0; i < phen_filter_cnt; i++) supp->phen_perm[supp->phen_filter[i]] = phen[supp->phen_filter[i]];
+        perm_init(supp->phen_perm, supp->phen_filter, phen_filter_cnt, rng);
         
         // Density computation
         double density_perm[ALT_CNT] = { 0. };
@@ -476,7 +480,9 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
                 memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
                 ymar_init(supp->tbl, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
                 outer_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-                density_perm[j] += stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt);
+                double st = log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt)); /* log10(...) */
+                if (isnan(st)) continue;
+                density_perm[j] -= st;
                 density_perm_cnt[j]++;
             }
         }

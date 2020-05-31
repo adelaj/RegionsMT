@@ -55,7 +55,7 @@ static bool tbl_phen_selector(struct tbl_col *cl, size_t row, size_t col, void *
     {
         struct array_result res = array_test(tbl, &context->cap, sizeof(size_t), 0, 0, row);
         if (!res.status) return 0;
-        if (res.status != ARRAY_UNTOUCHED && !array_init(&context->filter, NULL, row, sizeof(*context->filter), 0, ARRAY_REALLOC | ARRAY_FAILSAFE).status) return 0;
+        if (res.status != ARRAY_UNTOUCHED && !array_init(&context->filter, NULL, row, sizeof(*context->filter), 0, ARRAY_REALLOC).status) return 0;
         context->filter[--row] = 1;
         if (context->col_phen == col) 
             *cl = (struct tbl_col) { .handler = { .read = str_tbl_handler }, .ptr = *(size_t **) tbl + row, .context = &context->handler_context };
@@ -107,22 +107,31 @@ bool tbl_gen_selector2(struct tbl_col *cl, size_t row, size_t col, void *tbl, vo
 }
 
 struct interval { size_t left; size_t right; };
+struct top_hit { struct interval interval; uint8_t bits; size_t v_ind, radius_ind; };
+
 
 static bool tbl_top_hit_selector(struct tbl_col *cl, size_t row, size_t col, void *tbl, void *p_Cap)
 {
-    if (col < 2)
+    if (!array_test(tbl, p_Cap, sizeof(struct top_hit), 0, 0, row, 1).status) return 0;
+    switch (col)
     {
+    case 0: // radius_ind
+        *cl = (struct tbl_col) { .handler = { .read = size_handler }, .ptr = &(*(struct top_hit **) tbl)[row].radius_ind };
+        break;
+    case 1: //v_ind
+        *cl = (struct tbl_col) { .handler = { .read = size_handler }, .ptr = &(*(struct top_hit **) tbl)[row].v_ind };
+        break;
+    case 2: // bits
+        *cl = (struct tbl_col) { .handler = { .read = uint8_handler }, .ptr = &(*(struct top_hit **) tbl)[row].bits };
+        break;
+    case 3: // left
+        *cl = (struct tbl_col) { .handler = { .read = size_handler }, .ptr = &(*(struct top_hit **) tbl)[row].interval.left };    
+        break;
+    case 4: // right
+        *cl = (struct tbl_col) { .handler = { .read = size_handler }, .ptr = &(*(struct top_hit **) tbl)[row].interval.right };
+        break;
+    default:
         cl->handler.read = NULL;
-        return 1;
-    }
-    else if (col == 2)
-    {
-        if (!array_test(tbl, p_Cap, sizeof(struct interval), 0, 0, row, 1).status) return 0;
-        *cl = (struct tbl_col) { .handler = { .read = size_handler }, .ptr = &(*(struct interval **) tbl)[row].left };
-    }
-    else if (col == 3)
-    {
-        *cl = (struct tbl_col) { .handler = { .read = size_handler }, .ptr = &(*(struct interval **) tbl)[row].right };
     }
     return 1;
 }
@@ -155,14 +164,22 @@ bool append_out(const char *path_out, struct maver_adj_res res, struct log *log)
 }
 */
 
+static void print_na(FILE *f, double x, const char *c)
+{
+    if (isnan(x)) fprintf(f, "NA%s", c);
+    else
+    {
+        if (isinf(x)) x = x > 0 ? DBL_MAX : -DBL_MAX;
+        fprintf(f, "%.15e%s", x, c);
+    }
+}
+
 void print_cat(FILE *f, struct categorical_res x)
 {
     for (size_t i = 0; i < 4; i++)
     {
-        if (isfinite(x.pv[i])) fprintf(f, "%.15e,", x.pv[i]);
-        else fprintf(f, "NA,");
-        if (isfinite(x.qas[i])) fprintf(f, "%.15e\n", x.qas[i]);
-        else fprintf(f, "NA\n");
+        print_na(f, x.pv[i], ",");
+        print_na(f, x.qas[i], "\n");
     }
 }
 
@@ -208,12 +225,14 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
     // Applying phenotype filter
     for (size_t i = 0; i < phen_cnt; i++) if (!phen_context.filter[i]) phen[i] = SIZE_MAX;
 
+    uint64_t t0 = get_time();
     for (size_t i = 0; i < snp_cnt; i++)
     {
         struct categorical_res x = categorical_impl(&supp, gen + i * phen_cnt, phen, phen_cnt, phen_ucnt, 15);
         print_cat(f, x);
         //fflush(f);
     }
+    log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Categorical test computation took %~T.\n", t0, get_time());
     succ = 1;
 
 error:
@@ -233,7 +252,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
     gsl_rng *rng = NULL;    
     size_t *phen = NULL;
     FILE *f = NULL;
-    struct interval *top_hit = NULL;
+    struct top_hit *top_hit = NULL;
     size_t name_base_len = Strchrnull(phen_name, '|'), name_len = name_base_len + strlen(phen_name + name_base_len);
     struct phen_context phen_context = { .col_phen = SIZE_MAX, .col_filter = SIZE_MAX, .name = phen_name, .name_len = name_len, .name_base_len = name_base_len };
     size_t phen_skip = 1, phen_cnt = 0, phen_length = 0;
@@ -268,7 +287,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
     size_t wnd = 0;
     for (size_t i = 0; i < top_hit_cnt; i++)
     {
-        size_t left = top_hit[i].left - 1, right = top_hit[i].right - 1;
+        size_t left = top_hit[i].interval.left - 1, right = top_hit[i].interval.right - 1;
         if (left > right || right >= snp_cnt)
             log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Wrong interval: %~zu:%~zu!\n", left, right);
         else
@@ -291,24 +310,28 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
     // Applying phenotype filter
     for (size_t i = 0; i < phen_cnt; i++) if (!phen_context.filter[i]) phen[i] = SIZE_MAX;
 
+    char buff[256];
     for (size_t i = 0; i < top_hit_cnt; i++)
     {
-        size_t left = top_hit[i].left - 1, right = top_hit[i].right - 1;
+        size_t left = top_hit[i].interval.left - 1, right = top_hit[i].interval.right - 1;
         if (left > right || right >= snp_cnt) continue;
 
         uint64_t t0 = get_time();
-        struct maver_adj_res x = maver_adj_impl(&supp, gen + left * phen_cnt, phen, right - left + 1, phen_cnt, phen_ucnt, rpl, 10, rng, 15);
+        struct maver_adj_res x = maver_adj_impl(&supp, gen + left * phen_cnt, phen, right - left + 1, phen_cnt, phen_ucnt, rpl, 10, rng, top_hit[i].bits);
         //log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value for window %uz:%uz no. %uz: "
         //    "[%s] %f, %uz; [%s] %f, %uz; [%s] %f, %uz; [%s] %f, %uz.\n",
         //    left + 1, right + 1, i + 1,
         //    "CD", x.nlpv[0], x.rpl[0], "R", x.nlpv[1], x.rpl[1], "D", x.nlpv[2], x.rpl[2], "A", x.nlpv[3], x.rpl[3]);
         uint64_t t1 = get_time();
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation took %~T.\n", t0, t1);
-
-        int64_t diff = t1 - t0, hdq = diff / 3600000000, hdr = diff % 3600000000, mdq = hdr / 60000000, mdr = hdr % 60000000;
-        double sec = 1.e-6 * (double) mdr;
-        fprintf(f, "%zu,%.15e,%zu,%.15e,%zu,%.15e,%zu,%.15e,%zu,%" PRId64 " hr %" PRId64 " min %.6f sec\n",
-            i + 1, x.pv[0], x.rpl[0], x.pv[1], x.rpl[1], x.pv[2], x.rpl[2], x.pv[3], x.rpl[3], hdq, mdq, sec);
+        
+        for (size_t j = 0, b = 1; j < 4; j++, b <<= 1) if (top_hit[i].bits & b)
+        {
+            fprintf(f, "%zu,%zu,", top_hit[i].radius_ind, top_hit[i].v_ind + j);
+            print_na(f, x.pv[j], "\n");
+        }
+        
+        int len = snprintf(buff, sizeof(buff), "[CD] %.15e; [R] %.15e; [D] %.15e; [A] %.15e.", x.pv[0], x.pv[1], x.pv[2], x.pv[3]);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation for window %~uz:%~uz took %~T. Results:\n    %s*\n", left, right, t0, t1, buff, len);
         fflush(f);
     }
     
