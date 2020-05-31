@@ -24,7 +24,6 @@ matrix:
                   - lld
         env:
           - CMAKE=/usr/bin/cmake
-          - TOOLCHAIN=clang:clang-8
           - MATRIX=`echo {clang,gcc}:{x86_64,i386}:{Debug,Release}`
         script:
           - make --warn-undefined-variables -R -j all
