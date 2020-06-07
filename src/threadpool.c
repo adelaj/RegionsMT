@@ -172,7 +172,7 @@ void thread_pool_schedule(struct thread_pool *pool)
 {
     for (;;)
     {
-        // Lock the queue and the dispatch array
+        // Locking the queue and the dispatch array
         spinlock_acquire(&pool->spinlock);
 
         // Checking queue
@@ -236,7 +236,7 @@ void thread_pool_schedule(struct thread_pool *pool)
             else if (orphan) bool_store_release(&dispatched_task->norphan, 1);
         }
 
-        // Unlock the queue and the dispatch array
+        // Unlocking the queue and the dispatch array
         spinlock_release(&pool->spinlock);
 
         // Dispatch task to a thread

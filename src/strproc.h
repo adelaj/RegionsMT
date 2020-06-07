@@ -16,7 +16,7 @@ struct strl {
 
 #define STRL(STRL) (STRL).str, (STRL).len
 #define STRNEQ(STRA, LENA, STR, LEN, BACKEND) (((LEN) == (LENA)) && !(BACKEND((STRA), (STR), (LENA))))
-#define STREQ(STRA, LENA, STR, BACKEND) STRNEQ((STRA), (LENA), (STR), lengthof(STR), (BACKEND)) // Do not replace with STRC(STR)!
+#define STREQ(STRA, LENA, STR, BACKEND) STRNEQ((STRA), (LENA), (STR), lengthof(STR), (BACKEND)) // Do not replace '(STR), lengthof(STR)' with 'STRC(STR)'!
 #define STRLEQ(STRLA, STR, BACKEND) STREQ(STRL(STRLA), (STR), (BACKEND))
 #define STRLNEQ(STRLA, STR, LEN, BACKEND) STRNEQ(STRL(STRLA), (STR), (LEN), (BACKEND))
 

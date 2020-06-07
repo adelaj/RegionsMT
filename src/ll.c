@@ -7,35 +7,35 @@
 #if defined __GNUC__ || defined __clang__
 
 #   define DECLARE_LOAD_ACQUIRE(TYPE, PREFIX) \
-        TYPE PREFIX ## _load_acquire(TYPE volatile *src) \
+        TYPE PREFIX ## _load_acquire(volatile void *src) \
         { \
-            return __atomic_load_n(src, __ATOMIC_ACQUIRE); \
+            return __atomic_load_n((TYPE volatile *) src, __ATOMIC_ACQUIRE); \
         }
   
 #   define DECLARE_STORE_RELEASE(TYPE, PREFIX) \
-        void PREFIX ## _store_release(TYPE volatile *dst, TYPE val) \
+        void PREFIX ## _store_release(volatile void *dst, TYPE val) \
         { \
-            __atomic_store_n(dst, val, __ATOMIC_RELEASE); \
+            __atomic_store_n((TYPE volatile *) dst, val, __ATOMIC_RELEASE); \
         }
 
 #   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX) \
-        TYPE PREFIX ## _interlocked_compare_exchange(TYPE volatile *dst, TYPE cmp, TYPE xchg) \
+        TYPE PREFIX ## _interlocked_compare_exchange(volatile void *dst, TYPE cmp, TYPE xchg) \
         { \
-            __atomic_compare_exchange_n(dst, &cmp, xchg, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE); \
+            __atomic_compare_exchange_n((TYPE volatile *) dst, &cmp, xchg, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE); \
             return cmp;\
         }
 
 #   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE_ACQUIRE(TYPE, PREFIX) \
-        TYPE PREFIX ## _interlocked_compare_exchange_acquire(TYPE volatile *dst, TYPE cmp, TYPE xchg) \
+        TYPE PREFIX ## _interlocked_compare_exchange_acquire(volatile void *dst, TYPE cmp, TYPE xchg) \
         { \
-            __atomic_compare_exchange_n(dst, &cmp, xchg, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED); \
+            __atomic_compare_exchange_n((TYPE volatile *) dst, &cmp, xchg, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED); \
             return cmp;\
         }
 
 #   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND) \
-        TYPE PREFIX ## _interlocked_ ## SUFFIX(TYPE volatile *dst, TYPE arg) \
+        TYPE PREFIX ## _interlocked_ ## SUFFIX(volatile void *dst, TYPE arg) \
         { \
-            return BACKEND(dst, arg, __ATOMIC_ACQ_REL); \
+            return BACKEND((TYPE volatile *) dst, arg, __ATOMIC_ACQ_REL); \
         }
 
 static DECLARE_LOAD_ACQUIRE(int, spinlock)
@@ -100,26 +100,26 @@ size_t size_pop_cnt(size_t x)
 
 // Acquire semantics imposed by volatility. Should be used only with '/volatile:ms' option
 #   define DECLARE_LOAD_ACQUIRE(TYPE, PREFIX) \
-        TYPE PREFIX ## _load_acquire(TYPE volatile *src) \
+        TYPE PREFIX ## _load_acquire(volatile void *src) \
         { \
-            return *src; \
+            return *(TYPE volatile *) src; \
         }
 
 // Release semantics imposed by volatility. Should be used only with '/volatile:ms' option
 #   define DECLARE_STORE_RELEASE(TYPE, PREFIX) \
-        void PREFIX ## _store_release(TYPE volatile *dst, TYPE val) \
+        void PREFIX ## _store_release(volatile void *dst, TYPE val) \
         { \
-            *dst = val; \
+            *(TYPE volatile *) dst = val; \
         }
 
 #   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX, BACKEND_CAST, BACKEND, SUFFIX) \
-        TYPE PREFIX ## _interlocked_compare_exchange ## SUFFIX(TYPE volatile *dst, TYPE cmp, TYPE xchg) \
+        TYPE PREFIX ## _interlocked_compare_exchange ## SUFFIX(volatile void *dst, TYPE cmp, TYPE xchg) \
         { \
             return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, xchg, cmp);\
         }
 
 #   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND_CAST, BACKEND) \
-        TYPE PREFIX ## _interlocked_ ## SUFFIX(TYPE volatile *dst, TYPE arg) \
+        TYPE PREFIX ## _interlocked_ ## SUFFIX(volatile void *dst, TYPE arg) \
         { \
             return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, arg); \
         }

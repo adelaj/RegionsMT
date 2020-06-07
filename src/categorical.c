@@ -447,9 +447,10 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
         if (!alt_any) break;
 
         // Generating random permutation
-        for (size_t i = 0; i < phen_filter_cnt; i++) supp->phen_perm[supp->phen_filter[i]] = phen[supp->phen_filter[i]];
+        if (phen_cnt == phen_filter_cnt) memcpy(supp->phen_perm, phen, phen_cnt * sizeof(*supp->phen_perm));
+        else for (size_t i = 0; i < phen_filter_cnt; i++) supp->phen_perm[supp->phen_filter[i]] = phen[supp->phen_filter[i]];
         perm_init(supp->phen_perm, supp->phen_filter, phen_filter_cnt, rng);
-        
+                
         // Density computation
         double density_perm[ALT_CNT] = { 0. };
         size_t density_perm_cnt[ALT_CNT] = { 0 };

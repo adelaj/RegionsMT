@@ -34,22 +34,22 @@ _Static_assert((BIT_TEST2_MASK01 | BIT_TEST2_MASK10) == UINT8_MAX, "Wrong consta
 #define UINT32_BIT (sizeof(uint32_t) * CHAR_BIT)
 #define UINT64_BIT (sizeof(uint64_t) * CHAR_BIT)
 
-bool bool_load_acquire(volatile bool *);
-void bool_store_release(volatile bool *, bool);
-uint8_t uint8_load_acquire(volatile uint8_t *);
-uint16_t uint16_load_acquire(volatile uint16_t *);
-uint32_t uint32_load_acquire(volatile uint32_t *);
-uint64_t uint64_load_acquire(volatile uint64_t *);
-size_t size_load_acquire(volatile size_t *);
-void size_store_release(volatile size_t *, size_t);
-void ptr_store_release(void *volatile *, void *);
+bool bool_load_acquire(volatile void *);
+void bool_store_release(volatile void *, bool);
+uint8_t uint8_load_acquire(volatile void *);
+uint16_t uint16_load_acquire(volatile void *);
+uint32_t uint32_load_acquire(volatile void *);
+uint64_t uint64_load_acquire(volatile void *);
+size_t size_load_acquire(volatile void *);
+void size_store_release(volatile void *, size_t);
+void ptr_store_release(volatile void*, void *);
 
-uint8_t uint8_interlocked_or(volatile uint8_t *, uint8_t);
-uint16_t uint16_interlocked_or(volatile uint16_t *, uint16_t);
-uint8_t uint8_interlocked_and(volatile uint8_t *, uint8_t);
-uint16_t uint16_interlocked_and(volatile uint16_t *, uint16_t);
-void *ptr_interlocked_compare_exchange(void *volatile *, void *, void *);
-void *ptr_interlocked_exchange(void *volatile *, void *);
+uint8_t uint8_interlocked_or(volatile void *, uint8_t);
+uint16_t uint16_interlocked_or(volatile void *, uint16_t);
+uint8_t uint8_interlocked_and(volatile void *, uint8_t);
+uint16_t uint16_interlocked_and(volatile void *, uint16_t);
+void *ptr_interlocked_compare_exchange(volatile void *, void *, void *);
+void *ptr_interlocked_exchange(volatile void *, void *);
 
 size_t size_add(size_t *, size_t, size_t);
 size_t size_sub(size_t *, size_t, size_t);

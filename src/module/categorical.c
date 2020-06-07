@@ -183,6 +183,11 @@ void print_cat(FILE *f, struct categorical_res x)
     }
 }
 
+void phen_filter_na(const size_t *phen, const char *str, size_t cnt, uint8_t *filter)
+{
+    for (size_t i = 0; i < cnt; i++) if (filter[i] && !Stricmp(str + phen[i], "na")) filter[i] = 0;
+}
+
 bool categorical_run_chisq(const char *phen_name, const char *path_phen, const char *path_gen, const char *path_out, struct log *log)
 {
     bool succ = 0;
@@ -198,9 +203,12 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
 
     if (phen_context.col_phen == SIZE_MAX)
     {
-        log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Unable to find phenotype %~'\"s in the file %~'\"P!\n", phen_name, path_phen);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Unable to find phenotype %~'\"s in the file %~'\"P!\n", phen_name, path_phen);
         goto error;
     }
+
+    // Filter out 'NA' before any destructive operations with 'phen'
+    phen_filter_na(phen, phen_context.handler_context.str, phen_cnt, phen_context.filter);
 
     uintptr_t *phen_ptr;
     if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str).status) goto error;
@@ -255,6 +263,16 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
     struct top_hit *top_hit = NULL;
     size_t name_base_len = Strchrnull(phen_name, '|'), name_len = name_base_len + strlen(phen_name + name_base_len);
     struct phen_context phen_context = { .col_phen = SIZE_MAX, .col_filter = SIZE_MAX, .name = phen_name, .name_len = name_len, .name_base_len = name_base_len };
+    size_t top_hit_cap = 0;
+    size_t top_hit_skip = 0, top_hit_cnt = 0, top_hit_length = 0;
+    if (!tbl_read(path_top_hit, 0, tbl_top_hit_selector, NULL, &top_hit_cap, &top_hit, &top_hit_skip, &top_hit_cnt, &top_hit_length, ',', log)) goto error;
+
+    if (!top_hit_cnt)
+    {
+        log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Nothing to be done for the file %~'\"P!\n", path_top_hit);
+        goto error;
+    }
+
     size_t phen_skip = 0, phen_cnt = 0, phen_length = 0;
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
     if (phen_cnt) --phen_cnt;
@@ -265,6 +283,9 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
         goto error;
     }
 
+    // Filter out 'NA' before any destructive operations with 'phen'
+    phen_filter_na(phen, phen_context.handler_context.str, phen_cnt, phen_context.filter);
+
     uintptr_t *phen_ptr;
     if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str).status) goto error;
     size_t phen_ucnt = phen_cnt;
@@ -274,11 +295,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
     struct gen_context gen_context = { .phen_cnt = phen_cnt };
     size_t gen_skip = 0, snp_cnt = 0, gen_length = 0;
     if (!tbl_read(path_gen, 0, tbl_gen_selector2, NULL, &gen_context, &gen, &gen_skip, &snp_cnt, &gen_length, ',', log)) goto error;
-
-    size_t top_hit_cap = 0;
-    size_t top_hit_skip = 0, top_hit_cnt = 0, top_hit_length = 0;
-    if (!tbl_read(path_top_hit, 0, tbl_top_hit_selector, NULL, &top_hit_cap, &top_hit, &top_hit_skip, &top_hit_cnt, &top_hit_length, ',', log)) goto error;
-
+    
     gsl_set_error_handler(gsl_error_a);
     rng = gsl_rng_alloc(gsl_rng_taus);
     if (!rng) goto error;
@@ -331,7 +348,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
         }
         
         int len = snprintf(buff, sizeof(buff), "[CD] %.15e; [R] %.15e; [D] %.15e; [A] %.15e.", x.pv[0], x.pv[1], x.pv[2], x.pv[3]);
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation for window %~uz:%~uz took %~T. Results:\n    %s*\n", left, right, t0, t1, buff, len);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation for window %~uz:%~uz took %~T. Results:\n    %s*\n", top_hit[i].interval.left, top_hit[i].interval.right, t0, t1, buff, len);
         fflush(f);
     }
     
