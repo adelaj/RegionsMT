@@ -183,9 +183,15 @@ void print_cat(FILE *f, struct categorical_res x)
     }
 }
 
+static bool str_is_whitespace(const char *str)
+{
+    for (char ch = *str; ch; ch = *++str) if (ch != ' ' && ch != '\t') return 0;
+    return 1;
+}
+
 void phen_filter_na(const size_t *phen, const char *str, size_t cnt, uint8_t *filter)
 {
-    for (size_t i = 0; i < cnt; i++) if (filter[i] && !Stricmp(str + phen[i], "na")) filter[i] = 0;
+    for (size_t i = 0; i < cnt; i++) if (filter[i] && (str_is_whitespace(str + phen[i]) || !Stricmp(str + phen[i], "na"))) filter[i] = 0;
 }
 
 bool categorical_run_chisq(const char *phen_name, const char *path_phen, const char *path_gen, const char *path_out, struct log *log)
@@ -203,7 +209,7 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
 
     if (phen_context.col_phen == SIZE_MAX)
     {
-        log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Unable to find phenotype %~'\"s in the file %~'\"P!\n", phen_name, path_phen);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Phenotype %~'\"s is unavailable in the file %~'\"P!\n", phen_name, path_phen);
         goto error;
     }
 

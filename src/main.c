@@ -501,7 +501,7 @@ static int Main(int argc, char **argv)
             {
                 if (pos_cnt >= 5)
                 {
-                    lm_expr_test(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], pos_arr[4], &log);
+                    succ = lm_expr_test(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], pos_arr[4], &log);
                 }
             }
             else
