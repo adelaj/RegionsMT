@@ -167,10 +167,23 @@ void size_dec_interlocked(volatile size_t *mem)
     _InterlockedDecrement64((volatile long long *) mem);
 }
 
-size_t size_mul(size_t *p_hi, size_t a, size_t b)
+// Warning! 'y %= 64' is done internally!
+size_t size_shl(size_t *p_hi, size_t x, uint8_t y)
+{
+    *p_hi = (size_t) __shiftleft128((unsigned long long) x, 0, y);
+    return x << y;
+}
+
+size_t size_shr(size_t *p_lo, size_t x, uint8_t y)
+{
+    *p_lo = (size_t) __shiftright128(0, (unsigned long long) x, y);
+    return x >> y;
+}
+
+size_t size_mul(size_t *p_hi, size_t x, size_t y)
 {
     unsigned long long hi;
-    size_t res = (size_t) _umul128((unsigned long long) a, (unsigned long long) b, &hi);
+    size_t res = (size_t) _umul128((unsigned long long) x, (unsigned long long) y, &hi);
     *p_hi = (size_t) hi;
     return res;
 }
@@ -228,6 +241,20 @@ typedef unsigned __int128 Dsize_t;
 #   elif defined _M_IX86 || defined __i386__
 typedef unsigned long long Dsize_t;
 #   endif
+
+size_t size_shl(size_t *p_hi, size_t x, uint8_t y)
+{
+    Dsize_t val = (Dsize_t) x << (y % SIZE_BIT);
+    *p_hi = (size_t) (val >> SIZE_BIT);
+    return (size_t) val;
+}
+
+size_t size_shr(size_t *p_lo, size_t x, uint8_t y)
+{
+    Dsize_t val = ((Dsize_t) x << SIZE_BIT) >> (y % SIZE_BIT);
+    *p_lo = (size_t) val;
+    return (size_t) (val >> SIZE_BIT);
+}
 
 size_t size_mul(size_t *p_hi, size_t x, size_t y)
 {

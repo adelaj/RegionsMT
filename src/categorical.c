@@ -25,26 +25,28 @@
 static DECLARE_BITS_INIT(uint8_t, gen)
 static DECLARE_BITS_INIT(size_t, phen)
 
-static size_t gen_pop_cnt_alt_impl(size_t alt, uint8_t *bits, size_t pop_cnt)
+static size_t gen_pop_cnt_alt_impl(enum mt_alt alt, uint8_t *bits, size_t pop_cnt)
 {
     switch (alt)
     {
-    case 0: // codominant
+    case ALT_CD: // codominant
         return pop_cnt;
-    case 1: // recessive
+    case ALT_R: // recessive
         return pop_cnt == 2 ? bits[0] == (1 | 4) || bits[0] == (2 | 4) ? 2 : 1 : MIN(pop_cnt, 2);
-    case 2: // dominant
+    case ALT_D: // dominant
         return pop_cnt == 2 ? bits[0] == (1 | 2) || bits[0] == (1 | 4) ? 2 : 1 : MIN(pop_cnt, 2);
-    default: // allelic
+    case ALT_A: // allelic
         return MIN(pop_cnt, 2);
+    default:;
     }
+    return 0;
 }
 
-static void gen_shuffle_alt_impl(size_t alt, size_t *dst, size_t *src, uint8_t *bits)
+static void gen_shuffle_alt_impl(enum mt_alt alt, size_t *dst, size_t *src, uint8_t *bits)
 {
     switch (alt)
     {
-    case 0: // codominant
+    case ALT_CD: // codominant
         switch (bits[0])
         {
         case (1 | 2 | 4):
@@ -63,7 +65,7 @@ static void gen_shuffle_alt_impl(size_t alt, size_t *dst, size_t *src, uint8_t *
             break;
         }
         break;
-    case 1: // recessive
+    case ALT_R: // recessive
         switch (bits[0])
         {
         case (1 | 2 | 4):
@@ -79,7 +81,7 @@ static void gen_shuffle_alt_impl(size_t alt, size_t *dst, size_t *src, uint8_t *
             break;
         }
         break;
-    case 2: // dominant
+    case ALT_D: // dominant
         switch (bits[0])
         {
         case (1 | 2 | 4):
@@ -96,7 +98,7 @@ static void gen_shuffle_alt_impl(size_t alt, size_t *dst, size_t *src, uint8_t *
             break;
         }
         break;
-    case 3: // allelic
+    case ALT_A: // allelic
         switch (bits[0])
         {
         case (1 | 2 | 4):
@@ -116,6 +118,7 @@ static void gen_shuffle_alt_impl(size_t alt, size_t *dst, size_t *src, uint8_t *
             break;
         }
         break;
+    default:;
     }
 }
 
@@ -124,23 +127,42 @@ struct categorical_snp_data {
     uint8_t gen_bits[UINT8_CNT(GEN_CNT)];
 };
 
-_Static_assert((2 * GEN_CNT * sizeof(size_t)) / 2 / (GEN_CNT) == sizeof(size_t), "Multiplication overflow!");
-_Static_assert((GEN_CNT * sizeof(double)) / GEN_CNT == sizeof(double), "Multiplication overflow!");
-
-bool categorical_init(struct categorical_supp *supp, size_t phen_cnt, size_t phen_ucnt)
+// It is implicitly assumed that 'phen_ucnt <= phen_cnt'
+struct array_result categorical_init(struct categorical_supp *supp, size_t phen_cnt, size_t phen_ucnt)
 {
-    if (phen_ucnt > phen_cnt) return 0; // Wrong parameter    
-    
     *supp = (struct categorical_supp) { 0 };
-    if (array_init(&supp->phen_val, NULL, phen_ucnt, sizeof(*supp->phen_val), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
-        array_init(&supp->phen_mar, NULL, phen_ucnt, sizeof(*supp->phen_mar), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
-        array_init(&supp->phen_bits, NULL, UINT8_CNT(phen_ucnt), sizeof(*supp->phen_bits), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
-        array_init(&supp->filter, NULL, phen_cnt, sizeof(*supp->filter), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
-        array_init(&supp->outer, NULL, phen_ucnt, GEN_CNT * sizeof(*supp->outer), 0, ARRAY_STRICT).status &&
-        array_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->tbl), 0, ARRAY_STRICT).status) return 1;
-
+    struct array_result res = { 0 };
+    for (size_t i = 0, tot = 0;; i++, tot = size_add_sat(tot, res.tot))
+    {
+        switch (i)
+        {
+        case 0:
+            // It is assumed below that user was able to allocate memory at least for the phenotype data before function call
+            res = array_init(&supp->phen_val, NULL, phen_ucnt, sizeof(*supp->phen_val), 0, ARRAY_STRICT | is_failsafe(*supp->phen_val, size_t));
+            break;
+        case 1:
+            res = array_init(&supp->phen_mar, NULL, phen_ucnt, sizeof(*supp->phen_mar), 0, ARRAY_STRICT | is_failsafe(*supp->phen_mar, size_t));
+            break;
+        case 2:
+            res = array_init(&supp->phen_bits, NULL, UINT8_CNT(phen_ucnt), sizeof(*supp->phen_bits), 0, ARRAY_STRICT | is_failsafe(*supp->phen_bits, size_t));
+            break;
+        case 3:
+            res = array_init(&supp->filter, NULL, phen_cnt, sizeof(*supp->filter), 0, ARRAY_STRICT | is_failsafe(*supp->filter, size_t));
+            break;
+        case 4:
+            res = matrix_init(&supp->outer, NULL, phen_ucnt, GEN_CNT, sizeof(*supp->outer), 0, 0, ARRAY_STRICT);
+            break;
+        case 5:
+            res = matrix_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT, sizeof(*supp->tbl), 0, 0, ARRAY_STRICT);
+            break;
+        default:
+            res.tot = tot;
+            return res;
+        }
+        if (!res.status) break;
+    }
     categorical_close(supp);
-    return 1;
+    return res;
 }
 
 void categorical_close(struct categorical_supp *supp)
@@ -153,22 +175,47 @@ void categorical_close(struct categorical_supp *supp)
     free(supp->tbl);
 }
 
-bool maver_adj_init(struct maver_adj_supp *supp, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt)
+// It is implicitly assumed that 'phen_ucnt <= phen_cnt'
+struct array_result maver_adj_init(struct maver_adj_supp *supp, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt)
 {
-    if (phen_ucnt > phen_cnt) return 0; // Wrong parameter
-
     *supp = (struct maver_adj_supp) { 0 };
-    if (array_init(&supp->phen_perm, NULL, phen_cnt, sizeof(*supp->phen_perm), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
-        array_init(&supp->phen_filter, NULL, phen_cnt, sizeof(*supp->phen_filter), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
-        array_init(&supp->phen_mar, NULL, phen_cnt, sizeof(*supp->phen_mar), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
-        array_init(&supp->phen_bits, NULL, UINT8_CNT(phen_ucnt), sizeof(*supp->phen_bits), 0, ARRAY_STRICT | ARRAY_FAILSAFE).status &&
-        array_init(&supp->snp_data, NULL, snp_cnt, sizeof(*supp->snp_data), 0, ARRAY_STRICT).status &&
-        array_init(&supp->filter, NULL, snp_cnt * phen_cnt, sizeof(*supp->filter), 0, ARRAY_STRICT).status && // Result of 'snp_cnt * phen_cnt' is assumed not to be wrapped due to the validness of the 'gen' array
-        array_init(&supp->outer, NULL, phen_ucnt, GEN_CNT * sizeof(*supp->outer), 0, ARRAY_STRICT).status &&
-        array_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT * sizeof(*supp->tbl), 0, ARRAY_STRICT).status) return 1;
-    
+    struct array_result res = { 0 };
+    for (size_t i = 0, tot = 0;; i++, tot = size_add_sat(tot, res.tot))
+    {
+        switch (i)
+        {
+        case 0:
+            res = array_init(&supp->phen_perm, NULL, phen_cnt, sizeof(*supp->phen_perm), 0, ARRAY_STRICT | is_failsafe(*supp->phen_perm, size_t));
+            break;
+        case 1:
+            res = array_init(&supp->phen_filter, NULL, phen_cnt, sizeof(*supp->phen_filter), 0, ARRAY_STRICT | is_failsafe(*supp->phen_filter, size_t));
+            break;
+        case 2:
+            res = array_init(&supp->phen_mar, NULL, phen_cnt, sizeof(*supp->phen_mar), 0, ARRAY_STRICT | is_failsafe(*supp->phen_mar, size_t));
+            break;
+        case 3:
+            res = array_init(&supp->phen_bits, NULL, UINT8_CNT(phen_ucnt), sizeof(*supp->phen_bits), 0, ARRAY_STRICT | is_failsafe(*supp->phen_bits, size_t));
+            break;
+        case 4:
+            res = array_init(&supp->snp_data, NULL, snp_cnt, sizeof(*supp->snp_data), 0, ARRAY_STRICT);
+            break;
+        case 5:
+            res = matrix_init(&supp->filter, NULL, snp_cnt, phen_cnt, sizeof(*supp->filter), 0, 0, ARRAY_STRICT);
+            break;
+        case 6:
+            res = matrix_init(&supp->outer, NULL, phen_ucnt, GEN_CNT, sizeof(*supp->outer), 0, 0, ARRAY_STRICT);
+            break;
+        case 7:
+            res = matrix_init(&supp->tbl, NULL, phen_ucnt, 2 * GEN_CNT, sizeof(*supp->tbl), 0, 0, ARRAY_STRICT);
+            break;
+        default:
+            res.tot = tot;
+            return res;
+        }
+        if (!res.status) break;
+    }    
     maver_adj_close(supp);
-    return 0;
+    return res;
 }
 
 void maver_adj_close(struct maver_adj_supp *supp)
@@ -190,10 +237,10 @@ static size_t filter_init(size_t *filter, uint8_t *gen, size_t *phen, size_t phe
     return cnt;
 }
 
-static size_t gen_pop_cnt_alt_init(size_t *gen_pop_cnt_alt, uint8_t *gen_bits, size_t gen_pop_cnt, enum categorical_flags flags)
+static size_t gen_pop_cnt_alt_init(size_t *gen_pop_cnt_alt, uint8_t *gen_bits, size_t gen_pop_cnt, enum mt_flags flags)
 {
     size_t res = 0;
-    for (size_t i = 0; i < ALT_CNT; i++, flags >>= 1) if (flags & 1)
+    for (enum mt_alt i = 0; i < ALT_CNT; i++, flags >>= 1) if (flags & 1)
     {
         size_t tmp = gen_pop_cnt_alt_impl(i, gen_bits, gen_pop_cnt);
         if (tmp < 2) continue;
@@ -212,7 +259,7 @@ static void contingency_table_init(size_t *tbl, uint8_t *gen, size_t *phen, size
     }
 }
 
-static void contingency_table_shuffle_alt_impl(size_t alt, size_t *dst, size_t *src, uint8_t *gen_bits, size_t gen_pop_cnt, uint8_t *phen_bits, size_t phen_pop_cnt)
+static void contingency_table_shuffle_alt_impl(enum mt_alt alt, size_t *dst, size_t *src, uint8_t *gen_bits, size_t gen_pop_cnt, uint8_t *phen_bits, size_t phen_pop_cnt)
 {
     for (size_t i = 0, j = 0, off = 0; i < phen_pop_cnt; i++, j += GEN_CNT)
     {
@@ -326,9 +373,9 @@ static void perm_init(size_t *perm, size_t *filter, size_t cnt, gsl_rng *rng)
     }
 }
 
-struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *gen, size_t *phen, size_t phen_cnt, size_t phen_ucnt, enum categorical_flags flags)
+struct mt_result categorical_impl(struct categorical_supp *supp, uint8_t *gen, size_t *phen, size_t phen_cnt, size_t phen_ucnt, enum mt_flags flags)
 {    
-    struct categorical_res res;
+    struct mt_result res;
     uint8_t gen_bits[UINT8_CNT(GEN_CNT)] = { 0 };
     size_t gen_pop_cnt_alt[ALT_CNT] = { 0 };
     size_t gen_val[GEN_CNT];
@@ -355,7 +402,7 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
     contingency_table_init(supp->tbl + table_disp, gen, phen, cnt, supp->filter);
 
     // Performing computations for each alternative
-    for (size_t i = 0; i < ALT_CNT; i++)
+    for (enum mt_alt i = 0; i < ALT_CNT; i++)
     {
         size_t gen_pop_cnt = gen_pop_cnt_alt[i];
         if (!gen_pop_cnt) continue;
@@ -367,14 +414,14 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
         memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
         mar_init(supp->tbl, gen_mar, supp->phen_mar, &mar, gen_pop_cnt, phen_pop_cnt);
 
-        // Computing test statistic
+        // Computing p-value
         res.pv[i] = 
             outer_combined_init(supp->outer, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt) ? 
             stat_chisq(supp->tbl, supp->outer, mar, gen_pop_cnt, phen_pop_cnt) : 
             stat_exact(supp->tbl, gen_mar, supp->phen_mar);
         
         // Computing qas
-        if (i && phen_ucnt == 2) res.qas[i] = qas_or(supp->tbl);
+        if (i == ALT_CD && phen_ucnt == 2) res.qas[i] = qas_or(supp->tbl);
         else
         {
             val_init(gen_val, gen_bits, GEN_CNT);
@@ -385,7 +432,7 @@ struct categorical_res categorical_impl(struct categorical_supp *supp, uint8_t *
     return res;
 }
 
-struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, size_t *phen, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt, size_t rpl, size_t k, gsl_rng *rng, enum categorical_flags flags)
+struct adj_result categorical_adj_average(struct maver_adj_supp *supp, uint8_t *gen, size_t *phen, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt, size_t rpl, size_t k, gsl_rng *rng, enum mt_flags flags)
 {
     size_t table_disp = GEN_CNT * phen_ucnt;
     memset(supp->snp_data, 0, snp_cnt * sizeof(*supp->snp_data));
@@ -416,7 +463,7 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
         contingency_table_init(supp->tbl + table_disp, gen + off, phen, cnt, supp->filter + off);
 
         // Performing computations for each alternative
-        for (size_t j = 0; j < ALT_CNT; j++)
+        for (enum mt_alt j = 0; j < ALT_CNT; j++)
         {
             size_t gen_pop_cnt = supp->snp_data[i].gen_pop_cnt_alt[j];
             if (!gen_pop_cnt) continue;
@@ -425,9 +472,9 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
 
             // Computing sums
             memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
-            mar_init(supp->tbl, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, supp->snp_data[i].mar + j, gen_pop_cnt, phen_pop_cnt);
-            outer_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-            double st = log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt)); /* log10(...) */
+            mar_init(supp->tbl, supp->snp_data[i].gen_mar + (size_t) j * GEN_CNT, supp->phen_mar, supp->snp_data[i].mar + j, gen_pop_cnt, phen_pop_cnt);
+            outer_init(supp->outer, supp->snp_data[i].gen_mar + (size_t) j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
+            double st = log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt)); // log10(...)
             if (isnan(st)) continue;
             density[j] -= st;
             density_cnt[j]++;            
@@ -436,14 +483,14 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
 
     // Naive P-value for density = gsl_sf_gamma_inc_Q((double) density_cnt[i], density[i] /* / M_LOG10E */)
     bool alt[ALT_CNT];
-    for (size_t i = 0; i < ALT_CNT; i++, flags >>= 1) alt[i] = (flags & 1) && isfinite(density[i] /= (double) density_cnt[i]);
+    for (enum mt_alt i = 0; i < ALT_CNT; i++, flags >>= 1) alt[i] = (flags & 1) && isfinite(density[i] /= (double) density_cnt[i]);
 
     // Simulations
     size_t qc[ALT_CNT] = { 0 }, qt[ALT_CNT] = { 0 };
     for (size_t r = 0; r < rpl; r++)
     {
         bool alt_rpl[ALT_CNT], alt_any = 0;
-        for (size_t i = 0; i < ALT_CNT; i++) alt_any |= (alt_rpl[i] = alt[i] && (!k || qc[i] < k)); // Adaptive mode for positive parameter 'k'
+        for (enum mt_alt i = 0; i < ALT_CNT; i++) alt_any |= (alt_rpl[i] = alt[i] && (!k || qc[i] < k)); // Adaptive mode for positive parameter 'k'
         if (!alt_any) break;
 
         // Generating random permutation
@@ -470,7 +517,7 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
             contingency_table_init(supp->tbl + table_disp, gen + off, supp->phen_perm, cnt, supp->filter + off);
 
             // Performing computations for each alternative
-            for (size_t j = 0; j < ALT_CNT; j++) if (alt_rpl[j])
+            for (enum mt_alt j = 0; j < ALT_CNT; j++) if (alt_rpl[j])
             {
                 size_t gen_pop_cnt = supp->snp_data[i].gen_pop_cnt_alt[j];
                 if (!gen_pop_cnt) continue;
@@ -480,34 +527,22 @@ struct maver_adj_res maver_adj_impl(struct maver_adj_supp *supp, uint8_t *gen, s
                 // Computing sums
                 memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
                 ymar_init(supp->tbl, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-                outer_init(supp->outer, supp->snp_data[i].gen_mar + j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-                double st = log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt)); /* log10(...) */
+                outer_init(supp->outer, supp->snp_data[i].gen_mar + (size_t) j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
+                double st = log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt)); // log10(...)
                 if (isnan(st)) continue;
                 density_perm[j] -= st;
                 density_perm_cnt[j]++;
             }
         }
 
-        for (size_t i = 0; i < ALT_CNT; i++) if (alt_rpl[i])
+        for (enum mt_alt i = 0; i < ALT_CNT; i++) if (alt_rpl[i])
         {
             if (density_perm[i] >= density[i] * (double) density_perm_cnt[i]) qc[i]++; // >
             qt[i]++;
         }
     }
 
-    struct maver_adj_res res;
-    for (size_t i = 0; i < ALT_CNT; i++)
-    {
-        if (alt[i])
-        {
-            res.pv[i] = (double) qc[i] / (double) qt[i]; // nlpv = log10((double) qt[i]) - log10((double) qc[i]);
-            res.rpl[i] = qt[i];
-        }
-        else
-        {
-            res.pv[i] = nan(__func__);
-            res.rpl[i] = 0;
-        }
-    }
+    struct adj_result res;
+    for (enum mt_alt i = 0; i < ALT_CNT; i++) res.pv[i] = alt[i] ? (double) qc[i] / (double) qt[i] : nan(__func__); // nlpv = log10((double) qt[i]) - log10((double) qc[i]);
     return res;
 }

@@ -18,7 +18,8 @@ void array_broadcast(void *arr, size_t cnt, size_t sz, void *val)
 struct array_result matrix_init(void *p_Src, size_t *restrict p_cap, size_t xdim, size_t ydim, size_t sz, size_t xdiff, size_t ydiff, enum array_flags flags)
 {
     size_t xtot = ydim;
-    if (!size_mul_add_test(&xtot, sz, ydiff)) return (struct array_result) { .error = ARRAY_OVERFLOW };
+    if (flags & ARRAY_FAILSAFE) xtot = xtot * sz + ydiff;
+    else if (!size_mul_add_test(&xtot, sz, ydiff)) return (struct array_result) { .error = ARRAY_OVERFLOW };
     struct array_result res = array_init(p_Src, p_cap, xdim, xtot, xdiff, flags);
     if (p_cap && res.status == ARRAY_SUCCESS) *p_cap *= ydim;
     return res;

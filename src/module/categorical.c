@@ -174,7 +174,7 @@ static void print_na(FILE *f, double x, const char *c)
     }
 }
 
-void print_cat(FILE *f, struct categorical_res x)
+void print_cat(FILE *f, struct mt_result x)
 {
     for (size_t i = 0; i < 4; i++)
     {
@@ -209,7 +209,7 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
 
     if (phen_context.col_phen == SIZE_MAX)
     {
-        log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Phenotype %~'\"s is unavailable in the file %~'\"P!\n", phen_name, path_phen);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Phenotype %~'\"s is unavailable at the file %~'\"P!\n", phen_name, path_phen);
         goto error;
     }
 
@@ -234,7 +234,7 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
         goto error;
     }
 
-    if (!categorical_init(&supp, phen_cnt, phen_ucnt)) goto error;
+    if (!categorical_init(&supp, phen_cnt, phen_ucnt).status) goto error;
 
     // Applying phenotype filter
     for (size_t i = 0; i < phen_cnt; i++) if (!phen_context.filter[i]) phen[i] = SIZE_MAX;
@@ -242,7 +242,7 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
     uint64_t t0 = get_time();
     for (size_t i = 0; i < snp_cnt; i++)
     {
-        struct categorical_res x = categorical_impl(&supp, gen + i * phen_cnt, phen, phen_cnt, phen_ucnt, 15);
+        struct mt_result x = categorical_impl(&supp, gen + i * phen_cnt, phen, phen_cnt, phen_ucnt, 15);
         print_cat(f, x);
         //fflush(f);
     }
@@ -261,6 +261,7 @@ error:
 
 bool categorical_run_adj(const char *phen_name, const char *path_phen, const char *path_gen, const char *path_top_hit, const char *path_out, size_t rpl, uint64_t seed, struct log *log)
 {
+    bool succ = 0;
     struct maver_adj_supp supp = { 0 };
     uint8_t *gen = NULL;
     gsl_rng *rng = NULL;    
@@ -276,6 +277,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
     if (!top_hit_cnt)
     {
         log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Nothing to be done for the file %~'\"P!\n", path_top_hit);
+        succ = 1;
         goto error;
     }
 
@@ -285,7 +287,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
 
     if (phen_context.col_phen == SIZE_MAX)
     {
-        log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Unable to find phenotype %~'\"s in the file %~'\"P!\n", phen_name, path_phen);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Phenotype %~'\"s is unavailable at the file %~'\"P!\n", phen_name, path_phen);
         goto error;
     }
 
@@ -328,7 +330,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
         goto error;
     }
 
-    if (!maver_adj_init(&supp, wnd, phen_cnt, phen_ucnt)) goto error;
+    if (!maver_adj_init(&supp, wnd, phen_cnt, phen_ucnt).status) goto error;
 
     // Applying phenotype filter
     for (size_t i = 0; i < phen_cnt; i++) if (!phen_context.filter[i]) phen[i] = SIZE_MAX;
@@ -340,7 +342,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
         if (left > right || right >= snp_cnt) continue;
 
         uint64_t t0 = get_time();
-        struct maver_adj_res x = maver_adj_impl(&supp, gen + left * phen_cnt, phen, right - left + 1, phen_cnt, phen_ucnt, rpl, 10, rng, top_hit[i].bits);
+        struct adj_result x = categorical_adj_average(&supp, gen + left * phen_cnt, phen, right - left + 1, phen_cnt, phen_ucnt, rpl, 10, rng, top_hit[i].bits);
         //log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value for window %uz:%uz no. %uz: "
         //    "[%s] %f, %uz; [%s] %f, %uz; [%s] %f, %uz; [%s] %f, %uz.\n",
         //    left + 1, right + 1, i + 1,
@@ -353,10 +355,11 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
             print_na(f, x.pv[j], "\n");
         }
         
-        int len = snprintf(buff, sizeof(buff), "[CD] %.15e; [R] %.15e; [D] %.15e; [A] %.15e.", x.pv[0], x.pv[1], x.pv[2], x.pv[3]);
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation for window %~uz:%~uz took %~T. Results:\n    %s*\n", top_hit[i].interval.left, top_hit[i].interval.right, t0, t1, buff, len);
+        int len = snprintf(buff, sizeof(buff), "[CD] %.16e; [R] %.16e; [D] %.16e; [A] %.16e.", x.pv[0], x.pv[1], x.pv[2], x.pv[3]);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation for window %~uz:%~uz took %~T.\n    Results: %s*\n", top_hit[i].interval.left, top_hit[i].interval.right, t0, t1, buff, len);
         fflush(f);
     }
+    succ = 1;
     
 error:
     maver_adj_close(&supp);
@@ -366,5 +369,5 @@ error:
     free(phen_context.handler_context.str);
     free(phen);
     free(gen);
-    return 1;
+    return succ;
 }

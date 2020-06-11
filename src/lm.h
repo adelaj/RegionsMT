@@ -1,6 +1,7 @@
 #pragma once
 
 #include "log.h"
+#include "mt.h"
 
 void lm_test();
 
