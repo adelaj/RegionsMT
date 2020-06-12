@@ -225,6 +225,8 @@ struct mt_result lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double
                     if ((bits & 2) || bits == (1 | 4)) break;
                     continue;
                 }
+            default:
+                continue;
             }
             
             // Fit model for 'TEST'
