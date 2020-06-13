@@ -13,17 +13,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
-    - name: install packages
+    - name: Install packages
       run: |
           sudo add-apt-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-10 main"
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
           sudo apt-get update
           sudo apt-get install -y gcc-multilib clang-10 llvm-10 llvm-10-dev lld-10
-    - name: setting up environment
-      run: export MATRIX=`echo {clang,gcc}:{x86_64,i386}:{Debug,Release}`
-    - name: make
+    - name: Setting up environment
+      run: echo ::set-env name=MATRIX::$(echo {clang,gcc}:{x86_64,i386}:{Debug,Release})
+    - name: Make
       run: make --warn-undefined-variables -R -j all        
-    - name: make test
+    - name: Make test
       run: make --warn-undefined-variables -R -j -k test || true
-    - name: make clean
+    - name: Make clean
       run: make --warn-undefined-variables -R -j CLEAN="all git(gsl) all(gsl)" clean
