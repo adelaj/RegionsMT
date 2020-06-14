@@ -176,9 +176,9 @@ void categorical_close(struct categorical_supp *supp)
 }
 
 // It is implicitly assumed that 'phen_ucnt <= phen_cnt'
-struct array_result maver_adj_init(struct maver_adj_supp *supp, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt)
+struct array_result categorical_adj_average_init(struct categorical_adj_average_supp *supp, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt)
 {
-    *supp = (struct maver_adj_supp) { 0 };
+    *supp = (struct categorical_adj_average_supp) { 0 };
     struct array_result res = { 0 };
     for (size_t i = 0, tot = 0;; i++, tot = size_add_sat(tot, res.tot))
     {
@@ -218,7 +218,7 @@ struct array_result maver_adj_init(struct maver_adj_supp *supp, size_t snp_cnt, 
     return res;
 }
 
-void maver_adj_close(struct maver_adj_supp *supp)
+void maver_adj_close(struct categorical_adj_average_supp *supp)
 {
     free(supp->phen_perm);
     free(supp->phen_filter);
@@ -432,7 +432,7 @@ struct mt_result categorical_impl(struct categorical_supp *supp, uint8_t *gen, s
     return res;
 }
 
-struct adj_result categorical_adj_average(struct maver_adj_supp *supp, uint8_t *gen, size_t *phen, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt, size_t rpl, size_t k, gsl_rng *rng, enum mt_flags flags)
+struct adj_result categorical_adj_average(struct categorical_adj_average_supp *supp, uint8_t *gen, size_t *phen, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt, size_t rpl, size_t k, gsl_rng *rng, enum mt_flags flags)
 {
     size_t table_disp = GEN_CNT * phen_ucnt;
     memset(supp->snp_data, 0, snp_cnt * sizeof(*supp->snp_data));

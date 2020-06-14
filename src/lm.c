@@ -102,8 +102,8 @@ struct mt_result lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double
     if (!cnt) return res;
 
     // If codominant test is not scheduled, 'off' is set to 1.
-    bool alt_cd = flags & TEST_CD;
-    size_t off = (size_t) alt_cd + 1, tda = reg_cnt + off + 1;
+    bool test_cd = flags & TEST_CD;
+    size_t off = (size_t) test_cd + 1, tda = reg_cnt + off + 1;
 
     //
     // BASELINE MODEL
@@ -174,7 +174,7 @@ struct mt_result lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double
                 }
                 break;
             case ALT_R: // recessive
-                for (size_t j = 0, k = alt_cd; j < dimx; j++, k += tda)
+                for (size_t j = 0, k = test_cd; j < dimx; j++, k += tda)
                 {
                     uint8_t g = gen[supp->filter[j]];
                     bits |= 1 << g;
@@ -192,7 +192,7 @@ struct mt_result lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double
                 }
                 break;
             case ALT_D: // dominant
-                for (size_t j = 0, k = alt_cd; j < dimx; j++, k += tda)
+                for (size_t j = 0, k = test_cd; j < dimx; j++, k += tda)
                 {
                     uint8_t g = gen[supp->filter[j]];
                     bits |= 1 << g;
@@ -210,7 +210,7 @@ struct mt_result lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double
                 }
                 break;
             case ALT_A: // allelic
-                for (size_t j = 0, k = alt_cd; j < cnt; j++, k += tda)
+                for (size_t j = 0, k = test_cd; j < cnt; j++, k += tda)
                 {
                     uint8_t g = gen[supp->filter[j]];
                     bits |= 1 << g;
@@ -231,7 +231,7 @@ struct mt_result lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double
             
             // Fit model for 'TEST'
             
-            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + alt_cd - (i == ALT_CD), dimx, dimy, tda); // C = gsl_matrix_view_array(supp->cov, dimy, dimy);
+            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + test_cd - (i == ALT_CD), dimx, dimy, tda); // C = gsl_matrix_view_array(supp->cov, dimy, dimy);
             gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
             multifit_linear_tsvd(&R.matrix, &O.vector, tol, &P.vector, &ss_e, &df_e, supp->workspace);
@@ -249,13 +249,13 @@ struct mt_result lm_impl(struct lm_supp *supp, uint8_t *gen, double *reg, double
             size_t dimx = cnt, dimy = 2 + reg_cnt;
             if (dimy > dimx) continue;
 
-            for (size_t j = 0, k = alt_cd; j < dimx; j++, k += tda)
+            for (size_t j = 0, k = test_cd; j < dimx; j++, k += tda)
                 supp->reg[k] = (double) gen[supp->filter[j]];
             // Warning! No bit check is required
 
             // Fit model for 'QAS'
             
-            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + alt_cd, dimx, dimy, tda); // C = gsl_matrix_view_array(supp->cov, dimy, dimy);
+            gsl_matrix_view R = gsl_matrix_view_array_with_tda(supp->reg + test_cd, dimx, dimy, tda); // C = gsl_matrix_view_array(supp->cov, dimy, dimy);
             gsl_vector_view O = gsl_vector_view_array(supp->obs, dimx), P = gsl_vector_view_array(supp->par, dimy);
 
             multifit_linear_tsvd(&R.matrix, &O.vector, tol, &P.vector, &chisq, &rk, supp->workspace);

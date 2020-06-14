@@ -10,7 +10,7 @@ struct categorical_supp {
     size_t *filter, *tbl, *phen_val, *phen_mar, *outer;
 };
 
-struct maver_adj_supp {
+struct categorical_adj_average_supp {
     uint8_t *phen_bits;
     size_t *filter, *tbl, *phen_mar, *phen_perm, *phen_filter, *outer;
     struct categorical_snp_data *snp_data;    
@@ -29,6 +29,6 @@ struct array_result categorical_init(struct categorical_supp *, size_t, size_t);
 struct mt_result categorical_impl(struct categorical_supp *, uint8_t *, size_t *, size_t, size_t, enum mt_flags);
 void categorical_close(struct categorical_supp *);
 
-struct array_result maver_adj_init(struct maver_adj_supp *, size_t, size_t, size_t);
-struct adj_result categorical_adj_average(struct maver_adj_supp *, uint8_t *, size_t *, size_t, size_t, size_t, size_t, size_t, gsl_rng *, enum mt_flags);
-void maver_adj_close(struct maver_adj_supp *);
+struct array_result categorical_adj_average_init(struct categorical_adj_average_supp *, size_t, size_t, size_t);
+struct adj_result categorical_adj_average(struct categorical_adj_average_supp *, uint8_t *, size_t *, size_t, size_t, size_t, size_t, size_t, gsl_rng *, enum mt_flags);
+void maver_adj_close(struct categorical_adj_average_supp *);

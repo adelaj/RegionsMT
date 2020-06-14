@@ -43,3 +43,6 @@ for:
            $env:CMAKE=C:\msys64\usr\bin\bash.exe -c '/usr/bin/which cmake'
            $env:MATRIX=C:\msys64\usr\bin\bash.exe -c 'echo msvc:{x64,Win32}:{Debug,Release}'
            $env:MAKE="make"
+
+cache:
+  - C:\msys64\var\cache\pacman\pkg\

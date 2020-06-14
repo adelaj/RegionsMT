@@ -262,7 +262,7 @@ error:
 bool categorical_run_adj(const char *phen_name, const char *path_phen, const char *path_gen, const char *path_top_hit, const char *path_out, size_t rpl, uint64_t seed, struct log *log)
 {
     bool succ = 0;
-    struct maver_adj_supp supp = { 0 };
+    struct categorical_adj_average_supp supp = { 0 };
     uint8_t *gen = NULL;
     gsl_rng *rng = NULL;    
     size_t *phen = NULL;
@@ -330,7 +330,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
         goto error;
     }
 
-    if (!maver_adj_init(&supp, wnd, phen_cnt, phen_ucnt).status) goto error;
+    if (!categorical_adj_average_init(&supp, wnd, phen_cnt, phen_ucnt).status) goto error;
 
     // Applying phenotype filter
     for (size_t i = 0; i < phen_cnt; i++) if (!phen_context.filter[i]) phen[i] = SIZE_MAX;
