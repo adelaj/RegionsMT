@@ -2,7 +2,7 @@
 
 ///////////////////////////////////////////////////////////////////////////////
 //
-//  Common structures for multiple testing
+//  Common structures and routines for multiple testing
 //
 
 enum mt_alt {
@@ -29,3 +29,6 @@ struct mt_result {
 struct adj_result {
     double pv[ALT_CNT];
 };
+
+struct array_result levels_from_phen_impl(size_t *, size_t *, char *buff, size_t *, uint8_t *, uint8_t *);
+struct array_result levels_from_phen(size_t **, size_t *, char *, size_t *, uint8_t *, uint8_t *);

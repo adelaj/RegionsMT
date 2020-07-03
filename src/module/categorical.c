@@ -4,6 +4,7 @@
 #include "../tblproc.h"
 #include "../categorical.h"
 #include "../sort.h"
+#include "../mt.h"
 #include "categorical.h"
 
 #include <math.h>
@@ -191,7 +192,9 @@ static bool str_is_whitespace(const char *str)
 
 void phen_filter_na(const size_t *phen, const char *str, size_t cnt, uint8_t *filter)
 {
-    for (size_t i = 0; i < cnt; i++) if (filter[i] && (str_is_whitespace(str + phen[i]) || !Stricmp(str + phen[i], "na"))) filter[i] = 0;
+    for (size_t i = 0; i < cnt; i++)
+        if (!filter[i] || str_is_whitespace(str + phen[i]) || !Stricmp(str + phen[i], "na")) uint8_bit_reset(filter, i);
+        else uint8_bit_set(filter, i);
 }
 
 bool categorical_run_chisq(const char *phen_name, const char *path_phen, const char *path_gen, const char *path_out, struct log *log)
@@ -209,18 +212,15 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
 
     if (phen_context.col_phen == SIZE_MAX)
     {
-        log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Phenotype %~'\"s is unavailable at the file %~'\"P!\n", phen_name, path_phen);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Phenotype %\"~s is unavailable at the file %\"~P!\n", phen_name, path_phen);
         goto error;
     }
 
     // Filter out 'NA' before any destructive operations with 'phen'
     phen_filter_na(phen, phen_context.handler_context.str, phen_cnt, phen_context.filter);
 
-    uintptr_t *phen_ptr;
-    if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str).status) goto error;
     size_t phen_ucnt = phen_cnt;
-    ranks_unique_from_pointers_impl(phen, phen_ptr, (uintptr_t) phen, &phen_ucnt, sizeof(*phen), str_off_cmp, phen_context.handler_context.str);
-    free(phen_ptr);
+    if (!levels_from_phen_impl(phen, phen, phen_context.handler_context.str, &phen_ucnt, phen_context.filter, phen_context.filter).status) goto error;
 
     struct gen_context gen_context = { .phen_cnt = phen_cnt };
     size_t gen_skip = 0, snp_cnt = 0, gen_length = 0;
@@ -235,9 +235,6 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
     }
 
     if (!categorical_init(&supp, phen_cnt, phen_ucnt).status) goto error;
-
-    // Applying phenotype filter
-    for (size_t i = 0; i < phen_cnt; i++) if (!phen_context.filter[i]) phen[i] = SIZE_MAX;
 
     uint64_t t0 = get_time();
     for (size_t i = 0; i < snp_cnt; i++)
@@ -276,7 +273,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
 
     if (!top_hit_cnt)
     {
-        log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Nothing to be done for the file %~'\"P!\n", path_top_hit);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Nothing to be done for the file %\"~P!\n", path_top_hit);
         succ = 1;
         goto error;
     }
@@ -287,18 +284,16 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
 
     if (phen_context.col_phen == SIZE_MAX)
     {
-        log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Phenotype %~'\"s is unavailable at the file %~'\"P!\n", phen_name, path_phen);
+        log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Phenotype %\"~s is unavailable at the file %\"~P!\n", phen_name, path_phen);
         goto error;
     }
 
     // Filter out 'NA' before any destructive operations with 'phen'
+    // Filter out 'NA' before any destructive operations with 'phen'
     phen_filter_na(phen, phen_context.handler_context.str, phen_cnt, phen_context.filter);
 
-    uintptr_t *phen_ptr;
-    if (!pointers_stable(&phen_ptr, phen, phen_cnt, sizeof(*phen), str_off_stable_cmp, phen_context.handler_context.str).status) goto error;
     size_t phen_ucnt = phen_cnt;
-    ranks_unique_from_pointers_impl(phen, phen_ptr, (uintptr_t) phen, &phen_ucnt, sizeof(*phen), str_off_cmp, phen_context.handler_context.str);
-    free(phen_ptr);
+    if (!levels_from_phen_impl(phen, phen, phen_context.handler_context.str, &phen_ucnt, phen_context.filter, phen_context.filter).status) goto error;
 
     struct gen_context gen_context = { .phen_cnt = phen_cnt };
     size_t gen_skip = 0, snp_cnt = 0, gen_length = 0;
@@ -331,9 +326,6 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
     }
 
     if (!categorical_adj_average_init(&supp, wnd, phen_cnt, phen_ucnt).status) goto error;
-
-    // Applying phenotype filter
-    for (size_t i = 0; i < phen_cnt; i++) if (!phen_context.filter[i]) phen[i] = SIZE_MAX;
 
     char buff[256];
     for (size_t i = 0; i < top_hit_cnt; i++)

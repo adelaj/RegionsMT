@@ -331,7 +331,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
             size_t ind = 0;
             static const struct strl type[] = { STRI("categorical"), STRI("ordinal"), STRI("numeric") };
             for (; ind < countof(type) && (type[ind].len != context->len || Strnicmp(type[ind].str, context->buff->str, type[ind].len)); ind++);
-            if (ind == countof(type)) log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, context->metric, "Unexpected covariate type %~s*", context->buff->str, context->len);
+            if (ind == countof(type)) log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, context->metric, "Unexpected covariate type %\"~s*", context->buff->str, context->len);
             else
             {
                 arg->term[arg->term_cnt - 1].sort = (enum cov_sort []) { COV_SORT_FLAG_STR | COV_SORT_FLAG_CAT, COV_SORT_FLAG_STR, 0 }[ind];
@@ -492,7 +492,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
             size_t ind = 0;
             static const struct strl type[] = { STRI("descending"), STRI("natural") };
             for (; ind < countof(type) && (type[ind].len != context->len || Strnicmp(type[ind].str, context->buff->str, type[ind].len)); ind++);
-            if (ind == countof(type)) log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, context->metric, "Unexpected covariate flag %~s*", context->buff->str, context->len);
+            if (ind == countof(type)) log_message_xml_generic(log, CODE_METRIC, MESSAGE_ERROR, context->metric, "Unexpected covariate flag %\"~s*", context->buff->str, context->len);
             else
             {
                 arg->term[arg->term_cnt - 1].sort |= (enum cov_sort[]) { COV_SORT_FLAG_DSC, COV_SORT_FLAG_NAT }[ind];
@@ -629,13 +629,13 @@ static bool term_cmp(const void *A, const void *B, void *Thunk)
     return cmp > 0;
 }
 
-bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t cnt, struct log *log)
+bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t cnt, uint8_t *filter, struct log *log)
 {
     for (size_t i = 0; i < cnt; i++)
     {
         size_t *p_ind;
         const char *name = buff->str + term[i].off;
-        if (!str_pool_fetch(&cov->pool, name, sizeof(size_t), &p_ind)) log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Covariate %~s is unavailable!\n", name);
+        if (!str_pool_fetch(&cov->pool, name, sizeof(size_t), &p_ind)) log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Covariate %\"~s is unavailable!\n", name);
         else
         {
             size_t ind = *p_ind;
@@ -655,15 +655,11 @@ bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t
                 {
                     double res;
                     const char *str = cov->buff.str + cov->off[j + cov->dim * ind];
-                    if (!flt64_handler(str, 0, &res, NULL)) log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Unable to interpret string %~s as decimal number!\n", str);
-                    else
+                    if (!flt64_handler(str, 0, &res, NULL)) log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Unable to interpret string %\"~s as decimal number for covariate %\"~s. Sample no. %~uz excluded from analysis!\n", str, name, j);
                     {
+                        uint8_bit_set(filter, j);
                         (*(double **) ptr)[j] = res;
-                        continue;
                     }
-                    free(*ptr);
-                    *ptr = NULL;
-                    return 0;
                 }
                 *level = 0;
                 continue;
@@ -809,7 +805,9 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     free(cov.off);
     cov.off = off_trans;
     
-    if (!cov_querry(&cov, &arg.pool.buff, arg.term, arg.term_cnt, log)) return 0;
+    uint8_t *filter = NULL;
+    if (!array_init(&filter, NULL, UINT8_CNT(cov.dim), sizeof(*filter), 0, ARRAY_CLEAR | ARRAY_STRICT).status) return 0;
+    if (!cov_querry(&cov, &arg.pool.buff, arg.term, arg.term_cnt, filter, log)) return 0;
 
     uint8_t *gen = NULL;
     struct gen_context gen_context = { .phen_cnt = cov.dim };
@@ -974,7 +972,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     if (!lm_init(&supp, cov.dim, rky, 15)) return 0;
 
     struct lm_term phen = { .off = 0, .deg = 1, .sort = 0 };
-    if (!cov_querry(&cov, &(struct buff) { .str = (char *) phen_name }, &phen, 1, log)) return 0;
+    if (!cov_querry(&cov, &(struct buff) { .str = (char *) phen_name }, &phen, 1, filter, log)) return 0;
 
     FILE *f = fopen(path_out, "w");
     if (!f)
@@ -994,6 +992,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     fclose(f);
     lm_close(&supp);
 
+    free(filter);
     free(reg);
     free(gen);
     free(data);

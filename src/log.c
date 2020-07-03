@@ -110,12 +110,12 @@ enum fmt_flt_flags {
 enum fmt_flags {
     FMT_CONDITIONAL = 1,
     FMT_OVERPRINT =  2,
-    FMT_ENV = 4,
-    FMT_ENV_USER = 8,
-    FMT_QUOTE_SELECT = 16,
-    FMT_QUOTE_SINGLE = 32,
-    FMT_QUOTE_DOUBLE = 64,
-    FMT_LEFT_JUSTIFY = 128,
+    FMT_QUOTE_SELECT = 4,
+    FMT_QUOTE_SINGLE = 8,
+    FMT_QUOTE_DOUBLE = 16,
+    FMT_LEFT_JUSTIFY = 32,
+    FMT_ENV = 64,
+    FMT_ENV_USER = 128,
     FMT_ARG_PTR = 256,
     FMT_LIST_PTR = 512
 };
@@ -271,14 +271,14 @@ static struct message_result fmt_decode(struct fmt_result *res, const char *fmt,
         case '!':
             tmp = FMT_OVERPRINT;
             break;        
-        case '~':
-            tmp = res->flags & FMT_ENV ? res->flags & FMT_ENV_USER ? 0 : FMT_ENV_USER : FMT_ENV;
-            break;
         case '\'':
             tmp = res->flags & FMT_QUOTE_SELECT ? res->flags & FMT_QUOTE_SINGLE ? 0 : FMT_QUOTE_SINGLE : FMT_QUOTE_SELECT;
             break;
         case '\"':
             tmp = FMT_QUOTE_DOUBLE;
+            break;
+        case '~':
+            tmp = res->flags & FMT_ENV ? res->flags & FMT_ENV_USER ? 0 : FMT_ENV_USER : FMT_ENV;
             break;
         case '-':
             tmp = FMT_LEFT_JUSTIFY;
@@ -449,7 +449,7 @@ static struct message_result fmt_execute_code_metric(char *buff, size_t *p_cnt, 
     if (flags & FMT_EXE_FLAG_PHONY) return MESSAGE_SUCCESS;
     struct strl begin = { 0 }, end = { 0 };
     if (env) begin = env->begin, end = env->end;
-    return print_fmt(buff, p_cnt, NULL, "%~~''s* @ %~~\"s*:%~~uz", env, STRL(metric.func), env, STRL(metric.path), env, metric.line);
+    return print_fmt(buff, p_cnt, NULL, "%''~~s* @ %\"~~s*:%~~uz", env, STRL(metric.func), env, STRL(metric.path), env, metric.line);
 }
 
 static void fmt_execute_crt(char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
@@ -630,11 +630,11 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
                 if (!tmp) j = SIZE_MAX;
                 break;            
             case 1:
-                if (env && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(env->begin), 0);
+                if (quote >= 0 && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(lquote[quote]), 0);
                 else j++;
                 break;
             case 3:
-                if (quote >= 0 && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(lquote[quote]), 0);
+                if (env && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(env->begin), 0);
                 else j++;
                 break;
             case 5:
@@ -673,11 +673,11 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
                 else if (tf & FMT_EXE_FLAG_PHONY) j++;
                 break;
             case 7:
-                if (quote >= 0 && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(rquote[quote]), 0);
+                if (env && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(env->end), 0);
                 else j++;
                 break;
             case 9:
-                if (env && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(env->end), 0);
+                if (quote >= 0 && !(tf & FMT_EXE_FLAG_PHONY)) print(buff + cnt, &len, STRL(rquote[quote]), 0);
                 else j++;
                 break;
             case 10:
@@ -857,17 +857,17 @@ bool log_message_crt(struct log *restrict log, struct code_metric code_metric, e
 
 bool log_message_fopen(struct log *restrict log, struct code_metric code_metric, enum message_type type, const char *restrict path, Errno_t err)
 {
-    return log_message_fmt(log, code_metric, type, "Unable to open the file %~'\"P. %C!\n", path, err);
+    return log_message_fmt(log, code_metric, type, "Unable to open the file %\"~P. %C!\n", path, err);
 }
 
 bool log_message_fseek(struct log *restrict log, struct code_metric code_metric, enum message_type type, int64_t offset, const char *restrict path)
 {
-    return log_message_fmt(log, code_metric, type, "Unable to seek into the position %~uq of the file %~'\"P!\n", offset, path);
+    return log_message_fmt(log, code_metric, type, "Unable to seek into the position %~uq of the file %\"~P!\n", offset, path);
 }
 
 bool fopen_assert(struct log *restrict log, struct code_metric code_metric, const char *restrict path, bool res)
 {
-    if (!res) log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to open the file %~'\"P! %C!\n", path, errno);
+    if (!res) log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to open the file %\"~P! %C!\n", path, errno);
     return res;
 }
 
@@ -953,7 +953,7 @@ bool wapi_assert(struct log *log, struct code_metric code_metric, bool res)
 
 bool wapi_assert(struct log *log, struct code_metric code_metric, bool res)
 {
-    log_message_fmt(log, code_metric, MESSAGE_RESERVED, "Function %~''s* should be called only when %~''s* macro is defined!\n", STRC(__func__), STRC("_WIN32"));
+    log_message_fmt(log, code_metric, MESSAGE_RESERVED, "Function %''~s* should be called only when %''~s* macro is defined!\n", STRC(__func__), STRC("_WIN32"));
     return res;
 }
 

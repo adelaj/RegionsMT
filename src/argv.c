@@ -25,8 +25,8 @@ enum argv_name_val_status {
 static bool log_message_warning_argv_name_val(struct log *restrict log, struct code_metric code_metric, size_t ind, enum argv_name_val_status status, bool shrt, const char *name_str, size_t name_len, const char *val_str, size_t val_len)
 {
     const char *fmt[] = { 
-        "Unable to handle the value %~s* of the parameter %~'s* near",
-        "Redundant value %~s* for the option %~'s* within"
+        "Unable to handle the value %~s* of the parameter %'~s* near",
+        "Redundant value %~s* for the option %'~s* within"
     };
     return log_message_warning_generic(log, code_metric, ind, fmt[status], val_str, val_len, !shrt, name_str, name_len);
 }
@@ -40,9 +40,9 @@ enum argv_name_status {
 static bool log_message_warning_argv_name(struct log *restrict log, struct code_metric code_metric, size_t ind, enum argv_name_status status, bool shrt, const char *name_str, size_t name_len)
 {
     const char *fmt[] = {
-        "Unable to handle the option %~'s* within",
-        "Invalid identifier %~'s* within",
-        "Expected a value for the parameter %~'s* within"
+        "Unable to handle the option %'~s* within",
+        "Invalid identifier %'~s* within",
+        "Expected a value for the parameter %'~s* within"
     };
     return log_message_warning_generic(log, code_metric, ind, fmt[status], !shrt, name_str, name_len);
 }
