@@ -76,7 +76,7 @@ The following programs are required for the Windows installation:
 * [MSYS2](https://www.msys2.org/) (either `x86_64` or `i686` version) with `make` package (installation is listed below). For instance, it is assumed that `x86_64` of `MSYS2` is installed (by default) into `C:\msys64` folder. Do not add any subfolders of `C:\msys64` to `PATH` manually! 
 
 ### Build sequence
-The command-line interpreted which is used further is assumed to be `powershell`. 
+The command-line interpreter which is used further is assumed to be `powershell`.
 #### Directory structure
 The installation directory is assumed to be `~/build`, which in Windows terms should be treated as something like `C:\Users\User\build`.
 ```PowerShell

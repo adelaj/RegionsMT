@@ -393,7 +393,7 @@ struct mt_result categorical_impl(struct categorical_supp *supp, uint8_t *gen, s
     if (!gen_pop_cnt_alt_init(gen_pop_cnt_alt, gen_bits, gen_bits_init(gen_bits, cnt, GEN_CNT, supp->filter, gen), flags)) return res;
     
     // Counting unique phenotypes
-    memset(supp->phen_bits, 0, UINT8_CNT(phen_ucnt));
+    memset(supp->phen_bits, 0, sizeof(*supp->phen_bits) * UINT8_CNT(phen_ucnt));
     size_t phen_pop_cnt = phen_bits_init(supp->phen_bits, cnt, phen_ucnt, supp->filter, phen);
     if (phen_pop_cnt < 2) return res;
 
@@ -421,7 +421,7 @@ struct mt_result categorical_impl(struct categorical_supp *supp, uint8_t *gen, s
             stat_exact(supp->tbl, gen_mar, supp->phen_mar);
         
         // Computing qas
-        if (i == ALT_CD && phen_ucnt == 2) res.qas[i] = qas_or(supp->tbl);
+        if (i != ALT_CD && phen_ucnt == 2) res.qas[i] = qas_or(supp->tbl);
         else
         {
             val_init(gen_val, gen_bits, GEN_CNT);
