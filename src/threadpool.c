@@ -55,6 +55,10 @@ bool size_test_acquire_p(volatile void *mem, const void *arg)
     return size_test_acquire(mem);
 }
 
+bool loop_init(void *context, size_t *restrict arg, size_t cnt)
+{
+}
+
 struct thread_pool {
     spinlock_handle spinlock, add;
     mutex_handle mutex;

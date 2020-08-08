@@ -15,15 +15,12 @@ bool test_categorical_generator_a(void *dst, size_t *p_context, struct log *log)
         { MATCX(2, (size_t []) { 10, 20, 100, 20 }), 7.5171259287287606 } // Chi-Square
     };
     size_t *tbl, ind = *p_context;
-    if (array_assert(log, CODE_METRIC, array_init(&tbl, NULL, data[ind].cnt, sizeof(*tbl), 0, ARRAY_STRICT)))
-    {
-        memcpy(dst, data + ind, sizeof(*data));
-        memcpy(tbl, data[ind].tbl, data[ind].cnt * sizeof(*tbl));
-        ((struct test_categorical_a *) dst)->tbl = tbl;
-        if (++*p_context >= countof(data)) *p_context = 0;
-        return 1;
-    }
-    return 0;
+    if (!array_assert(log, CODE_METRIC, array_init(&tbl, NULL, data[ind].cnt, sizeof(*tbl), 0, ARRAY_STRICT))) return 0;
+    memcpy(dst, data + ind, sizeof(*data));
+    memcpy(tbl, data[ind].tbl, data[ind].cnt * sizeof(*tbl));
+    ((struct test_categorical_a *) dst)->tbl = tbl;
+    if (++*p_context >= countof(data)) *p_context = 0;
+    return 1;
 }
 
 void test_categorical_disposer_a(void *In)
