@@ -44,19 +44,29 @@ struct tls_base {
     size_t tid, pid, inc;
 };
 
+struct  task_cond {
+    condition_callback callback;
+    void *arg;
+    volatile void *mem;
+};
+
+struct task_aggr {
+    aggregator_callback callback;
+    void *arg;
+    volatile void *mem;
+};
+
 struct task {
     task_callback callback;
-    condition_callback cond;
-    aggregator_callback aggr;
-    void *arg, *context, *cond_arg, *aggr_arg;
-    volatile void *cond_mem, *aggr_mem;
+    void *arg, *context;
+    struct task_cond cond;
+    struct task_aggr aggr;
 };
 
 struct dispatched_task {
     task_callback callback;
-    aggregator_callback aggr;
-    void *arg, *context, *aggr_arg;
-    volatile void *aggr_mem;
+    struct task_aggr aggr;
+    void *arg, *context;
     volatile bool ngarbage, norphan;
 };
 

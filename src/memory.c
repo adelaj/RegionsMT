@@ -71,10 +71,10 @@ struct array_result array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, 
     return (struct array_result) { .status = ARRAY_SUCCESS, .tot = tot };
 }
 
-struct array_result array_test_impl(void *p_Arr, size_t *restrict p_cap, size_t sz, size_t diff, enum array_flags flags, size_t *restrict arg, size_t cnt)
+struct array_result array_test_impl(void *p_Arr, size_t *restrict p_cap, size_t sz, size_t diff, enum array_flags flags, size_t *restrict cntl, size_t cnt)
 {
-    size_t car, sum = size_sum(&car, arg, cnt);
-    return car ? (struct array_result) { .error = ARRAY_OVERFLOW } : array_init(p_Arr, p_cap, sum, sz, diff, flags | ARRAY_REALLOC);
+    size_t hi, sum = size_sum(&hi, cntl, cnt);
+    return hi ? (struct array_result) { .error = ARRAY_OVERFLOW } : array_init(p_Arr, p_cap, sum, sz, diff, flags | ARRAY_REALLOC);
 }
 
 struct array_result queue_init(struct queue *queue, size_t cnt, size_t sz)

@@ -288,17 +288,35 @@ DECLARE_LOAD_ACQUIRE(size_t, size)
 DECLARE_STORE_RELEASE(size_t, size)
 DECLARE_STORE_RELEASE(void *, ptr)
 
-size_t size_sum(size_t *p_hi, size_t *args, size_t args_cnt)
+size_t size_sum(size_t *p_hi, size_t *argl, size_t cnt)
 {
-    if (!args_cnt)
+    if (!cnt)
     {
         *p_hi = 0;
         return 0;
     }
-    size_t lo = args[0], hi = 0, car;
-    for (size_t i = 1; i < args_cnt; lo = size_add(&car, lo, args[i++]), hi += car);
+    size_t lo = argl[0], hi = 0, car;
+    for (size_t i = 1; i < cnt; lo = size_add(&car, lo, argl[i++]), hi += car);
     *p_hi = hi;
     return lo;
+}
+
+size_t size_prod_test(size_t *p_res, size_t *argl, size_t cnt)
+{
+    if (!cnt)
+    {
+        *p_res = 1;
+        return cnt;
+    }
+    size_t res = argl[0];
+    for (size_t i = 1; i < cnt; i++)
+    {
+        size_t hi;
+        res = size_mul(&hi, res, argl[i]);
+        if (hi) return i;
+    }
+    *p_res = res;
+    return cnt;
 }
 
 #define DECLARE_UINT_LOG10(TYPE, PREFIX, MAX, ...) \

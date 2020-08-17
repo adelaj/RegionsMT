@@ -56,6 +56,7 @@ size_t size_shr(size_t *, size_t, uint8_t);
 size_t size_add(size_t *, size_t, size_t);
 size_t size_sub(size_t *, size_t, size_t);
 size_t size_sum(size_t *, size_t *, size_t);
+size_t size_prod_test(size_t *, size_t *, size_t);
 size_t size_mul(size_t *, size_t, size_t);
 
 uint32_t uint32_bit_scan_reverse(uint32_t);

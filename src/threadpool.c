@@ -55,8 +55,16 @@ bool size_test_acquire_p(volatile void *mem, const void *arg)
     return size_test_acquire(mem);
 }
 
-bool loop_init(void *context, size_t *restrict arg, size_t cnt)
+bool loop_init(struct thread_pool *pool, task_callback callback, void *context, size_t *restrict arg, size_t cnt, bool hi)
 {
+    size_t res;
+    if (size_prod_test(&res, arg, cnt) != cnt || res == SIZE_MAX) return 0;
+    //return thread_pool_enqueue_yield(pool,  );
+}
+
+unsigned loop_tread_close(void *arg, void *context, void *tls)
+{
+
 }
 
 struct thread_pool {
@@ -154,13 +162,13 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
         }
 
         // Execute the task
-        unsigned res = dispatched_task->callback(dispatched_task->arg, dispatched_task->context, arg->tls);
+        unsigned res = dispatched_task->callback ? dispatched_task->callback(dispatched_task->arg, dispatched_task->context, arg->tls): TASK_SUCCESS;
         if (res == TASK_YIELD)
         {
             bool_store_release(&dispatched_task->norphan, 0);
             continue;
         }
-        dispatched_task->aggr(dispatched_task->aggr_mem, dispatched_task->aggr_arg, res);
+        if (dispatched_task->aggr.callback) dispatched_task->aggr.callback(dispatched_task->aggr.mem, dispatched_task->aggr.arg, res);
         bool_store_release(&dispatched_task->ngarbage, 0);
         size_dec_interlocked(&pool->task_hint);
 
@@ -186,7 +194,7 @@ void thread_pool_schedule(struct thread_pool *pool)
         while (off < pool->queue.cnt)
         {
             task = queue_fetch(&pool->queue, off, sizeof(*task));
-            switch (task->cond(task->cond_mem, task->cond_arg))
+            switch (task->cond.callback ? task->cond.callback(task->cond.mem, task->cond.arg) : COND_EXECUTE)
             {
             case COND_WAIT:
                 off++;
@@ -226,9 +234,9 @@ void thread_pool_schedule(struct thread_pool *pool)
         {
             if (dispatch)
             {
-                dispatched_task->aggr = task->aggr;
-                dispatched_task->aggr_arg = task->aggr_arg;
-                dispatched_task->aggr_mem = task->aggr_mem;
+                dispatched_task->aggr.callback = task->aggr.callback;
+                dispatched_task->aggr.arg = task->aggr.arg;
+                dispatched_task->aggr.mem = task->aggr.mem;
                 dispatched_task->arg = task->arg;
                 dispatched_task->callback = task->callback;
                 dispatched_task->context = task->context;

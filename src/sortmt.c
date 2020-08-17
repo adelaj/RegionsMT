@@ -116,10 +116,10 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                         .aggr = bit_set_interlocked_p,
                         .arg = &res->s_args[i],
                         .context = &res->context,
-                        .cond_mem = snc->cond_mem,
-                        .aggr_mem = res->sync,
-                        .cond_arg = snc->cond_arg,
-                        .aggr_arg = &res->args[i]
+                        //.cond_mem = snc->cond_mem,
+                        //.aggr_mem = res->sync,
+                        //.cond_arg = snc->cond_arg,
+                        //.aggr_arg = &res->args[i]
                     };
                 }
 
@@ -133,10 +133,10 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                         .aggr = bit_set_interlocked_p,
                         .arg = &res->m_args[i],
                         .context = &res->context,
-                        .cond_mem = res->sync,
-                        .aggr_mem = res->sync,
-                        .cond_arg = &res->args[i << 1],
-                        .aggr_arg = &res->args[j]
+                        //.cond_mem = res->sync,
+                        //.aggr_mem = res->sync,
+                        //.cond_arg = &res->args[i << 1],
+                        //.aggr_arg = &res->args[j]
                     };
                 }
 
@@ -147,10 +147,10 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                     .aggr = snc->a_succ,
                     .arg = &res->m_args[m_cnt - 1],
                     .context = &res->context,
-                    .cond_mem = res->sync,
-                    .aggr_mem = snc->a_succ_mem,
-                    .cond_arg = &res->args[(m_cnt - 1) << 1],
-                    .aggr_arg = snc->a_succ_arg
+                    //.cond_mem = res->sync,
+                    //.aggr_mem = snc->a_succ_mem,
+                    //.cond_arg = &res->args[(m_cnt - 1) << 1],
+                    //.aggr_arg = snc->a_succ_arg
                 };
 
                 //if (thread_pool_enqueue_tasks(pool, res->tasks, m_cnt + s_cnt, 1)) return res;
@@ -167,10 +167,10 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                     .aggr = snc->a_succ,
                     .arg = &res->s_args[0],
                     .context = &res->context,
-                    .cond_mem = snc->cond_mem,
-                    .aggr_mem = snc->a_succ_mem,
-                    .cond_arg = snc->cond_arg,
-                    .aggr_arg = snc->a_succ_arg
+                    //.cond_mem = snc->cond_mem,
+                    //.aggr_mem = snc->a_succ_mem,
+                    //.cond_arg = snc->cond_arg,
+                    //.aggr_arg = snc->a_succ_arg
                 };
 
                 //if (thread_pool_enqueue_tasks(pool, res->tasks, 1, 1)) return res;
