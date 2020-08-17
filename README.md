@@ -93,7 +93,7 @@ git clone --depth 1 https://github.com/adelaj/RegionsMT
 $env:MSYSTEM="MSYS2"
 C:\msys64\usr\bin\bash.exe -lc 'pacman -Syu --noconfirm'
 C:\msys64\usr\bin\bash.exe -lc 'pacman -Syu --noconfirm' # Should be run for the second time
-C:\msys64\usr\bin\bash.exe -lc 'pacman -S --needed make'
+C:\msys64\usr\bin\bash.exe -lc 'pacman -S --noconfirm --needed make'
 ```
 #### Building `RegionsMT` and all of the required dependencies
 ```PowerShell

@@ -34,6 +34,9 @@ _Static_assert((BIT_TEST2_MASK01 | BIT_TEST2_MASK10) == UINT8_MAX, "Wrong consta
 #define UINT32_BIT (sizeof(uint32_t) * CHAR_BIT)
 #define UINT64_BIT (sizeof(uint64_t) * CHAR_BIT)
 
+#define SIZE_PROD_TEST(PROD, ARG, CNT) (size_prod_test((PROD), (ARG), (CNT)) == (CNT))
+#define SIZE_PROD_TEST_VA(PROD, ...) (size_prod_test((PROD), ARG(size_t, __VA_ARGS__)) == countof(((size_t []) { __VA_ARGS__ })))
+
 bool bool_load_acquire(volatile void *);
 void bool_store_release(volatile void *, bool);
 uint8_t uint8_load_acquire(volatile void *);

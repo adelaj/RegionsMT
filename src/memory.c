@@ -122,7 +122,7 @@ void *queue_fetch(struct queue *queue, size_t offset, size_t sz)
 }
 
 // This function should be called ONLY if 'queue_test' succeeds
-void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
+static void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
 {
     size_t bor, left = size_sub(&bor, queue->begin, queue->cap - queue->cnt);
     if (bor) left += queue->cap;
@@ -138,7 +138,7 @@ void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, size_t c
     queue->cnt += cnt;
 }
 
-void queue_enqueue_yield_lo(struct queue *restrict queue, generator_callback generator, void *context, size_t cnt, size_t sz)
+static void queue_enqueue_yield_lo(struct queue *restrict queue, generator_callback generator, void *context, size_t cnt, size_t sz)
 {
     size_t bor, left = size_sub(&bor, queue->begin, queue->cap - queue->cnt);
     if (bor) left += queue->cap;
@@ -155,7 +155,7 @@ void queue_enqueue_yield_lo(struct queue *restrict queue, generator_callback gen
 }
 
 // This function should be called ONLY if 'queue_test' succeeds
-void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
+static void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
 {
     size_t bor, diff = size_sub(&bor, queue->begin, cnt);
     if (bor && diff) // cnt > queue->begin

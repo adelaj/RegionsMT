@@ -113,7 +113,7 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                     res->tasks[i] = (struct task) {
                         .callback = sort_thread_proc,
                         .cond = snc->cond,
-                        .aggr = bit_set_interlocked_p,
+                        //.aggr = bit_set_interlocked_p,
                         .arg = &res->s_args[i],
                         .context = &res->context,
                         //.cond_mem = snc->cond_mem,
@@ -129,8 +129,8 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                     res->args[j] = j;
                     res->tasks[j] = (struct task) {
                         .callback = merge_thread_proc,
-                        .cond = bit_test2_acquire_p,
-                        .aggr = bit_set_interlocked_p,
+                        //.cond = bit_test2_acquire_p,
+                        //.aggr = bit_set_interlocked_p,
                         .arg = &res->m_args[i],
                         .context = &res->context,
                         //.cond_mem = res->sync,
@@ -143,7 +143,7 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
                 // Last merging task requires special handling
                 res->tasks[s_cnt + m_cnt - 1] = (struct task) {
                     .callback = merge_thread_proc,
-                    .cond = bit_test2_acquire_p,
+                    //.cond = bit_test2_acquire_p,
                     .aggr = snc->a_succ,
                     .arg = &res->m_args[m_cnt - 1],
                     .context = &res->context,

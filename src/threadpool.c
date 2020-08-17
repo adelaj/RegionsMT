@@ -7,64 +7,86 @@
 #include <string.h>
 #include <stdlib.h>
 
-void bit_set_interlocked_p(volatile void *arr, const void *p_bit)
-{
-    bit_set_interlocked(arr, *(const size_t *) p_bit);
-}
-
-void bit_reset_interlocked_p(volatile void *arr, const void *p_bit)
-{
-    bit_reset_interlocked(arr, *(const size_t *) p_bit);
-}
-
-void bit_set2_interlocked_p(volatile void *arr, const void *p_bit)
-{
-    bit_set2_interlocked(arr, *(const size_t *) p_bit);
-}
-
-void size_inc_interlocked_p(volatile void *mem, const void *arg)
+void aggr_inc(volatile void *Mem, const void *arg, unsigned status)
 {
     (void) arg;
-    size_inc_interlocked(mem);
+    volatile struct inc_mem *mem = Mem;
+    switch (status)
+    {
+    case AGGR_FAIL:
+        size_inc_interlocked(&mem->fail);
+        break;
+    case AGGR_SUCCESS:
+        size_inc_interlocked(&mem->success);
+        break;
+    case AGGR_DROP:
+        size_inc_interlocked(&mem->drop);
+        break;
+    }
 }
 
-void size_dec_interlocked_p(volatile void *mem, const void *arg)
+unsigned cond_inc(volatile void *Mem, const void *Tot)
 {
-    (void) arg;
-    size_dec_interlocked(mem);
+    volatile struct inc_mem *mem = Mem;
+    return size_load_acquire(&mem->success) + size_load_acquire(&mem->fail) + size_load_acquire(&mem->drop) == *(size_t *) Tot;
 }
 
-bool bit_test2_acquire_p(volatile void *arr, const void *p_bit)
+struct loop_data {
+    volatile struct inc_mem mem;
+    size_t tot;
+    size_t ind[];
+};
+
+struct loop_generator_context {
+    task_callback callback;
+    struct task_cond cond;
+    struct task_aggr aggr;
+    size_t prod, cnt;
+    void *context;
+    struct loop_data *data;
+};
+
+static unsigned loop_tread_close(void *Data, void *context, void *tls)
 {
-    return bit_test2_acquire(arr, *(const size_t *) p_bit);
+    (void) context;
+    (void) tls;
+    volatile struct loop_data *data = Data;
+    bool fail = size_load_acquire(&data->mem.fail), drop = size_load_acquire(&data->mem.drop);
+    free(context);
+    return drop ? TASK_DROP : !fail;
 }
 
-bool bit_test_range_acquire_p(volatile void *arr, const void *p_cnt)
+void loop_generator(void *Task, size_t ind, void *Context)
 {
-    return bit_test_range_acquire(arr, *(const size_t *) p_cnt);
+    struct loop_generator_context *context = Context;
+    *(struct task *) Task = ind < context->prod ?
+        (struct task) {
+            .callback = context->callback,
+            .arg = context->data->ind + ind * context->cnt,
+            .context = context->context,
+            .cond = context->cond,
+            .aggr = (struct task_aggr) { .callback = aggr_inc, .mem = &context->data->mem }
+        } :
+        (struct task) {
+            .callback = loop_tread_close,
+            .arg = context->data,
+            .cond = (struct task_cond) { .callback = cond_inc, .mem = &context->data->mem, .arg = &context->data->tot },
+            .aggr = context->aggr
+        };
 }
 
-bool bit_test2_range01_acquire_p(volatile void *arr, const void *p_cnt)
+bool loop_init(struct thread_pool *pool, task_callback callback, struct task_cond cond, struct task_aggr aggr, void *context, size_t *restrict arg, size_t cnt, bool hi, struct log *log)
 {
-    return bit_test2_range01_acquire(arr, *(const size_t *) p_cnt);
-}
-
-bool size_test_acquire_p(volatile void *mem, const void *arg)
-{
-    (void) arg;
-    return size_test_acquire(mem);
-}
-
-bool loop_init(struct thread_pool *pool, task_callback callback, void *context, size_t *restrict arg, size_t cnt, bool hi)
-{
-    size_t res;
-    if (size_prod_test(&res, arg, cnt) != cnt || res == SIZE_MAX) return 0;
-    //return thread_pool_enqueue_yield(pool,  );
-}
-
-unsigned loop_tread_close(void *arg, void *context, void *tls)
-{
-
+    size_t prod, tot = 0;
+    if (!crt_assert_impl(log, CODE_METRIC, !SIZE_PROD_TEST(&prod, arg, cnt) || prod == SIZE_MAX || !SIZE_PROD_TEST_VA(&tot, prod, cnt) ? ERANGE : 0)) return 0;
+    struct loop_data *data;
+    if (!array_assert(log, CODE_METRIC, array_init(&data, NULL, fam_countof(struct loop_data, ind, tot), sizeof(*data->ind), fam_diffof(struct loop_data, ind, tot), ARRAY_STRICT))) return 0;
+    data->mem = (struct inc_mem) { 0 };
+    data->tot = tot;
+    if (prod) memset(data->ind, 0, cnt * sizeof(*data->ind)); // Building index set
+    for (size_t i = 1, j = cnt; i < prod; i++, j += cnt)
+        for (size_t k = 0; k < cnt && (data->ind[j + k] = data->ind[j + k - cnt] + 1) == arg[k]; data->ind[j + k] = 0, k++);
+    return thread_pool_enqueue_yield(pool, loop_generator, &(struct loop_generator_context) { .callback = callback, .cond = cond, .aggr = aggr, .cnt = cnt, .prod = prod, .context = context, .data = data }, prod + 1, hi, log);
 }
 
 struct thread_pool {
@@ -201,6 +223,7 @@ void thread_pool_schedule(struct thread_pool *pool)
                 pending = 1;
                 continue;
             case COND_DROP:
+                if (task->aggr.callback) task->aggr.callback(task->aggr.mem, task->aggr.arg, AGGR_DROP);
                 queue_dequeue(&pool->queue, off, sizeof(*task));
                 continue;
             case COND_EXECUTE:

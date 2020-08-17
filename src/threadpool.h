@@ -8,6 +8,7 @@
 enum {
     TASK_FAIL = 0,
     TASK_SUCCESS,
+    TASK_DROP,
     TASK_YIELD
 };
 
@@ -27,17 +28,11 @@ typedef unsigned (*task_callback)(void *, void *, void *);
 typedef unsigned (*condition_callback)(volatile void *, const void *);
 typedef void (*aggregator_callback)(volatile void *, const void *, unsigned);
 
-void bit_set_interlocked_p(volatile void *, const void *);
-void bit_reset_interlocked_p(volatile void *, const void *);
-void bit_set2_interlocked_p(volatile void *, const void *);
-void size_inc_interlocked_p(volatile void *, const void *);
-void size_dec_interlocked_p(volatile void *, const void *);
+struct inc_mem {
+    size_t fail, success, drop;
+};
 
-bool bit_test2_acquire_p(volatile void *, const void *);
-bool bit_test_range_acquire_p(volatile void *, const void *);
-bool bit_test2_range01_acquire_p(volatile void *, const void *);
-
-bool size_test_acquire_p(volatile void *, const void *);
+void aggr_inc(volatile void *, const void *, unsigned);
 
 struct tls_base {
     struct thread_pool *pool;
