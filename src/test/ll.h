@@ -11,6 +11,7 @@ bool test_ll_generator_a(void *, size_t *, struct log *);
 bool test_ll_a_1(void *, struct log *);
 bool test_ll_a_2(void *, struct log *);
 bool test_ll_a_3(void *, struct log *);
+#define test_ll_dispose_a test_dispose
 
 struct test_ll_b { 
     uint32_t a, res_bsf, res_bsr; 
@@ -18,5 +19,6 @@ struct test_ll_b {
 
 bool test_ll_generator_b(void *, size_t *, struct log *);
 bool test_ll_b(void *, struct log *);
+#define test_ll_dispose_b NULL
 
 void test_ll_perf(struct log *);

@@ -11,18 +11,7 @@ void aggr_inc(volatile void *Mem, const void *arg, unsigned status)
 {
     (void) arg;
     volatile struct inc_mem *mem = Mem;
-    switch (status)
-    {
-    case AGGR_FAIL:
-        size_inc_interlocked(&mem->fail);
-        break;
-    case AGGR_SUCCESS:
-        size_inc_interlocked(&mem->success);
-        break;
-    case AGGR_DROP:
-        size_inc_interlocked(&mem->drop);
-        break;
-    }
+    size_inc_interlocked((volatile void *[]) { &mem->fail, &mem->success, &mem->drop }[MIN(status, AGGR_DROP)]);
 }
 
 unsigned cond_inc(volatile void *Mem, const void *Tot)
@@ -52,7 +41,7 @@ static unsigned loop_tread_close(void *Data, void *context, void *tls)
     (void) tls;
     volatile struct loop_data *data = Data;
     bool fail = size_load_acquire(&data->mem.fail), drop = size_load_acquire(&data->mem.drop);
-    free(context);
+    free(Data);
     return drop ? TASK_DROP : !fail;
 }
 
@@ -75,17 +64,21 @@ void loop_generator(void *Task, size_t ind, void *Context)
         };
 }
 
-bool loop_init(struct thread_pool *pool, task_callback callback, struct task_cond cond, struct task_aggr aggr, void *context, size_t *restrict arg, size_t cnt, bool hi, struct log *log)
+bool loop_init(struct thread_pool *pool, task_callback callback, struct task_cond cond, struct task_aggr aggr, void *context, size_t *restrict cntl, size_t cnt, size_t *restrict offl, bool hi, struct log *log)
 {
     size_t prod, tot = 0;
-    if (!crt_assert_impl(log, CODE_METRIC, !SIZE_PROD_TEST(&prod, arg, cnt) || prod == SIZE_MAX || !SIZE_PROD_TEST_VA(&tot, prod, cnt) ? ERANGE : 0)) return 0;
+    if (!crt_assert_impl(log, CODE_METRIC, !SIZE_PROD_TEST(&prod, cntl, cnt) || prod == SIZE_MAX || !SIZE_PROD_TEST_VA(&tot, prod, cnt) ? ERANGE : 0)) return 0;
     struct loop_data *data;
-    if (!array_assert(log, CODE_METRIC, array_init(&data, NULL, fam_countof(struct loop_data, ind, tot), sizeof(*data->ind), fam_diffof(struct loop_data, ind, tot), ARRAY_STRICT))) return 0;
-    data->mem = (struct inc_mem) { 0 };
+    if (!array_assert(log, CODE_METRIC, array_init(&data, NULL, fam_countof(struct loop_data, ind, tot), fam_sizeof(struct loop_data, ind), fam_diffof(struct loop_data, ind, tot), ARRAY_STRICT))) return 0;
+    size_store_release(&data->mem.fail, 0);
+    size_store_release(&data->mem.success, 0);
+    size_store_release(&data->mem.drop, 0);
     data->tot = tot;
-    if (prod) memset(data->ind, 0, cnt * sizeof(*data->ind)); // Building index set
+    if (prod) // Building index set
+        if (offl) memcpy(data->ind, offl, cnt * sizeof(*data->ind));
+        else memset(data->ind, 0, cnt * sizeof(*data->ind));
     for (size_t i = 1, j = cnt; i < prod; i++, j += cnt)
-        for (size_t k = 0; k < cnt && (data->ind[j + k] = data->ind[j + k - cnt] + 1) == arg[k]; data->ind[j + k] = 0, k++);
+        for (size_t k = 0; k < cnt && (data->ind[j + k] = data->ind[j + k - cnt] + 1) == (offl ? offl[k] + cntl[k] : cntl[k]); data->ind[j + k] = 0, k++);
     return thread_pool_enqueue_yield(pool, loop_generator, &(struct loop_generator_context) { .callback = callback, .cond = cond, .aggr = aggr, .cnt = cnt, .prod = prod, .context = context, .data = data }, prod + 1, hi, log);
 }
 
@@ -364,6 +357,11 @@ static bool thread_pool_init(struct thread_pool *pool, size_t cnt, size_t task_h
         persistent_array_close(&pool->arg);
     }
     return 0;
+}
+
+void *thread_pool_fetch_tls(struct thread_pool *pool, size_t ind)
+{
+    return ((struct thread_arg *) persistent_array_fetch(&pool->arg, ind, sizeof(struct thread_arg)))->tls;
 }
 
 static void thread_pool_finish_range(struct thread_pool *pool, size_t l, size_t r)

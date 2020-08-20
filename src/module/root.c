@@ -13,7 +13,7 @@ void module_root_context_dispose(void *Context)
 
 void module_root_out_dispose(struct module_root_out *out)
 {
-    log_multiple_close(out->thread_log, out->thread_cnt);
+    //log_multiple_close(out->thread_log, out->thread_cnt);
     log_close(&out->log);
     free(out->thread_log);
     free(out);

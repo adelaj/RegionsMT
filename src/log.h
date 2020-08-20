@@ -119,9 +119,8 @@ enum log_flags {
 };
 
 bool log_init(struct log *restrict, const char *restrict, size_t, enum log_flags, const struct ttl_style *restrict, const struct style *restrict, struct log *restrict);
+bool log_dup(struct log *restrict, struct log *restrict);
 void log_close(struct log *restrict);
-bool log_multiple_init(struct log *restrict, size_t, char *restrict, size_t, enum log_flags, const struct ttl_style *restrict, const struct style *restrict, struct log *restrict);
-void log_multiple_close(struct log *restrict, size_t);
 bool log_flush(struct log *restrict);
 
 bool log_message(struct log *restrict, struct code_metric, enum message_type, message_callback, void *);

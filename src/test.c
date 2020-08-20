@@ -2,50 +2,66 @@
 #include "ll.h"
 #include "log.h"
 #include "memory.h"
+#include "threadpool.h"
 #include "utf8.h"
 #include "test.h"
 
 #include <stdlib.h>
 
-bool test(const struct test_group *group_arr, size_t cnt, struct log *log)
+void test_dispose(void *ptr)
 {
+    free(ptr);
+}
+
+struct test_tls {
+    struct tls_base base;
+    struct log *log;
+};
+
+static unsigned test_gen_inst_thread(void *Indl, void *Group, void *Tls)
+{
+    size_t *indl = Indl, tn = indl[0], gn = indl[1], gi = indl[2];
+    const struct test_group *group = Group;
+    struct test_tls *tls = Tls;
+    log_message_fmt(tls->log, CODE_METRIC, MESSAGE_INFO, "Test %~uz:%~uz:%~uz from the group %\"~s* assigned to the thread no. %~uz.\n", tn, gn, gi, STRL(group->name), tls->base.tid);
+    void *data;
+    if (!group->generator[gn](&data, &gi, tls->log)) return 0;
+    uint64_t start = get_time();
+    bool succ = group->test[tn](data, tls->log);
+    if (!succ) log_message_fmt(tls->log, CODE_METRIC, MESSAGE_WARNING, "Test %~uz:%~uz:%~uz from the group %\"~s* failed!\n", tn, gn, gi, STRL(group->name));
+    else log_message_fmt(tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %~uz:%~uz:%~uz from the group %\"~s* took %~T.\n", tn, gn, gi, STRL(group->name), start, get_time());
+    if (group->dispose) group->dispose(data);
+    return succ;
+}
+
+static unsigned test_gen_thread(void *Indl, void *Group, void *Tls)
+{
+    size_t *indl = Indl, tn = indl[0], gn = indl[1];
+    const struct test_group *group = Group;
+    struct test_tls *tls = Tls;
+    size_t cnt = 1;
+    for (size_t ind = 0; group->generator[gn](NULL, &ind, tls->log), ind; cnt++);
+    return loop_init(tls->base.pool, test_gen_inst_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, (void *) group, ARG(size_t, 1, 1, cnt), (size_t []) { tn, gn, 0 }, 0, tls->log);
+}
+
+bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct log *log)
+{
+    struct thread_pool *pool = thread_pool_create(thread_cnt, sizeof(struct test_tls), 0, log);
+    if (!pool) return 0;
+    size_t ind = 0;
+    for (; ind < thread_cnt; ind++)
+        if (!log_dup(((struct test_tls *) thread_pool_fetch_tls(pool, ind))->log, log)) break;
     bool succ = 0;
-    uint64_t all = get_time();
-    size_t test_data_sz = 0;
-    for (size_t i = 0; i < cnt; i++) if (test_data_sz < group_arr[i].test_sz) test_data_sz = group_arr[i].test_sz;
-    void *test_data = NULL;
-    if (!array_init(&test_data, NULL, test_data_sz, 1, 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-    else
+    if (ind == thread_cnt)
     {
-        succ = 1;
-        for (size_t i = 0; i < cnt; i++)
-        {
-            uint64_t start = get_time();
-            const struct test_group *group = group_arr + i;
-            for (size_t j = 0; j < group->test_generator_cnt; j++)
-            {
-                size_t context = 0;
-                do {
-                    size_t ind = context;
-                    if (group->test_generator[j](test_data, &context, log))
-                    {
-                        for (size_t k = 0; k < group->test_cnt; k++)
-                        {
-                            bool res = group->test[k](test_data, log);
-                            if (!res) log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Test no. %~uz of the group no. %~uz failed under the input data instance no. %~uz of the generator no. %~uz!\n", k + 1, i + 1, ind + 1, j + 1);
-                            succ &= res;
-                        }
-                        if (group->test_dispose) group->test_dispose(test_data);
-                        continue;
-                    }
-                    succ = 0;
-                } while (context);
-            }
-            log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution of the group no. %~uz took %~T.\n", i + 1, start, get_time());
-        }
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Tests execution took %~T.\n", all, get_time());
-        free(test_data);
+        size_t i = 0;
+        for (; i < cnt; i++)
+            if (!loop_init(pool, test_gen_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, (void *) (groupl + i), ARG(size_t, groupl[i].test_cnt, groupl[i].generator_cnt), NULL, 0, log)) break;
+        succ = i == cnt;
+        thread_pool_schedule(pool);
     }
+    while (ind--) log_close(((struct test_tls *) thread_pool_fetch_tls(pool, ind))->log);
+    thread_pool_dispose(pool);
     return succ;
 }
 

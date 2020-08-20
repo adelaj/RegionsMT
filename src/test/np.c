@@ -5,28 +5,22 @@
 
 #include <stdlib.h> 
 
-bool test_np_generator_a(void *dst, size_t *p_context, struct log *log)
+bool test_np_generator_a(void *p_res, size_t *p_ind, struct log *log)
 {
-    size_t context = *p_context, cnt = (size_t) 1 << context;
-    char *str;
-    if (!array_init(&str, NULL, cnt, sizeof(*str), 0, ARRAY_STRICT).status) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
-    else
+    size_t context = *p_ind, cnt = (size_t) 1 << context;
+    if (!p_res)
     {
-        for (size_t i = 0; i < cnt;) 
-            for (char j = 0; j < CHAR_MAX && i < cnt; j++)
-                for (char k = 0; k < j && i < cnt; k++) str[i++] = k;
-        *(struct test_np_a *) dst = (struct test_np_a) { .str = str, .cnt = cnt };
-        if (context < TEST_NP_EXP) ++*p_context;
-        else *p_context = 0;
+        if (context < TEST_NP_EXP) ++*p_ind;
+        else *p_ind = 0;
         return 1;
-    }
-    return 0;
-}
-
-void test_np_disposer_a(void *In)
-{
-    struct test_np_a *in = In;
-    free(in->str);
+    }    
+    if (!array_assert(log, CODE_METRIC, array_init(p_res, NULL, fam_countof(struct test_np_a, str, cnt), fam_sizeof(struct test_np_a, str), fam_diffof(struct test_np_a, str, cnt), ARRAY_STRICT))) return 0;
+    struct test_np_a *res = *(struct test_np_a **) p_res;
+    res->cnt = cnt;
+    for (size_t i = 0; i < cnt;)
+        for (char j = 0; j < CHAR_MAX && i < cnt; j++)
+            for (char k = 0; k < j && i < cnt; k++) res->str[i++] = k;
+    return 1;
 }
 
 static void *Memrchr_test(void const *Str, int ch, size_t cnt)
@@ -40,20 +34,12 @@ bool test_np_a(void *In, struct log *log)
 {
     (void) log;
     struct test_np_a *in = In;
-    for (char i = 0; i < CHAR_MAX; i++)
+    for (char i = 0; i < CHAR_MAX; i++) for (size_t cnt = in->cnt; cnt;)
     {
-        for (size_t cnt = in->cnt; cnt;)
-        {
-            char *a = Memrchr(in->str, i, cnt);
-            if (a != Memrchr_test(in->str, i, cnt)) log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Unexpected search result!\n");
-            else
-            {
-                if (!a) break;
-                cnt = a - in->str;
-                continue;
-            }
-            return 0;
-        }
+        char *a = Memrchr(in->str, i, cnt);
+        if (a != Memrchr_test(in->str, i, cnt)) return 0;
+        if (!a) break;
+        cnt = a - in->str;
     }
     return 1;
 }

@@ -8,25 +8,31 @@
 #include <string.h>
 #include <math.h>
 
-bool test_categorical_generator_a(void *dst, size_t *p_context, struct log *log)
+bool test_categorical_generator_a(void *p_res, size_t *p_ind, struct log *log)
 {
-    struct test_categorical_a data[] = {
-        { MATCX(2, (size_t []) { 1, 10, 20, 21 }), 1.4632678190897159 }, // Exact Fisher
-        { MATCX(2, (size_t []) { 10, 20, 100, 20 }), 7.5171259287287606 } // Chi-Square
+    struct {
+        double pv, qas;
+        size_t *tbl, dimx, dimy, cnt;
+    } data[] = {
+        // fisher.test(matrix(c(1, 10, 20, 21), 2, 2))$p.value
+        { 0.03441376438044415, 0., MATCX(2, (size_t []) { 1, 10, 20, 21 }) }, // Exact Fisher
+        // chisq.test(matrix(c(10, 20, 100, 20), 2, 2), correct = F)$p.value
+        { 3.040003413570398e-08, 0., MATCX(2, (size_t []) { 10, 20, 100, 20 }) } // Chi-Square
     };
-    size_t *tbl, ind = *p_context;
-    if (!array_assert(log, CODE_METRIC, array_init(&tbl, NULL, data[ind].cnt, sizeof(*tbl), 0, ARRAY_STRICT))) return 0;
-    memcpy(dst, data + ind, sizeof(*data));
-    memcpy(tbl, data[ind].tbl, data[ind].cnt * sizeof(*tbl));
-    ((struct test_categorical_a *) dst)->tbl = tbl;
-    if (++*p_context >= countof(data)) *p_context = 0;
+    if (!p_res)
+    {
+        if (++*p_ind >= countof(data)) *p_ind = 0;
+        return 1;
+    }    
+    size_t ind = *p_ind;
+    if (!array_assert(log, CODE_METRIC, array_init(p_res, NULL, fam_countof(struct test_categorical_a, tbl, data[ind].cnt), fam_sizeof(struct test_categorical_a, tbl), fam_diffof(struct test_categorical_a, tbl, data[ind].cnt), ARRAY_STRICT))) return 0;
+    struct test_categorical_a *res = *(struct test_categorical_a **) p_res;
+    res->pv = data->pv;
+    res->qas = data->qas;
+    res->dimx = data->dimx;
+    res->dimy = data->dimy;
+    memcpy(res->tbl, data[ind].tbl, data[ind].cnt * sizeof(*res->tbl));
     return 1;
-}
-
-void test_categorical_disposer_a(void *In)
-{
-    struct test_categorical_a *in = In;
-    free(in->tbl);
 }
 
 bool test_categorical_a(void *In, struct log *log)
@@ -38,11 +44,10 @@ bool test_categorical_a(void *In, struct log *log)
         array_assert(log, CODE_METRIC, array_init(&xmar, NULL, in->dimx, sizeof(*xmar), 0, ARRAY_STRICT | ARRAY_CLEAR)) &&
         array_assert(log, CODE_METRIC, array_init(&ymar, NULL, in->dimy, sizeof(*ymar), 0, ARRAY_STRICT | ARRAY_CLEAR)))
     {
-        double nlpv; // qas;
         size_t mar = 0;
         mar_init(in->tbl, xmar, ymar, &mar, in->dimx, in->dimy);
-        nlpv = outer_combined_init(outer, xmar, ymar, mar, in->dimx, in->dimy) ? stat_chisq(in->tbl, outer, mar, in->dimx, in->dimy) : stat_exact(in->tbl, xmar, ymar);
-        if (fabs(nlpv - in->nlpv) >= nlpv * REL_ERROR) log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Relative error is too large!\n");
+        double pv = outer_combined_init(outer, xmar, ymar, mar, in->dimx, in->dimy) ? stat_chisq(in->tbl, outer, mar, in->dimx, in->dimy) : stat_exact(in->tbl, xmar, ymar);
+        if (fabs(pv - in->pv) >= pv * REL_ERROR) log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Relative error is too large!\n");
         else succ = 1;
     }    
     free(xmar);

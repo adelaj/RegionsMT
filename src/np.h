@@ -60,6 +60,7 @@ void Aligned_free(void *);
 
 // File operations
 FILE *Fopen(const char *, const char *);
+FILE *Fdup(FILE *, const char *);
 int Fclose(FILE *); // Tolerant to the 'NULL' and 'std###' streams
 int Fseeki64(FILE *, int64_t, int);
 int64_t Ftelli64(FILE *);

@@ -34,13 +34,13 @@
 #   include "test/sort.h"
 #   include "test/utf8.h"
 
-static bool test_main(struct log *log)
+static bool test_main(size_t thread_cnt, struct log *log)
 {
-    const struct test_group group_arr[] = {
+    const struct test_group groupl[] = {
         {
-            NULL,
-            sizeof(struct test_ll_a),
-            CLII((test_generator_callback[]) {
+            STRI("Low level facilities A"),
+            test_ll_dispose_a,
+            CLII((test_generator_callback []) {
                 test_ll_generator_a,
             }),
             CLII((test_callback[]) {
@@ -50,76 +50,76 @@ static bool test_main(struct log *log)
             })
         },
         {
-            NULL,
-            sizeof(struct test_ll_a),
-            CLII((test_generator_callback[]) {
+            STRI("Low level facilities B"),
+            test_ll_dispose_b,
+            CLII((test_generator_callback []) {
                 test_ll_generator_b,
             }),
-            CLII((test_callback[]) {
+            CLII((test_callback []) {
                 test_ll_b,
             })
         },
         {
-            test_np_disposer_a,
-            sizeof(struct test_np_a),
-            CLII((test_generator_callback[]) {
+            STRI("Non-portable facilities emulation"),
+            test_np_dispose_a,
+            CLII((test_generator_callback []) {
                 test_np_generator_a,
             }),
-            CLII((test_callback[]) {
+            CLII((test_callback []) {
                 test_np_a,
             })
         },
         {
-            test_sort_disposer_a,
-            sizeof(struct test_sort_a),
-            CLII((test_generator_callback[]) {
+            STRI("Sorting routines A: sort algorithms"),
+            test_sort_dispose_a,
+            CLII((test_generator_callback []) {
                 test_sort_generator_a_1,
                 test_sort_generator_a_2,
                 test_sort_generator_a_3
             }),
-            CLII((test_callback[]) {
+            CLII((test_callback []) {
                 test_sort_a,
             })
         },
         {
-            test_sort_disposer_b,
-            sizeof(struct test_sort_b),
-            CLII((test_generator_callback[]) {
+            STRI("Sorting routines B: orders computation"),
+            test_sort_dispose_b,
+            CLII((test_generator_callback []) {
                 test_sort_generator_b_1
             }),
-            CLII((test_callback[]) {
+            CLII((test_callback []) {
                 test_sort_b_1,
                 test_sort_b_2
             })
         },
         {
-            test_sort_disposer_c,
-            sizeof(struct test_sort_c),
-            CLII((test_generator_callback[]) {
+            STRI("Sorting routines C: exact search"),
+            test_sort_dispose_c,
+            CLII((test_generator_callback []) {
                 test_sort_generator_c_1
             }),
-            CLII((test_callback[]) {
+            CLII((test_callback []) {
                 test_sort_c_1,
                 test_sort_c_2
             })
         },
         {
-            test_sort_disposer_d,
-            sizeof(struct test_sort_d),
-            CLII((test_generator_callback[]) {
+            STRI("Sorting routines D: inexact search"),
+            test_sort_dispose_d,
+            CLII((test_generator_callback []) {
                 test_sort_generator_d_1
             }),
-            CLII((test_callback[]) {
+            CLII((test_callback []) {
                 test_sort_d_1
             })
         },
         {
+            STRI("Unicode facilities"),
             NULL,
-            sizeof(struct test_utf8),
-            CLII((test_generator_callback[]) {
+            CLII((test_generator_callback []) {
                 test_utf8_generator,
             }),
-            CLII((test_callback[]) {
+            CLII((test_callback []) {
                 test_utf8_len,
                 test_utf8_encode,
                 test_utf8_decode,
@@ -128,18 +128,18 @@ static bool test_main(struct log *log)
             })
         },
         {
-            test_categorical_disposer_a,
-            sizeof(struct test_categorical_a),
-            CLII((test_generator_callback[]) {
+            STRI("Catigorical data analysis"),
+            test_categorical_dispose_a,
+            CLII((test_generator_callback []) {
                 test_categorical_generator_a,
             }),
-            CLII((test_callback[]) {
+            CLII((test_callback []) {
                 test_categorical_a,
             })
         }
     };
     log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Test mode triggered!\n");
-    return test(group_arr, countof(group_arr), log);
+    return test(groupl, countof(groupl), thread_cnt, log);
 }
 
 #else
@@ -475,7 +475,7 @@ static int Main(int argc, char **argv)
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_TEST))
             {
-                succ = test_main(&log);
+                succ = test_main(main_args.thread_cnt, &log);
             }
             else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CAT))
             {

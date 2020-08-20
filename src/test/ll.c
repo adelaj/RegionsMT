@@ -6,7 +6,7 @@
 #include <math.h>
 #include <string.h>
 
-bool test_ll_generator_a(void *dst, size_t *p_context, struct log *log)
+bool test_ll_generator_a(void *p_res, size_t *p_ind, struct log *log)
 {
     (void) log;
     struct test_ll_a data[] = {
@@ -30,8 +30,13 @@ bool test_ll_generator_a(void *dst, size_t *p_context, struct log *log)
         { 0, DBL_EPSILON, 1, 1, 1 },
         { DBL_EPSILON, 0, -1, -1, -1 }
     };
-    memcpy(dst, data + *p_context, sizeof(*data));
-    if (++*p_context >= countof(data)) *p_context = 0;
+    if (!p_res)
+    {
+        if (++*p_ind >= countof(data)) *p_ind = 0;
+        return 1;
+    }
+    if (!array_assert(log, CODE_METRIC, array_init(p_res, NULL, 1, sizeof(struct test_ll_a), 0, ARRAY_STRICT))) return 0;
+    *(struct test_ll_a **) p_res = data + *p_ind;
     return 1;
 }
 
@@ -77,10 +82,10 @@ bool test_ll_a_3(void *In, struct log *log)
     return res == in->res_dsc_nan && flt64_stable_cmp_dsc_nan_test(&in->a, &in->b, NULL) == res;
 }
 
-bool test_ll_generator_b(void *dst, size_t *p_context, struct log *log)
+bool test_ll_generator_b(void *p_res, size_t *p_ind, struct log *log)
 {
     (void) log;
-    struct test_ll_b data[] = {
+    static const struct test_ll_b data[] = {
         { 0b0, UINT32_MAX, UINT32_MAX },
         { 0b1, 0, 0 },
         { 0b10, 1, 1 },
@@ -102,15 +107,15 @@ bool test_ll_generator_b(void *dst, size_t *p_context, struct log *log)
         { 0b100100000000000000, 14, 17 },
         { 0b1001000000000000000, 15, 18 },
     };
-    memcpy(dst, data + *p_context, sizeof(*data));
-    if (++*p_context >= countof(data)) *p_context = 0;
+    if (p_res) *(const struct test_ll_b **) p_res = data + *p_ind;
+    else if (++*p_ind >= countof(data)) *p_ind = 0;
     return 1;
 }
 
 bool test_ll_b(void *In, struct log *log)
 {
     (void) log;
-    struct test_ll_b *in = In;
+    const struct test_ll_b *in = In;
     uint32_t res_bsr = uint32_bit_scan_reverse(in->a), res_bsf = uint32_bit_scan_forward(in->a);
     if (res_bsr != in->res_bsr || res_bsf != in->res_bsf) return 0;
     return 1;

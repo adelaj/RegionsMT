@@ -527,7 +527,7 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
         if (list_ptr)
         {
             p_arg_list = ARG_FETCH_PTR(ptr, p_arg);
-            p_arg_sub = &p_arg_list; // Here MSVC promts warning that should be dismissed
+            p_arg_sub = (void *) &p_arg_list; // Here MSVC promts warning which is supressed by '(void *)'
             tf |= FMT_EXE_FLAG_PTR;
             list_ptr = list_ptr || ptr;
         }
@@ -723,7 +723,7 @@ bool log_init(struct log *restrict log, const char *restrict path, size_t lim, e
     {
         bool tty = (flags & (LOG_FORCE_TTY)) || file_is_tty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
         size_t cap = bom ? MAX(lim, lengthof(UTF8_BOM)) : lim;
-        if (array_assert(fallback, CODE_METRIC, array_init(&log->buff, &log->cap, size_add_sat(cap, cap), sizeof(*log->buff), 0, 0)))
+        if (array_assert(fallback, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)))
         {
             if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
             else log->cnt = 0;
@@ -735,6 +735,27 @@ bool log_init(struct log *restrict log, const char *restrict path, size_t lim, e
             log->fallback = fallback;
             if (log->cnt < log->lim || log_flush(log)) return 1;
             free(log->buff);
+        }
+        Fclose(f);
+    }
+    return 0;
+}
+
+bool log_dup(struct log *restrict dst, struct log *restrict src)
+{
+    FILE *f = Fdup(src->file, "a");
+    if (crt_assert(src, CODE_METRIC, f))
+    {
+        if (array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->lim, sizeof(*dst->buff), 0, 0)))
+        {
+            dst->cnt = 0;
+            dst->ttl_style = src->ttl_style;
+            dst->style = src->style;
+            dst->lim = src->lim;
+            dst->file = f;
+            dst->tot = 0;
+            dst->fallback = src;
+            return 1;
         }
         Fclose(f);
     }
@@ -757,20 +778,6 @@ void log_close(struct log *restrict log)
     log_flush(log);
     Fclose(log->file);
     free(log->buff);
-}
-
-bool log_multiple_init(struct log *restrict arr, size_t cnt, char *restrict path, size_t cap, enum log_flags flags, const struct ttl_style *restrict ttl_style, const struct style *restrict style, struct log *restrict log_error)
-{
-    size_t i = 0;
-    for (; i < cnt && log_init(arr + i, path, cap, flags | LOG_APPEND, ttl_style, style, log_error); i++);
-    if (i == cnt) return 1;
-    for (; --i; log_close(arr + i));
-    return 0;
-}
-
-void log_multiple_close(struct log *restrict arr, size_t cnt)
-{
-    if (cnt) for (size_t i = cnt; --i; log_close(arr + i));
 }
 
 static struct message_result log_prefix(char *buff, size_t *p_cnt, struct code_metric metric, enum message_type type, const struct ttl_style *ttl_style)

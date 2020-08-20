@@ -3,15 +3,15 @@
 #include "log.h"
 
 typedef bool (*test_generator_callback)(void *, size_t *, struct log *);
-typedef void (*test_disposer_callback)(void *);
+typedef void (*test_dispose_callback)(void *);
 typedef bool (*test_callback)(void *, struct log *);
 
 struct test_group {
-    test_disposer_callback test_dispose;
-    size_t test_sz;
+    const struct strl name;
+    test_dispose_callback dispose;
     struct {
-        test_generator_callback *test_generator;
-        size_t test_generator_cnt;
+        test_generator_callback *generator;
+        size_t generator_cnt;
     };
     struct {
         test_callback *test;
@@ -19,4 +19,5 @@ struct test_group {
     };
 };
 
-bool test(const struct test_group *, size_t, struct log *);
+void test_dispose(void *);
+bool test(const struct test_group *, size_t, size_t, struct log *);

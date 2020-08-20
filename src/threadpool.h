@@ -15,13 +15,15 @@ enum {
 enum {
     COND_WAIT = 0,
     COND_EXECUTE,
-    COND_DROP
+    COND_DROP,
+    COND_CNT
 };
 
 enum {
     AGGR_FAIL = 0,
     AGGR_SUCCESS,
-    AGGR_DROP
+    AGGR_DROP,
+    AGGR_CNT
 };
 
 typedef unsigned (*task_callback)(void *, void *, void *);
@@ -68,10 +70,13 @@ struct dispatched_task {
 // Opaque structure with OS-dependent implementation
 struct thread_pool;
 
+bool loop_init(struct thread_pool *, task_callback, struct task_cond, struct task_aggr, void *, size_t *restrict, size_t, size_t *restrict, bool, struct log *);
+
 bool thread_pool_enqueue(struct thread_pool *, struct task *, size_t, bool, struct log *);
 bool thread_pool_enqueue_yield(struct thread_pool *, generator_callback, void *, size_t, bool, struct log *);
 void thread_pool_schedule(struct thread_pool *);
 struct thread_pool *thread_pool_create(size_t, size_t, size_t, struct log *);
+void *thread_pool_fetch_tls(struct thread_pool *, size_t);
 void thread_pool_dispose(struct thread_pool *);
 size_t thread_pool_get_count(struct thread_pool *);
 

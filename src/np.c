@@ -147,6 +147,13 @@ FILE *Fopen(const char *path, const char *mode)
     return f;
 }
 
+FILE *Fdup(FILE *f, const char *mode)
+{
+    int fd = _dup(_fileno(f));
+    if (fd == -1) return NULL;
+    return _fdopen(fd, mode);
+}
+
 bool file_is_tty(FILE *f)
 {
     return _isatty(_fileno(f));
@@ -189,6 +196,13 @@ uint64_t get_time()
 
 #   include <sys/time.h>
 #   include <unistd.h>
+
+FILE *Fdup(FILE *f, const char *mode)
+{
+    int fd = dup(fileno(f));
+    if (fd == -1) return NULL;
+    return fdopen(fd, mode);
+}
 
 FILE *Fopen(const char *path, const char *mode)
 {
@@ -236,9 +250,9 @@ bool aligned_alloca_chk(size_t cnt, size_t sz, size_t al)
     return size_mul_add_test(&cnt, sz, al - 1);
 }
 
-int Fclose(FILE *file)
+int Fclose(FILE *f)
 {
-    return file && file != stderr && file != stdin && file != stdout ? fclose(file) : 0;
+    return f && f != stderr && f != stdin && f != stdout ? fclose(f) : 0;
 }
 
 size_t Strnlen(const char *str, size_t len)
