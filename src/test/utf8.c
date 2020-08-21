@@ -51,7 +51,7 @@ bool test_utf8_encode(void *In, struct log *log)
     const struct test_utf8 *restrict in = In;
     uint8_t byte[UTF8_COUNT], len;
     utf8_encode(in->val, byte, &len);
-    return !memcmp(in->utf8, byte, len * sizeof(*byte)) && len != in->utf8_len;
+    return !memcmp(in->utf8, byte, len * sizeof(*byte)) && len == in->utf8_len;
 }
 
 bool test_utf8_decode(void *In, struct log *log)

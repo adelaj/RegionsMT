@@ -95,7 +95,7 @@ struct thread_pool {
     size_t task_cnt;
     struct persistent_array dispatched_task;
     struct persistent_array arg;
-    bool flag;
+    bool query_wake;
 };
 
 static bool thread_pool_enqueue_impl(struct thread_pool *pool, size_t cnt, struct log *log)
@@ -135,12 +135,11 @@ size_t thread_pool_get_count(struct thread_pool *pool)
     return size_load_acquire(&pool->cnt);
 }
 
-enum thread_state {
-    THREAD_ACTIVE = 0,
-    THREAD_FLAGGED,
-    THREAD_IDLE,
-    THREAD_SHUTDOWN_QUERY,
-    THREAD_SHUTDOWN
+enum {
+    THREAD_BIT_ACTIVE = 0,
+    THREAD_BIT_QUERY_WAKE,
+    THREAD_BIT_QUERY_SHUTDOWN,
+    THREAD_BIT_CNT
 };
 
 struct thread_arg {
@@ -149,7 +148,7 @@ struct thread_arg {
     thread_handle thread;
     mutex_handle mutex;
     condition_handle condition;
-    enum thread_state state;
+    uint8_t bits[UINT8_CNT(THREAD_BIT_CNT)];
 };
 
 static thread_return thread_callback_convention thread_proc(void *Arg)
@@ -172,18 +171,17 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
             if (!dispatched_task)
             {
                 mutex_acquire(&arg->mutex);
-                if (arg->state != THREAD_FLAGGED) 
+                if (!uint8_bit_test_reset(arg->bits, THREAD_BIT_QUERY_WAKE))
                 {
-                    if (arg->state == THREAD_SHUTDOWN_QUERY)
+                    uint8_bit_reset(arg->bits, THREAD_BIT_ACTIVE);
+                    if (uint8_bit_test(arg->bits, THREAD_BIT_QUERY_SHUTDOWN))
                     {
-                        arg->state = THREAD_SHUTDOWN;
                         mutex_release(&arg->mutex);
                         return (thread_return) 0;
                     }
-                    arg->state = THREAD_IDLE;
                     condition_sleep(&arg->condition, &arg->mutex);                    
                 }
-                arg->state = THREAD_ACTIVE;
+                uint8_bit_set(arg->bits, THREAD_BIT_ACTIVE);
                 mutex_release(&arg->mutex);
                 continue;
             }
@@ -202,7 +200,7 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
 
         // Inform scheduller that global queue state has been changed
         mutex_acquire(&pool->mutex);
-        pool->flag = 1;
+        pool->query_wake = 1;
         condition_signal(&pool->condition);
         mutex_release(&pool->mutex);
     }
@@ -289,7 +287,7 @@ void thread_pool_schedule(struct thread_pool *pool)
                     struct thread_arg *arg = persistent_array_fetch(&pool->arg, ind, sizeof(struct thread_arg));
                     if (ptr_interlocked_compare_exchange(&arg->dispatched_task, NULL, dispatched_task)) continue;
                     mutex_acquire(&arg->mutex);
-                    arg->state = THREAD_FLAGGED;
+                    uint8_bit_set(arg->bits, THREAD_BIT_QUERY_WAKE);
                     condition_signal(&arg->condition);
                     mutex_release(&arg->mutex);
                     break;
@@ -302,8 +300,8 @@ void thread_pool_schedule(struct thread_pool *pool)
 
         // Go to the sleep state
         mutex_acquire(&pool->mutex);
-        if (!pool->flag) condition_sleep(&pool->condition, &pool->mutex);
-        pool->flag = 0;
+        if (!pool->query_wake) condition_sleep(&pool->condition, &pool->mutex);
+        pool->query_wake = 0;
         mutex_release(&pool->mutex);
     }   
 }
@@ -317,7 +315,8 @@ static bool thread_arg_init(struct thread_arg *arg, size_t tls_sz, struct log *l
             if (thread_assert(log, CODE_METRIC, condition_init(&arg->condition)))
             {
                 mutex_acquire(&arg->mutex);
-                arg->state = THREAD_ACTIVE;
+                memset(arg->bits, 0, sizeof(arg->bits));
+                uint8_bit_set(arg->bits, THREAD_BIT_ACTIVE);
                 mutex_release(&arg->mutex);
                 ptr_store_release(&arg->dispatched_task, NULL);
                 return 1;
@@ -355,7 +354,7 @@ static bool thread_pool_init(struct thread_pool *pool, size_t cnt, size_t task_h
                         size_store_release(&pool->cnt, 0); // Number of initialized threads
                         pool->task_cnt = 0; // Guaranteed number of avilable task slots
                         mutex_acquire(&pool->mutex);
-                        pool->flag = 0;
+                        pool->query_wake = 0;
                         mutex_release(&pool->mutex);
                         return 1;
                     }
@@ -381,7 +380,7 @@ static void thread_pool_finish_range(struct thread_pool *pool, size_t l, size_t 
     {
         struct thread_arg *arg = persistent_array_fetch(&pool->arg, i, sizeof(*arg));
         mutex_acquire(&arg->mutex);
-        arg->state = THREAD_SHUTDOWN_QUERY;
+        uint8_bit_set(arg->bits, THREAD_BIT_QUERY_SHUTDOWN);
         condition_signal(&arg->condition);
         mutex_release(&arg->mutex);
         thread_return res; // Always zero

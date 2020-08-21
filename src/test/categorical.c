@@ -31,6 +31,7 @@ bool test_categorical_generator_a(void *p_res, size_t *p_ind, struct log *log)
     res->qas = data->qas;
     res->dimx = data->dimx;
     res->dimy = data->dimy;
+    res->cnt = data->cnt;
     memcpy(res->tbl, data[ind].tbl, data[ind].cnt * sizeof(*res->tbl));
     return 1;
 }

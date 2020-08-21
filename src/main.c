@@ -38,7 +38,7 @@ static bool test_main(size_t thread_cnt, struct log *log)
 {
     const struct test_group groupl[] = {
         {
-            STRI("Low level facilities A"),
+            //STRI("Low level facilities A"),
             test_ll_dispose_a,
             CLII((test_generator_callback []) {
                 test_ll_generator_a,
@@ -50,7 +50,7 @@ static bool test_main(size_t thread_cnt, struct log *log)
             })
         },
         {
-            STRI("Low level facilities B"),
+            //STRI("Low level facilities B"),
             test_ll_dispose_b,
             CLII((test_generator_callback []) {
                 test_ll_generator_b,
@@ -60,7 +60,7 @@ static bool test_main(size_t thread_cnt, struct log *log)
             })
         },
         {
-            STRI("Non-portable facilities emulation"),
+            //STRI("Emulation of the non-portable facilities"),
             test_np_dispose_a,
             CLII((test_generator_callback []) {
                 test_np_generator_a,
@@ -70,7 +70,7 @@ static bool test_main(size_t thread_cnt, struct log *log)
             })
         },
         {
-            STRI("Sorting routines A: sort algorithms"),
+            //STRI("Sorting routines A: sort algorithms"),
             test_sort_dispose_a,
             CLII((test_generator_callback []) {
                 test_sort_generator_a_1,
@@ -82,7 +82,7 @@ static bool test_main(size_t thread_cnt, struct log *log)
             })
         },
         {
-            STRI("Sorting routines B: orders computation"),
+            //STRI("Sorting routines B: order computation"),
             test_sort_dispose_b,
             CLII((test_generator_callback []) {
                 test_sort_generator_b_1
@@ -93,7 +93,7 @@ static bool test_main(size_t thread_cnt, struct log *log)
             })
         },
         {
-            STRI("Sorting routines C: exact search"),
+            //STRI("Sorting routines C: precise search"),
             test_sort_dispose_c,
             CLII((test_generator_callback []) {
                 test_sort_generator_c_1
@@ -104,7 +104,7 @@ static bool test_main(size_t thread_cnt, struct log *log)
             })
         },
         {
-            STRI("Sorting routines D: inexact search"),
+            //STRI("Sorting routines D: approximate search"),
             test_sort_dispose_d,
             CLII((test_generator_callback []) {
                 test_sort_generator_d_1
@@ -114,7 +114,7 @@ static bool test_main(size_t thread_cnt, struct log *log)
             })
         },
         {
-            STRI("Unicode facilities"),
+            //STRI("Unicode facilities"),
             test_utf8_dispose,
             CLII((test_generator_callback []) {
                 test_utf8_generator,
@@ -126,9 +126,9 @@ static bool test_main(size_t thread_cnt, struct log *log)
                 test_utf16_encode,
                 test_utf16_decode
             })
-        },
+        },/*
         {
-            STRI("Catigorical data analysis"),
+            //STRI("Catigorical data analysis"),
             test_categorical_dispose_a,
             CLII((test_generator_callback []) {
                 test_categorical_generator_a,
@@ -136,9 +136,10 @@ static bool test_main(size_t thread_cnt, struct log *log)
             CLII((test_callback []) {
                 test_categorical_a,
             })
-        }
+        }*/
     };
-    log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Test mode triggered!\n");
+    log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Test mode triggered. Notation: %~s*:%~s*:%~s*:%~s*.\n",
+        STRC("<group no.>"), STRC("<test no.>"), STRC("<generator no.>"), STRC("<generator instance no.>"));
     return test(groupl, countof(groupl), thread_cnt, log);
 }
 

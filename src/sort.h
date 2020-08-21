@@ -33,7 +33,7 @@ void sort_unique(void *restrict, size_t *, size_t, cmp_callback, void *, void *r
 enum binary_search_flags {
     BINARY_SEARCH_RIGHTMOST = 1, // Searches for the rightmost occurrence of the key
     BINARY_SEARCH_CRITICAL = 2, // Searches for the left/rightmost occurrence of the key
-    BINARY_SEARCH_INEXACT = 4, // Searches for the best approximation from left/right side
+    BINARY_SEARCH_IMPRECISE = 4, // Searches for the best approximation from left/right side
 };
 
 bool binary_search(size_t *, const void *restrict, const void *restrict, size_t, size_t, stable_cmp_callback, void *, enum binary_search_flags);

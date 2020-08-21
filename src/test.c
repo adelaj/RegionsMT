@@ -20,32 +20,30 @@ struct test_tls {
 
 static unsigned test_gen_inst_thread(void *Indl, void *Group, void *Tls)
 {
-    size_t *indl = Indl, tn = indl[0], gn = indl[1], gi = indl[2];
+    // w -- group index; x -- test index; y -- generator index; z -- generator instance index
+    size_t *indl = Indl, w = indl[0], x = indl[1], y = indl[2], z = indl[3];
     const struct test_group *group = Group;
     struct test_tls *tls = Tls;
-    log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Test %~uz:%~uz:%~uz from the group %\"~s* assigned to the thread no. %~uz.\n", tn, gn, gi, STRL(group->name), tls->base.tid);
+    //log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Test %~uz:%~uz:%~uz:%~uz assigned to the thread no. %~uz.\n", w, x, y, z, tls->base.tid);
     void *data;
-    if (!group->generator[gn](&data, &gi, &tls->log)) return 0;
+    if (!group->generator[y](&data, &z, &tls->log)) return 0;
     uint64_t start = get_time();
-    bool succ = group->test[tn](data, &tls->log);
-    if (!succ) log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_WARNING, "Test %~uz:%~uz:%~uz from the group %\"~s* failed!\n", tn, gn, gi, STRL(group->name));
-    else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %~uz:%~uz:%~uz from the group %\"~s* took %~T.\n", tn, gn, gi, STRL(group->name), start, get_time());
+    bool succ = group->test[x](data, &tls->log);
+    if (!succ) log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_WARNING, "Test %~uz:%~uz:%~uz:%~uz failed!\n", w, x, y, z);
+    else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %~uz:%~uz:%~uz:%~uz took %~T.\n", w, x, y, z, start, get_time());
     if (group->dispose) group->dispose(data);
     return succ;
 }
 
 static unsigned test_gen_thread(void *Indl, void *Group, void *Tls)
 {
-    size_t *indl = Indl, tn = indl[0], gn = indl[1];
+    // w -- group index; x -- test index; y -- generator index
+    size_t *indl = Indl, w = indl[0], x = indl[1], y = indl[2];
     const struct test_group *group = Group;
     struct test_tls *tls = Tls;
-    log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Test %~uz:%~uz from the group %\"~s* assigned to thread %~uz!\n", tn, gn, STRL(group->name), tls->base.tid);
-    return 1;
-    /*
     size_t cnt = 1;
-    for (size_t ind = 0; group->generator[gn](NULL, &ind, &tls->log), ind; cnt++);
-    return loop_init(tls->base.pool, test_gen_inst_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, (void *) group, ARG(size_t, 1, 1, cnt), (size_t []) { tn, gn, 0 }, 0, &tls->log);
-    */
+    for (size_t i = 0; group->generator[y](NULL, &i, &tls->log), i; cnt++);
+    return loop_init(tls->base.pool, test_gen_inst_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, (void *) group, ARG(size_t, 1, 1, 1, cnt), (size_t []) { w, x, y, 0 }, 0, &tls->log);
 }
 
 bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct log *log)
@@ -60,7 +58,7 @@ bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct
     {
         size_t i = 0;
         for (; i < cnt; i++)
-            if (!loop_init(pool, test_gen_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, (void *) (groupl + i), ARG(size_t, groupl[i].test_cnt, groupl[i].generator_cnt), NULL, 0, log)) break;
+            if (!loop_init(pool, test_gen_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, (void *) (groupl + i), ARG(size_t, 1, groupl[i].test_cnt, groupl[i].generator_cnt), (size_t[]) { i, 0, 0 }, 0, log)) break;
         succ = i == cnt;
         thread_pool_schedule(pool);
     }

@@ -36,7 +36,7 @@ bool test_ll_generator_a(void *p_res, size_t *p_ind, struct log *log)
         return 1;
     }
     if (!array_assert(log, CODE_METRIC, array_init(p_res, NULL, 1, sizeof(struct test_ll_a), 0, ARRAY_STRICT))) return 0;
-    *(struct test_ll_a **) p_res = data + *p_ind;
+    **(struct test_ll_a **) p_res = data[*p_ind];
     return 1;
 }
 

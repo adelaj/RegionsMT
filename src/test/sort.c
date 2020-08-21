@@ -210,7 +210,8 @@ bool test_sort_b_2(void *In, struct log *log)
     if (array_assert(log, CODE_METRIC, array_init(&arr, NULL, in->cnt, sizeof(*arr), 0, ARRAY_STRICT)))
     {
         memcpy(arr, in->arr, in->cnt * sizeof(*arr));
-        if (array_assert(log, CODE_METRIC, orders_apply(ord, ucnt, sizeof(*arr), arr, NULL, sizeof(*arr))))
+        size_t swp;
+        if (array_assert(log, CODE_METRIC, orders_apply(ord, ucnt, sizeof(*arr), arr, &swp, sizeof(*arr))))
         {
             size_t ind = 1;
             for (; ind < ucnt; ind++) if (in->arr[ord[ind]] != arr[ind]) break;
@@ -267,8 +268,8 @@ bool test_sort_d_1(void *In, struct log *log)
     {
         uint64_t x = (UINT64_C(1) << i) + 1, y = x - 2;
         size_t tmp, res_x = MIN(i + 1, in->cnt - 1), res_y = y ? MIN(i - 1, in->cnt - 1) : 0;
-        if (!binary_search(&tmp, &x, in->arr, in->cnt, sizeof(*in->arr), uint64_stable_cmp_asc_test, NULL, BINARY_SEARCH_INEXACT | BINARY_SEARCH_RIGHTMOST) || tmp != res_x) return 0;
-        if (!binary_search(&tmp, &y, in->arr, in->cnt, sizeof(*in->arr), uint64_stable_cmp_asc_test, NULL, BINARY_SEARCH_INEXACT) || tmp != res_y) return 0;
+        if (!binary_search(&tmp, &x, in->arr, in->cnt, sizeof(*in->arr), uint64_stable_cmp_asc_test, NULL, BINARY_SEARCH_IMPRECISE | BINARY_SEARCH_RIGHTMOST) || tmp != res_x) return 0;
+        if (!binary_search(&tmp, &y, in->arr, in->cnt, sizeof(*in->arr), uint64_stable_cmp_asc_test, NULL, BINARY_SEARCH_IMPRECISE) || tmp != res_y) return 0;
     }
     return 1;
 }

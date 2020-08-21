@@ -7,7 +7,6 @@ typedef void (*test_dispose_callback)(void *);
 typedef bool (*test_callback)(void *, struct log *);
 
 struct test_group {
-    const struct strl name;
     test_dispose_callback dispose;
     struct {
         test_generator_callback *generator;

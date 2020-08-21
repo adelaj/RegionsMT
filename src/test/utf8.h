@@ -17,4 +17,4 @@ bool test_utf8_encode(void *, struct log *);
 bool test_utf8_decode(void *, struct log *);
 bool test_utf16_encode(void *, struct log *);
 bool test_utf16_decode(void *, struct log *);
-#define test_utf8_dispose test_dispose
+#define test_utf8_dispose NULL

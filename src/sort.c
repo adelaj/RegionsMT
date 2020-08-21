@@ -457,7 +457,7 @@ bool binary_search(size_t *p_ind, const void *key, const void *arr, size_t cnt, 
             return 1;            
         }
     }
-    if (!(flags & BINARY_SEARCH_INEXACT) && cmp(key, (char *) arr + sz * left, context)) return 0;
+    if (!(flags & BINARY_SEARCH_IMPRECISE) && cmp(key, (char *) arr + sz * left, context)) return 0;
     *p_ind = left;
     return 1;
 }
