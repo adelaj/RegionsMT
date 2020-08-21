@@ -51,12 +51,12 @@ DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, __atomic_fetch_and)
 DECLARE_INTERLOCKED_OP(void *, ptr, exchange, __atomic_exchange_n)
 DECLARE_INTERLOCKED_OP(size_t, size, add, __atomic_fetch_add)
 
-size_t size_inc_interlocked(volatile size_t *mem)
+size_t size_interlocked_inc(volatile size_t *mem)
 {
     return __atomic_add_fetch(mem, 1, __ATOMIC_ACQ_REL);
 }
 
-size_t size_dec_interlocked(volatile size_t *mem)
+size_t size_interlocked_dec(volatile size_t *mem)
 {
     return __atomic_sub_fetch(mem, 1, __ATOMIC_ACQ_REL);
 }
@@ -158,17 +158,17 @@ uint32_t uint32_pop_cnt(uint32_t x)
 
 DECLARE_LOAD_ACQUIRE(uint64_t, uint64)
 
-size_t size_inc_interlocked(volatile size_t *mem)
+size_t size_interlocked_inc(volatile size_t *mem)
 {
     return (size_t) _InterlockedIncrement64((volatile long long *) mem) - 1;
 }
 
-size_t size_dec_interlocked(volatile size_t *mem)
+size_t size_interlocked_dec(volatile size_t *mem)
 {
     return (size_t) _InterlockedDecrement64((volatile long long *) mem) + 1;
 }
 
-size_t size_add_interlocked(volatile size_t *mem, size_t val)
+size_t size_interlocked_add(volatile size_t *mem, size_t val)
 {
     return (size_t) _InterlockedExchangeAdd64((volatile long long *) mem, (long long) val);
 }
@@ -227,17 +227,17 @@ size_t size_pop_cnt(size_t x)
 
 #   elif defined _M_IX86
 
-void size_inc_interlocked(volatile size_t *mem)
+void size_interlocked_inc(volatile size_t *mem)
 {
     _InterlockedIncrement((volatile long *) mem);
 }
 
-void size_dec_interlocked(volatile size_t *mem)
+void size_interlocked_dec(volatile size_t *mem)
 {
     _InterlockedDecrement((volatile long *) mem);
 }
 
-size_t size_add_interlocked(volatile size_t *mem, size_t val)
+size_t size_interlocked_add(volatile size_t *mem, size_t val)
 {
     return (size_t) _InterlockedExchangeAdd((volatile long long *) mem, (long long) val);
 }

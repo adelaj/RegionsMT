@@ -11,7 +11,7 @@ void aggr_inc(volatile void *Mem, const void *arg, unsigned status)
 {
     (void) arg;
     volatile struct inc_mem *mem = Mem;
-    size_inc_interlocked((volatile void *[]) { &mem->fail, &mem->success, &mem->drop }[MIN(status, AGGR_DROP)]);
+    size_interlocked_inc((volatile void *[]) { &mem->fail, &mem->success, &mem->drop }[MIN(status, AGGR_DROP)]);
 }
 
 unsigned cond_inc(volatile void *Mem, const void *Tot)
@@ -106,7 +106,7 @@ static bool thread_pool_enqueue_impl(struct thread_pool *pool, size_t cnt, struc
     for (size_t i = pool->task_cnt; i < probe; i++)
         bool_store_release(&((struct dispatched_task *) persistent_array_fetch(&pool->dispatched_task, i, sizeof(struct dispatched_task)))->ngarbage, 0);
     if (pool->task_cnt < probe) pool->task_cnt = probe;
-    size_add_interlocked(&pool->task_hint, cnt);
+    size_interlocked_add(&pool->task_hint, cnt);
     return 1;
 }
 
@@ -196,7 +196,7 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
         }
         if (dispatched_task->aggr.callback) dispatched_task->aggr.callback(dispatched_task->aggr.mem, dispatched_task->aggr.arg, res);
         bool_store_release(&dispatched_task->ngarbage, 0);
-        size_dec_interlocked(&pool->task_hint);
+        size_interlocked_dec(&pool->task_hint);
 
         // Inform scheduller that global queue state has been changed
         mutex_acquire(&pool->mutex);
@@ -229,7 +229,7 @@ void thread_pool_schedule(struct thread_pool *pool)
             case COND_DROP:
                 if (task->aggr.callback) task->aggr.callback(task->aggr.mem, task->aggr.arg, AGGR_DROP);
                 queue_dequeue(&pool->queue, off, sizeof(*task));
-                size_dec_interlocked(&pool->task_hint);
+                size_interlocked_dec(&pool->task_hint);
                 continue;
             case COND_EXECUTE:
                 dispatch = 1;
