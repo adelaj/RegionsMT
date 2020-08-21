@@ -224,16 +224,17 @@ void queue_dequeue(struct queue *queue, size_t offset, size_t sz)
 
 struct array_result persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz, enum persistent_array_flags flags)
 {
+    bool weak = flags & PERSISTENT_ARRAY_WEAK;
     if (!cnt)
     {
         *arr = (struct persistent_array) { 0 };
-        return flags & PERSISTENT_ARRAY_WEAK ? 
+        return weak ?
             (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED } : 
             array_init(&arr->ptr, &arr->cap, SIZE_BIT, sizeof(*arr->ptr), 0, 0);
     }
     size_t off = arr->off = size_log2(cnt, 0);
     arr->bck = 1;
-    struct array_result res = array_init(&arr->ptr, &arr->cap, flags & PERSISTENT_ARRAY_WEAK ? 1 : SIZE_BIT - off, sizeof(*arr->ptr), 0, 0);
+    struct array_result res = array_init(&arr->ptr, &arr->cap, weak ? 1 : SIZE_BIT - off, sizeof(*arr->ptr), 0, weak ? 0 : ARRAY_STRICT);
     if (!res.status) return res;
     size_t tot = res.tot;
     res = array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT | (flags & PERSISTENT_ARRAY_CLEAR));

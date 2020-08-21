@@ -719,46 +719,42 @@ struct message_result print_fmt(char *buff, size_t *p_cnt, const struct style *s
 bool log_init(struct log *restrict log, const char *restrict path, size_t lim, enum log_flags flags, const struct ttl_style *restrict ttl_style, const struct style *restrict style, struct log *restrict fallback)
 {
     FILE *f = path ? Fopen(path, flags & LOG_APPEND ? "a" : "w") : stderr;
-    if (fopen_assert(fallback, CODE_METRIC, path, f))
+    if (!fopen_assert(fallback, CODE_METRIC, path, f)) return 0;
+    bool tty = (flags & (LOG_FORCE_TTY)) || file_is_tty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
+    size_t cap = bom ? MAX(lim, lengthof(UTF8_BOM)) : lim;
+    if (array_assert(fallback, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)))
     {
-        bool tty = (flags & (LOG_FORCE_TTY)) || file_is_tty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
-        size_t cap = bom ? MAX(lim, lengthof(UTF8_BOM)) : lim;
-        if (array_assert(fallback, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)))
-        {
-            if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
-            else log->cnt = 0;
-            log->ttl_style = tty ? ttl_style : NULL;
-            log->style = tty ? style : NULL;
-            log->lim = lim;
-            log->file = f;
-            log->tot = 0;
-            log->fallback = fallback;
-            if (log->cnt < log->lim || log_flush(log)) return 1;
-            free(log->buff);
-        }
-        Fclose(f);
+        if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
+        else log->cnt = 0;
+        log->ttl_style = tty ? ttl_style : NULL;
+        log->style = tty ? style : NULL;
+        log->lim = lim;
+        log->file = f;
+        log->tot = 0;
+        log->fallback = fallback;
+        if (log->cnt < log->lim || log_flush(log)) return 1;
+        free(log->buff);
     }
+    Fclose(f);
     return 0;
 }
 
 bool log_dup(struct log *restrict dst, struct log *restrict src)
 {
     FILE *f = Fdup(src->file, "a");
-    if (crt_assert(src, CODE_METRIC, f))
+    if (!crt_assert(src, CODE_METRIC, f)) return 0;
+    if (array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->lim, sizeof(*dst->buff), 0, 0)))
     {
-        if (array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->lim, sizeof(*dst->buff), 0, 0)))
-        {
-            dst->cnt = 0;
-            dst->ttl_style = src->ttl_style;
-            dst->style = src->style;
-            dst->lim = src->lim;
-            dst->file = f;
-            dst->tot = 0;
-            dst->fallback = src;
-            return 1;
-        }
-        Fclose(f);
+        dst->cnt = 0;
+        dst->ttl_style = src->ttl_style;
+        dst->style = src->style;
+        dst->lim = src->lim;
+        dst->file = f;
+        dst->tot = 0;
+        dst->fallback = src;
+        return 1;
     }
+    Fclose(f);
     return 0;
 }
 

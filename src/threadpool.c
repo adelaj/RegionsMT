@@ -22,7 +22,7 @@ unsigned cond_inc(volatile void *Mem, const void *Tot)
 
 struct loop_data {
     volatile struct inc_mem mem;
-    size_t tot;
+    size_t prod;
     size_t ind[];
 };
 
@@ -30,7 +30,7 @@ struct loop_generator_context {
     task_callback callback;
     struct task_cond cond;
     struct task_aggr aggr;
-    size_t prod, cnt;
+    size_t cnt;
     void *context;
     struct loop_data *data;
 };
@@ -48,7 +48,7 @@ static unsigned loop_tread_close(void *Data, void *context, void *tls)
 void loop_generator(void *Task, size_t ind, void *Context)
 {
     struct loop_generator_context *context = Context;
-    *(struct task *) Task = ind < context->prod ?
+    *(struct task *) Task = ind < context->data->prod ?
         (struct task) {
             .callback = context->callback,
             .arg = context->data->ind + ind * context->cnt,
@@ -59,7 +59,7 @@ void loop_generator(void *Task, size_t ind, void *Context)
         (struct task) {
             .callback = loop_tread_close,
             .arg = context->data,
-            .cond = (struct task_cond) { .callback = cond_inc, .mem = &context->data->mem, .arg = &context->data->tot },
+            .cond = (struct task_cond) { .callback = cond_inc, .mem = &context->data->mem, .arg = &context->data->prod },
             .aggr = context->aggr
         };
 }
@@ -73,13 +73,17 @@ bool loop_init(struct thread_pool *pool, task_callback callback, struct task_con
     size_store_release(&data->mem.fail, 0);
     size_store_release(&data->mem.success, 0);
     size_store_release(&data->mem.drop, 0);
-    data->tot = tot;
+    data->prod = prod;
     if (prod) // Building index set
         if (offl) memcpy(data->ind, offl, cnt * sizeof(*data->ind));
         else memset(data->ind, 0, cnt * sizeof(*data->ind));
     for (size_t i = 1, j = cnt; i < prod; i++, j += cnt)
-        for (size_t k = 0; k < cnt && (data->ind[j + k] = data->ind[j + k - cnt] + 1) == (offl ? offl[k] + cntl[k] : cntl[k]); data->ind[j + k] = 0, k++);
-    return thread_pool_enqueue_yield(pool, loop_generator, &(struct loop_generator_context) { .callback = callback, .cond = cond, .aggr = aggr, .cnt = cnt, .prod = prod, .context = context, .data = data }, prod + 1, hi, log);
+    {
+        size_t k = 0;
+        for (; k < cnt && (data->ind[j + k] = data->ind[j + k - cnt] + 1) == (offl ? offl[k] + cntl[k] : cntl[k]); data->ind[j + k] = 0, k++);
+        for (k++; k < cnt; data->ind[j + k] = data->ind[j + k - cnt], k++);
+    }
+    return thread_pool_enqueue_yield(pool, loop_generator, &(struct loop_generator_context) { .callback = callback, .cond = cond, .aggr = aggr, .cnt = cnt, .context = context, .data = data }, prod + 1, hi, log);
 }
 
 struct thread_pool {
@@ -87,19 +91,30 @@ struct thread_pool {
     mutex_handle mutex;
     condition_handle condition;
     struct queue queue;
-    volatile size_t cnt, task_cnt, task_hint;
+    volatile size_t cnt, task_hint;
+    size_t task_cnt;
     struct persistent_array dispatched_task;
     struct persistent_array arg;
     bool flag;
 };
 
+static bool thread_pool_enqueue_impl(struct thread_pool *pool, size_t cnt, struct log *log)
+{
+    size_t car, probe = size_add(&car, size_load_acquire(&pool->task_hint), cnt);
+    if (!crt_assert_impl(log, CODE_METRIC, car ? ERANGE : 0)) return 0;
+    if (!array_assert(log, CODE_METRIC, persistent_array_test(&pool->dispatched_task, probe, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK))) return 0;
+    for (size_t i = pool->task_cnt; i < probe; i++)
+        bool_store_release(&((struct dispatched_task *) persistent_array_fetch(&pool->dispatched_task, i, sizeof(struct dispatched_task)))->ngarbage, 0);
+    if (pool->task_cnt < probe) pool->task_cnt = probe;
+    size_add_interlocked(&pool->task_hint, cnt);
+    return 1;
+}
+
 bool thread_pool_enqueue(struct thread_pool *pool, struct task *task, size_t cnt, bool hi, struct log *log)
 {
     spinlock_acquire(&pool->spinlock);
-    size_t car, probe = size_add(&car, size_load_acquire(&pool->task_hint), cnt);
-    bool succ = 
-        crt_assert_impl(log, CODE_METRIC, car ? ERANGE : 0) &&
-        array_assert(log, CODE_METRIC, persistent_array_test(&pool->dispatched_task, probe, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK)) &&
+    bool succ =
+        thread_pool_enqueue_impl(pool, cnt, log) &&
         array_assert(log, CODE_METRIC, queue_enqueue(&pool->queue, hi, task, cnt, sizeof(*task)));
     spinlock_release(&pool->spinlock);
     return succ;
@@ -108,10 +123,8 @@ bool thread_pool_enqueue(struct thread_pool *pool, struct task *task, size_t cnt
 bool thread_pool_enqueue_yield(struct thread_pool *pool, generator_callback generator, void *context, size_t cnt, bool hi, struct log *log)
 {
     spinlock_acquire(&pool->spinlock);
-    size_t car, probe = size_add(&car, size_load_acquire(&pool->task_hint), cnt);
     bool succ =
-        crt_assert_impl(log, CODE_METRIC, car ? ERANGE : 0) &&
-        array_assert(log, CODE_METRIC, persistent_array_test(&pool->dispatched_task, probe, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK)) &&
+        thread_pool_enqueue_impl(pool, cnt, log) && 
         array_assert(log, CODE_METRIC, queue_enqueue_yield(&pool->queue, hi, generator, context, cnt, sizeof(struct task)));
     spinlock_release(&pool->spinlock);
     return succ;
@@ -218,6 +231,7 @@ void thread_pool_schedule(struct thread_pool *pool)
             case COND_DROP:
                 if (task->aggr.callback) task->aggr.callback(task->aggr.mem, task->aggr.arg, AGGR_DROP);
                 queue_dequeue(&pool->queue, off, sizeof(*task));
+                size_dec_interlocked(&pool->task_hint);
                 continue;
             case COND_EXECUTE:
                 dispatch = 1;
@@ -250,15 +264,12 @@ void thread_pool_schedule(struct thread_pool *pool)
         {
             if (dispatch)
             {
-                dispatched_task->aggr.callback = task->aggr.callback;
-                dispatched_task->aggr.arg = task->aggr.arg;
-                dispatched_task->aggr.mem = task->aggr.mem;
+                dispatched_task->aggr = task->aggr;
                 dispatched_task->arg = task->arg;
                 dispatched_task->callback = task->callback;
                 dispatched_task->context = task->context;
                 bool_store_release(&dispatched_task->ngarbage, 1);
                 bool_store_release(&dispatched_task->norphan, 1);
-                size_inc_interlocked(&pool->task_hint);
                 queue_dequeue(&pool->queue, off, sizeof(*task));
             }
             else if (orphan) bool_store_release(&dispatched_task->norphan, 1);
@@ -299,7 +310,7 @@ void thread_pool_schedule(struct thread_pool *pool)
 
 static bool thread_arg_init(struct thread_arg *arg, size_t tls_sz, struct log *log)
 {
-    if (array_assert(log, CODE_METRIC, array_init(&arg->tls, NULL, 1, tls_sz, 0, ARRAY_FAILSAFE | ARRAY_CLEAR)))
+    if (array_assert(log, CODE_METRIC, array_init(&arg->tls, NULL, 1, tls_sz, 0, 0)))
     {
         if (thread_assert(log, CODE_METRIC, mutex_init(&arg->mutex)))
         {
@@ -332,7 +343,7 @@ static bool thread_pool_init(struct thread_pool *pool, size_t cnt, size_t task_h
     {
         if (array_assert(log, CODE_METRIC, queue_init(&pool->queue, task_hint, sizeof(struct task))))
         {
-            if (array_assert(log, CODE_METRIC, persistent_array_init(&pool->dispatched_task, task_hint, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK)))
+            if (array_assert(log, CODE_METRIC, persistent_array_init(&pool->dispatched_task, task_hint, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK | PERSISTENT_ARRAY_CLEAR)))
             {
                 if (thread_assert(log, CODE_METRIC, mutex_init(&pool->mutex)))
                 {
@@ -342,7 +353,7 @@ static bool thread_pool_init(struct thread_pool *pool, size_t cnt, size_t task_h
                         spinlock_release(&pool->add); // Initializing the thread array spinlock
                         size_store_release(&pool->task_hint, 0); // The number of slots sufficient to store the queue intermediate data 
                         size_store_release(&pool->cnt, 0); // Number of initialized threads
-                        size_store_release(&pool->task_cnt, 0);
+                        pool->task_cnt = 0; // Guaranteed number of avilable task slots
                         mutex_acquire(&pool->mutex);
                         pool->flag = 0;
                         mutex_release(&pool->mutex);

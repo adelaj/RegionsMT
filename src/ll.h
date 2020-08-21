@@ -96,8 +96,9 @@ void bit_reset_interlocked(volatile uint8_t *, size_t);
 // Sets two bits starting from the selected position specified by 2nd argument
 void bit_set2_interlocked(volatile uint8_t *, size_t);
 
-void size_inc_interlocked(volatile size_t *);
-void size_dec_interlocked(volatile size_t *);
+size_t size_inc_interlocked(volatile size_t *);
+size_t size_dec_interlocked(volatile size_t *);
+size_t size_add_interlocked(volatile size_t *, size_t);
 
 // Gets two bits starting from the position specified by 2nd argument 
 uint8_t bit_get2_acquire(volatile uint8_t *, size_t);

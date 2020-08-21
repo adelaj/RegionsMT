@@ -115,7 +115,7 @@ static bool test_main(size_t thread_cnt, struct log *log)
         },
         {
             STRI("Unicode facilities"),
-            NULL,
+            test_utf8_dispose,
             CLII((test_generator_callback []) {
                 test_utf8_generator,
             }),

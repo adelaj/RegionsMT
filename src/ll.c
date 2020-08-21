@@ -49,15 +49,16 @@ DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, __atomic_fetch_or)
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, and, __atomic_fetch_and)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, __atomic_fetch_and)
 DECLARE_INTERLOCKED_OP(void *, ptr, exchange, __atomic_exchange_n)
+DECLARE_INTERLOCKED_OP(size_t, size, add, __atomic_fetch_add)
 
-void size_inc_interlocked(volatile size_t *mem)
+size_t size_inc_interlocked(volatile size_t *mem)
 {
-    __atomic_add_fetch(mem, 1, __ATOMIC_ACQ_REL);
+    return __atomic_add_fetch(mem, 1, __ATOMIC_ACQ_REL);
 }
 
-void size_dec_interlocked(volatile size_t *mem)
+size_t size_dec_interlocked(volatile size_t *mem)
 {
-    __atomic_sub_fetch(mem, 1, __ATOMIC_ACQ_REL);
+    return __atomic_sub_fetch(mem, 1, __ATOMIC_ACQ_REL);
 }
 
 uint32_t uint32_bit_scan_reverse(uint32_t x)
@@ -157,14 +158,19 @@ uint32_t uint32_pop_cnt(uint32_t x)
 
 DECLARE_LOAD_ACQUIRE(uint64_t, uint64)
 
-void size_inc_interlocked(volatile size_t *mem)
+size_t size_inc_interlocked(volatile size_t *mem)
 {
-    _InterlockedIncrement64((volatile long long *) mem);
+    return (size_t) _InterlockedIncrement64((volatile long long *) mem) - 1;
 }
 
-void size_dec_interlocked(volatile size_t *mem)
+size_t size_dec_interlocked(volatile size_t *mem)
 {
-    _InterlockedDecrement64((volatile long long *) mem);
+    return (size_t) _InterlockedDecrement64((volatile long long *) mem) + 1;
+}
+
+size_t size_add_interlocked(volatile size_t *mem, size_t val)
+{
+    return (size_t) _InterlockedExchangeAdd64((volatile long long *) mem, (long long) val);
 }
 
 // Warning! 'y %= 64' is done internally!
@@ -229,6 +235,11 @@ void size_inc_interlocked(volatile size_t *mem)
 void size_dec_interlocked(volatile size_t *mem)
 {
     _InterlockedDecrement((volatile long *) mem);
+}
+
+size_t size_add_interlocked(volatile size_t *mem, size_t val)
+{
+    return (size_t) _InterlockedExchangeAdd((volatile long long *) mem, (long long) val);
 }
 
 #   endif
