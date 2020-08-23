@@ -80,7 +80,8 @@ bool loop_init(struct thread_pool *pool, task_callback callback, struct task_con
     for (size_t i = 1, j = cnt; i < prod; i++, j += cnt)
     {
         size_t k = 0;
-        for (; k < cnt && (data->ind[j + k] = data->ind[j + k - cnt] + 1) == (offl ? offl[k] + cntl[k] : cntl[k]); data->ind[j + k] = 0, k++);
+        if (offl) for (; k < cnt && (data->ind[j + k] = data->ind[j + k - cnt] + 1) == offl[k] + cntl[k]; data->ind[j + k] = offl[k], k++);
+        else for (; k < cnt && (data->ind[j + k] = data->ind[j + k - cnt] + 1) == cntl[k]; data->ind[j + k] = 0, k++);
         for (k++; k < cnt; data->ind[j + k] = data->ind[j + k - cnt], k++);
     }
     return thread_pool_enqueue_yield(pool, loop_generator, &(struct loop_generator_context) { .callback = callback, .cond = cond, .aggr = aggr, .cnt = cnt, .context = context, .data = data }, prod + 1, hi, log);
@@ -195,11 +196,11 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
             continue;
         }
         if (dispatched_task->aggr.callback) dispatched_task->aggr.callback(dispatched_task->aggr.mem, dispatched_task->aggr.arg, res);
-        bool_store_release(&dispatched_task->ngarbage, 0);
         size_interlocked_dec(&pool->task_hint);
 
         // Inform scheduller that global queue state has been changed
         mutex_acquire(&pool->mutex);
+        bool_store_release(&dispatched_task->ngarbage, 0);
         pool->query_wake = 1;
         condition_signal(&pool->condition);
         mutex_release(&pool->mutex);
@@ -258,49 +259,52 @@ void thread_pool_schedule(struct thread_pool *pool)
             else if (!bool_load_acquire(&dispatched_task->ngarbage)) break;
         }
         
-        if (dispatched_task) // Always true
+        if (!dispatched_task) exit(EXIT_FAILURE); // Never happens
+        
+        if (dispatch)
         {
-            if (dispatch)
-            {
-                dispatched_task->aggr = task->aggr;
-                dispatched_task->arg = task->arg;
-                dispatched_task->callback = task->callback;
-                dispatched_task->context = task->context;
-                bool_store_release(&dispatched_task->ngarbage, 1);
-                bool_store_release(&dispatched_task->norphan, 1);
-                queue_dequeue(&pool->queue, off, sizeof(*task));
-            }
-            else if (orphan) bool_store_release(&dispatched_task->norphan, 1);
+            dispatched_task->aggr = task->aggr;
+            dispatched_task->arg = task->arg;
+            dispatched_task->callback = task->callback;
+            dispatched_task->context = task->context;
+            bool_store_release(&dispatched_task->ngarbage, 1);
+            bool_store_release(&dispatched_task->norphan, 1);
+            queue_dequeue(&pool->queue, off, sizeof(*task));
         }
-
+        else if (orphan) bool_store_release(&dispatched_task->norphan, 1);
+        
         // Unlocking the queue and the dispatch array
         spinlock_release(&pool->spinlock);
 
         // Dispatch task to a thread
-        if (dispatched_task)
+        if (dispatch || orphan)
         {
-            if (dispatch || orphan)
+            size_t cnt = thread_pool_get_count(pool), ind = 0;
+            for (; ind < cnt; ind++)
             {
-                size_t cnt = thread_pool_get_count(pool), ind = 0;
-                for (; ind < cnt; ind++)
-                {
-                    struct thread_arg *arg = persistent_array_fetch(&pool->arg, ind, sizeof(struct thread_arg));
-                    if (ptr_interlocked_compare_exchange(&arg->dispatched_task, NULL, dispatched_task)) continue;
-                    mutex_acquire(&arg->mutex);
-                    uint8_bit_set(arg->bits, THREAD_BIT_QUERY_WAKE);
-                    condition_signal(&arg->condition);
-                    mutex_release(&arg->mutex);
-                    break;
-                }
-                if (ind < cnt) continue; // Continue the outer loop
-                bool_store_release(&dispatched_task->norphan, 0);
+                struct thread_arg *arg = persistent_array_fetch(&pool->arg, ind, sizeof(struct thread_arg));
+                if (ptr_interlocked_compare_exchange(&arg->dispatched_task, NULL, dispatched_task)) continue;
+                mutex_acquire(&arg->mutex);
+                uint8_bit_set(arg->bits, THREAD_BIT_QUERY_WAKE);
+                condition_signal(&arg->condition);
+                mutex_release(&arg->mutex);
+                break;
             }
-            else if (garbage && !pending) return; // Return if there is nothing to be done
+            if (ind < cnt) continue; // Continue the outer loop
+            bool_store_release(&dispatched_task->norphan, 0);
         }
 
         // Go to the sleep state
         mutex_acquire(&pool->mutex);
-        if (!pool->query_wake) condition_sleep(&pool->condition, &pool->mutex);
+        if (!pool->query_wake)
+        {
+            if (!dispatch && !orphan && garbage && !pending)
+            {
+                mutex_release(&pool->mutex);
+                return; // Return if there is nothing to be done
+            }
+            condition_sleep(&pool->condition, &pool->mutex);
+        }
         pool->query_wake = 0;
         mutex_release(&pool->mutex);
     }   

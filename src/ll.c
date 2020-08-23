@@ -51,16 +51,6 @@ DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, __atomic_fetch_and)
 DECLARE_INTERLOCKED_OP(void *, ptr, exchange, __atomic_exchange_n)
 DECLARE_INTERLOCKED_OP(size_t, size, add, __atomic_fetch_add)
 
-size_t size_interlocked_inc(volatile size_t *mem)
-{
-    return __atomic_add_fetch(mem, 1, __ATOMIC_ACQ_REL);
-}
-
-size_t size_interlocked_dec(volatile size_t *mem)
-{
-    return __atomic_sub_fetch(mem, 1, __ATOMIC_ACQ_REL);
-}
-
 uint32_t uint32_bit_scan_reverse(uint32_t x)
 {
     return x ? ((sizeof(unsigned) * CHAR_BIT) - __builtin_clz((unsigned) x) - 1) : UINT_MAX;
@@ -116,13 +106,13 @@ size_t size_pop_cnt(size_t x)
 #   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX, BACKEND_CAST, BACKEND, SUFFIX) \
         TYPE PREFIX ## _interlocked_compare_exchange ## SUFFIX(volatile void *dst, TYPE cmp, TYPE xchg) \
         { \
-            return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, xchg, cmp);\
+            return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, (BACKEND_CAST) xchg, (BACKEND_CAST) cmp);\
         }
 
 #   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND_CAST, BACKEND) \
         TYPE PREFIX ## _interlocked_ ## SUFFIX(volatile void *dst, TYPE arg) \
         { \
-            return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, arg); \
+            return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, (BACKEND_CAST) arg); \
         }
 
 static DECLARE_LOAD_ACQUIRE(long, spinlock)
@@ -140,38 +130,24 @@ DECLARE_INTERLOCKED_OP(void *, ptr, exchange, void *, _InterlockedExchangePointe
 uint32_t uint32_bit_scan_reverse(uint32_t x)
 {
     unsigned long res;
-    return _BitScanReverse(&res, (unsigned long) x) ? (uint32_t) res : UINT32_MAX;
+    return (uint32_t) _BitScanReverse(&res, (unsigned long) x) ? (uint32_t) res : UINT32_MAX;
 }
 
 uint32_t uint32_bit_scan_forward(uint32_t x)
 {
     unsigned long res;
-    return _BitScanForward(&res, (unsigned long) x) ? (uint32_t) res : UINT32_MAX;
+    return (uint32_t) _BitScanForward(&res, (unsigned long) x) ? (uint32_t) res : UINT32_MAX;
 }
 
 uint32_t uint32_pop_cnt(uint32_t x)
 {
-    return __popcnt((unsigned) x);
+    return (uint32_t) __popcnt((unsigned) x);
 }
 
 #   ifdef _M_X64
 
 DECLARE_LOAD_ACQUIRE(uint64_t, uint64)
-
-size_t size_interlocked_inc(volatile size_t *mem)
-{
-    return (size_t) _InterlockedIncrement64((volatile long long *) mem) - 1;
-}
-
-size_t size_interlocked_dec(volatile size_t *mem)
-{
-    return (size_t) _InterlockedDecrement64((volatile long long *) mem) + 1;
-}
-
-size_t size_interlocked_add(volatile size_t *mem, size_t val)
-{
-    return (size_t) _InterlockedExchangeAdd64((volatile long long *) mem, (long long) val);
-}
+DECLARE_INTERLOCKED_OP(size_t, size, add, long long, _InterlockedExchangeAdd64)
 
 // Warning! 'y %= 64' is done internally!
 size_t size_shl(size_t *p_hi, size_t x, uint8_t y)
@@ -197,27 +173,27 @@ size_t size_mul(size_t *p_hi, size_t x, size_t y)
 size_t size_add(size_t *p_car, size_t x, size_t y)
 {
     unsigned long long res;
-    *p_car = _addcarry_u64(0, (unsigned long long) x, (unsigned long long) y, &res);
+    *p_car = (size_t) _addcarry_u64(0, (unsigned long long) x, (unsigned long long) y, &res);
     return (size_t) res;
 }
 
 size_t size_sub(size_t *p_bor, size_t x, size_t y)
 {
     unsigned long long res;
-    *p_bor = _subborrow_u64(0, (unsigned long long) x, (unsigned long long) y, &res);
+    *p_bor = (size_t) _subborrow_u64(0, (unsigned long long) x, (unsigned long long) y, &res);
     return (size_t) res;
 }
 
 size_t size_bit_scan_reverse(size_t x)
 {
     unsigned long res;
-    return _BitScanReverse64(&res, (unsigned long long) x) ? (size_t) res : SIZE_MAX;
+    return (size_t) _BitScanReverse64(&res, (unsigned long long) x) ? (size_t) res : SIZE_MAX;
 }
 
 size_t size_bit_scan_forward(size_t x)
 {
     unsigned long res;
-    return _BitScanForward64(&res, (unsigned long long) x) ? (size_t) res : SIZE_MAX;
+    return (size_t) _BitScanForward64(&res, (unsigned long long) x) ? (size_t) res : SIZE_MAX;
 }
 
 size_t size_pop_cnt(size_t x)
@@ -227,20 +203,7 @@ size_t size_pop_cnt(size_t x)
 
 #   elif defined _M_IX86
 
-void size_interlocked_inc(volatile size_t *mem)
-{
-    _InterlockedIncrement((volatile long *) mem);
-}
-
-void size_interlocked_dec(volatile size_t *mem)
-{
-    _InterlockedDecrement((volatile long *) mem);
-}
-
-size_t size_interlocked_add(volatile size_t *mem, size_t val)
-{
-    return (size_t) _InterlockedExchangeAdd((volatile long long *) mem, (long long) val);
-}
+DECLARE_INTERLOCKED_OP(size_t, size, add, long long, _InterlockedExchangeAdd)
 
 #   endif
 #endif 
@@ -298,6 +261,21 @@ DECLARE_LOAD_ACQUIRE(uint32_t, uint32)
 DECLARE_LOAD_ACQUIRE(size_t, size)
 DECLARE_STORE_RELEASE(size_t, size)
 DECLARE_STORE_RELEASE(void *, ptr)
+
+size_t size_interlocked_sub(volatile void *mem, size_t val)
+{
+    return size_interlocked_add(mem, 0 - val);
+}
+
+size_t size_interlocked_inc(volatile void *mem)
+{
+    return size_interlocked_add(mem, 1);
+}
+
+size_t size_interlocked_dec(volatile void *mem)
+{
+    return size_interlocked_sub(mem, 1);
+}
 
 size_t size_sum(size_t *p_hi, size_t *argl, size_t cnt)
 {
@@ -585,8 +563,8 @@ size_t size_sub_sat(size_t a, size_t b)
 // Returns the sign of the a - b
 int size_sign(size_t a, size_t b)
 {
-    size_t bor, diff = size_sub(&bor, a, b);
-    return diff ? 1 - (int) (bor << 1) : 0;
+    size_t bor;
+    return size_sub(&bor, a, b) ? 1 - (int) (bor << 1) : 0;
 }
 
 #define DECLARE_STABLE_CMP_ASC(PREFIX, SUFFIX) \
@@ -650,18 +628,11 @@ DECLARE_STABLE_CMP_ASC(flt64, _abs)
 DECLARE_FLT64_STABLE_CMP_NAN(_dsc, _CMP_NLE_UQ)
 DECLARE_FLT64_STABLE_CMP_NAN(_asc, _CMP_NGE_UQ)
 
-// Returns zero for NaN!
+// Returns correct sign even for a NaN
 int flt64_sign(double x)
 {
-    __m128i res = _mm_castpd_si128(_mm_cmpgt_pd(_mm_set_sd(x), _mm_set_pd(x, 0)));
-    return _mm_extract_epi32(res, 2) - _mm_cvtsi128_si32(res);
-}
-
-uint32_t uint32_fused_mul_add(uint32_t *p_res, uint32_t m, uint32_t a)
-{
-    uint64_t val = (uint64_t) *p_res * (uint64_t) m + (uint64_t) a;
-    *p_res = (uint32_t) val;
-    return (uint32_t) (val >> UINT32_BIT);
+    __m128i res = _mm_cmpeq_epi64(_mm_and_si128(_mm_castpd_si128(_mm_loaddup_pd(&x)), _mm_set_epi64x(0x8000000000000000, 0x7fffffffffffffff)), _mm_set_epi64x(0, 0));
+    return _mm_cvtsi128_si32(res) + 1 ? -(_mm_extract_epi32(res, 2) << 1) - 1 : 0;
 }
 
 size_t size_fused_mul_add(size_t *p_res, size_t m, size_t a)

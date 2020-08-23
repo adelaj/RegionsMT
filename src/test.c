@@ -58,7 +58,7 @@ bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct
     {
         size_t i = 0;
         for (; i < cnt; i++)
-            if (!loop_init(pool, test_gen_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, (void *) (groupl + i), ARG(size_t, 1, groupl[i].test_cnt, groupl[i].generator_cnt), (size_t[]) { i, 0, 0 }, 0, log)) break;
+            if (!loop_init(pool, test_gen_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, (void *) (groupl + i), ARG(size_t, 1, groupl[i].test_cnt, groupl[i].generator_cnt), (size_t []) { i, 0, 0 }, 0, log)) break;
         succ = i == cnt;
         thread_pool_schedule(pool);
     }

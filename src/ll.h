@@ -54,6 +54,11 @@ uint16_t uint16_interlocked_and(volatile void *, uint16_t);
 void *ptr_interlocked_compare_exchange(volatile void *, void *, void *);
 void *ptr_interlocked_exchange(volatile void *, void *);
 
+size_t size_interlocked_inc(volatile void *);
+size_t size_interlocked_dec(volatile void *);
+size_t size_interlocked_add(volatile void *, size_t);
+size_t size_interlocked_sub(volatile void *, size_t);
+
 size_t size_shl(size_t *, size_t, uint8_t);
 size_t size_shr(size_t *, size_t, uint8_t);
 size_t size_add(size_t *, size_t, size_t);
@@ -95,10 +100,6 @@ void bit_reset_interlocked(volatile uint8_t *, size_t);
 
 // Sets two bits starting from the selected position specified by 2nd argument
 void bit_set2_interlocked(volatile uint8_t *, size_t);
-
-size_t size_interlocked_inc(volatile size_t *);
-size_t size_interlocked_dec(volatile size_t *);
-size_t size_interlocked_add(volatile size_t *, size_t);
 
 // Gets two bits starting from the position specified by 2nd argument 
 uint8_t bit_get2_acquire(volatile uint8_t *, size_t);

@@ -84,7 +84,7 @@ bool test_utf16_decode(void *In, struct log *log)
 {
     (void) log;
     const struct test_utf8 *restrict in = In;
-    if (in->val == UTF8_BOUND) return 1;
+    if (in->val >= UTF8_BOUND) return 1;
     uint16_t word[UTF16_COUNT];
     uint8_t context = 0, len = 0, ind = 0;
     uint32_t val = 0;
