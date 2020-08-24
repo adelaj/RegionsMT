@@ -18,38 +18,33 @@
             __atomic_store_n((TYPE volatile *) dst, val, __ATOMIC_RELEASE); \
         }
 
-#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX) \
-        TYPE PREFIX ## _interlocked_compare_exchange(volatile void *dst, TYPE cmp, TYPE xchg) \
+#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX, SUFFIX, MEM_ORD_SUCC, MEM_ORD_FAIL) \
+        TYPE PREFIX ## _interlocked_compare_exchange ## SUFFIX(volatile void *dst, TYPE cmp, TYPE xchg) \
         { \
-            __atomic_compare_exchange_n((TYPE volatile *) dst, &cmp, xchg, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE); \
+            __atomic_compare_exchange_n((TYPE volatile *) dst, &cmp, xchg, 0, MEM_ORD_SUCC, MEM_ORD_FAIL); \
             return cmp;\
         }
 
-#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE_ACQUIRE(TYPE, PREFIX) \
-        TYPE PREFIX ## _interlocked_compare_exchange_acquire(volatile void *dst, TYPE cmp, TYPE xchg) \
-        { \
-            __atomic_compare_exchange_n((TYPE volatile *) dst, &cmp, xchg, 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED); \
-            return cmp;\
-        }
-
-#   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND) \
+#   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND, MEM_ORD) \
         TYPE PREFIX ## _interlocked_ ## SUFFIX(volatile void *dst, TYPE arg) \
         { \
-            return BACKEND((TYPE volatile *) dst, arg, __ATOMIC_ACQ_REL); \
+            return BACKEND((TYPE volatile *) dst, arg, MEM_ORD); \
         }
 
 static DECLARE_LOAD_ACQUIRE(int, spinlock)
 static DECLARE_STORE_RELEASE(int, spinlock)
-static DECLARE_INTERLOCKED_COMPARE_EXCHANGE_ACQUIRE(int, spinlock)
+static DECLARE_INTERLOCKED_COMPARE_EXCHANGE(int, spinlock, _acquire, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)
 
-DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr,, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
 
-DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, __atomic_fetch_or)
-DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, __atomic_fetch_or)
-DECLARE_INTERLOCKED_OP(uint8_t, uint8, and, __atomic_fetch_and)
-DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, __atomic_fetch_and)
-DECLARE_INTERLOCKED_OP(void *, ptr, exchange, __atomic_exchange_n)
-DECLARE_INTERLOCKED_OP(size_t, size, add, __atomic_fetch_add)
+DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, __atomic_fetch_or, __ATOMIC_ACQ_REL)
+DECLARE_INTERLOCKED_OP(uint8_t, uint8, or_release, __atomic_fetch_or, __ATOMIC_RELEASE)
+DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, __atomic_fetch_or, __ATOMIC_ACQ_REL)
+DECLARE_INTERLOCKED_OP(uint8_t, uint8, and, __atomic_fetch_and, __ATOMIC_ACQ_REL)
+DECLARE_INTERLOCKED_OP(uint8_t, uint8, and_release, __atomic_fetch_and, __ATOMIC_RELEASE)
+DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, __atomic_fetch_and, __ATOMIC_ACQ_REL)
+DECLARE_INTERLOCKED_OP(void *, ptr, exchange, __atomic_exchange_n, __ATOMIC_ACQ_REL)
+DECLARE_INTERLOCKED_OP(size_t, size, add, __atomic_fetch_add, __ATOMIC_ACQ_REL)
 
 uint32_t uint32_bit_scan_reverse(uint32_t x)
 {
@@ -67,8 +62,6 @@ uint32_t uint32_pop_cnt(uint32_t x)
 }
 
 #   ifdef __x86_64__
-
-DECLARE_LOAD_ACQUIRE(uint64_t, uint64)
 
 size_t size_bit_scan_reverse(size_t x)
 {
@@ -122,8 +115,10 @@ static DECLARE_INTERLOCKED_COMPARE_EXCHANGE(long, spinlock, long, _InterlockedCo
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, void *, _InterlockedCompareExchangePointer,)
 
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, char, _InterlockedOr8)
+DECLARE_INTERLOCKED_OP(uint8_t, uint8, or_release, char, _InterlockedOr8)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, short, _InterlockedOr16)
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, and, char, _InterlockedAnd8)
+DECLARE_INTERLOCKED_OP(uint8_t, uint8, and_release, char, _InterlockedAnd8)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, short, _InterlockedAnd16)
 DECLARE_INTERLOCKED_OP(void *, ptr, exchange, void *, _InterlockedExchangePointer)
 
@@ -146,7 +141,6 @@ uint32_t uint32_pop_cnt(uint32_t x)
 
 #   ifdef _M_X64
 
-DECLARE_LOAD_ACQUIRE(uint64_t, uint64)
 DECLARE_INTERLOCKED_OP(size_t, size, add, long long, _InterlockedExchangeAdd64)
 
 // Warning! 'y %= 64' is done internally!
@@ -254,11 +248,15 @@ size_t size_sub(size_t *p_bor, size_t x, size_t y)
 #endif
 
 DECLARE_LOAD_ACQUIRE(bool, bool)
-DECLARE_STORE_RELEASE(bool, bool)
 DECLARE_LOAD_ACQUIRE(uint8_t, uint8)
 DECLARE_LOAD_ACQUIRE(uint16_t, uint16)
 DECLARE_LOAD_ACQUIRE(uint32_t, uint32)
 DECLARE_LOAD_ACQUIRE(size_t, size)
+DECLARE_LOAD_ACQUIRE(void *, ptr)
+DECLARE_STORE_RELEASE(bool, bool)
+DECLARE_STORE_RELEASE(uint8_t, uint8)
+DECLARE_STORE_RELEASE(uint16_t, uint16)
+DECLARE_STORE_RELEASE(uint32_t, uint32)
 DECLARE_STORE_RELEASE(size_t, size)
 DECLARE_STORE_RELEASE(void *, ptr)
 
@@ -473,71 +471,6 @@ void *double_lock_execute(spinlock_handle *p_spinlock, double_lock_callback init
     return res;
 }
 
-void bit_set_interlocked(volatile uint8_t *arr, size_t bit)
-{
-    uint8_interlocked_or(arr + bit / CHAR_BIT, 1 << bit % CHAR_BIT);
-}
-
-void bit_reset_interlocked(volatile uint8_t *arr, size_t bit)
-{
-    uint8_interlocked_and(arr + bit / CHAR_BIT, ~(1 << bit % CHAR_BIT));
-}
-
-void bit_set2_interlocked(volatile uint8_t *arr, size_t bit)
-{
-    uint8_t pos = bit % CHAR_BIT;
-    if (pos < CHAR_BIT - 1) uint8_interlocked_or(arr + bit / CHAR_BIT, 3u << pos);
-    else uint16_interlocked_or((volatile uint16_t *) (arr + bit / CHAR_BIT), 3u << (CHAR_BIT - 1));
-}
-
-uint8_t bit_get2_acquire(volatile uint8_t *arr, size_t bit)
-{
-    uint8_t pos = bit % CHAR_BIT;
-    if (pos < CHAR_BIT - 1) return (uint8_load_acquire(arr + bit / CHAR_BIT) >> pos) & 3;
-    else return (uint16_load_acquire((uint16_t *) (arr + bit / CHAR_BIT)) >> (CHAR_BIT - 1)) & 3;
-}
-
-bool bit_test2_acquire(volatile uint8_t *arr, size_t bit)
-{
-    return bit_get2_acquire(arr, bit) == 3;
-}
-
-bool bit_test_range_acquire(volatile uint8_t *arr, size_t cnt)
-{
-    size_t div = cnt / CHAR_BIT, rem = cnt % CHAR_BIT;
-    for (size_t i = 0; i < div; i++) if (uint8_load_acquire(arr + i) != UINT8_MAX) return 0;
-    if (!rem) return 1;
-    uint8_t msk = (1u << rem) - 1;
-    return (uint8_load_acquire(arr + div) & msk) == msk;    
-}
-
-bool bit_test2_range01_acquire(volatile uint8_t *arr, size_t cnt)
-{
-    size_t div = cnt / CHAR_BIT, rem = cnt % CHAR_BIT;
-    for (size_t i = 0; i < div; i++) if ((uint8_load_acquire(arr + i) & BIT_TEST2_MASK01) != BIT_TEST2_MASK01) return 0;
-    if (!rem) return 1;
-    uint8_t msk = ((1u << rem) - 1) & BIT_TEST2_MASK01;
-    return (uint8_load_acquire(arr + div) & msk) == msk;
-}
-
-bool bit_test2_range_acquire(volatile uint8_t *arr, size_t cnt)
-{
-    size_t div = cnt / CHAR_BIT, rem = cnt % CHAR_BIT;
-    for (size_t i = 0; i < div; i++)
-    {
-        uint8_t res = uint8_load_acquire(arr + i);
-        if (((res | res >> 1) & BIT_TEST2_MASK01) != BIT_TEST2_MASK01) return 0;
-    }
-    if (!rem) return 1;
-    uint8_t res = uint8_load_acquire(arr + div), msk = ((1u << rem) - 1) & BIT_TEST2_MASK01;
-    return ((res | (res >> 1)) & msk) == msk;
-}
-
-bool size_test_acquire(volatile size_t *mem)
-{
-    return size_load_acquire(mem);
-}
-
 uint8_t uint8_bit_scan_reverse(uint8_t x)
 {
     return (uint8_t) uint32_bit_scan_reverse((uint8_t) x);
@@ -659,6 +592,12 @@ bool size_mul_add_test(size_t *p_res, size_t m, size_t a)
         return arr[bit / (CHAR_BIT * sizeof(TYPE))] & ((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE))); \
     }
 
+#define DECLARE_BIT_TEST_ACQUIRE(TYPE, PREFIX) \
+    bool PREFIX ## _bit_test_acquire(volatile void *arr, size_t bit) \
+    { \
+        return PREFIX ## _load_acquire((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE))) & ((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE))); \
+    }
+
 #define DECLARE_BIT_TEST_SET(TYPE, PREFIX) \
     bool PREFIX ## _bit_test_set(TYPE *arr, size_t bit) \
     { \
@@ -667,6 +606,13 @@ bool size_mul_add_test(size_t *p_res, size_t m, size_t a)
         if (arr[div] & msk) return 1; \
         arr[div] |= msk; \
         return 0; \
+    }
+
+#define DECLARE_INTERLOCKED_BIT_TEST_SET(TYPE, PREFIX) \
+    bool PREFIX ## _interlocked_bit_test_set(volatile void *arr, size_t bit) \
+    { \
+        TYPE msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)), res = PREFIX ## _interlocked_or((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), msk); \
+        return res & msk; \
     }
 
 #define DECLARE_BIT_TEST_RESET(TYPE, PREFIX) \
@@ -679,16 +625,35 @@ bool size_mul_add_test(size_t *p_res, size_t m, size_t a)
         return 1; \
     }
 
+#define DECLARE_INTERLOCKED_BIT_TEST_RESET(TYPE, PREFIX) \
+    bool PREFIX ## _interlocked_bit_test_reset(volatile void *arr, size_t bit) \
+    { \
+        TYPE msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)), res = PREFIX ## _interlocked_and((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), ~msk); \
+        return res & msk; \
+    }
+
 #define DECLARE_BIT_SET(TYPE, PREFIX) \
     void PREFIX ## _bit_set(TYPE *arr, size_t bit) \
     { \
         arr[bit / (CHAR_BIT * sizeof(TYPE))] |= (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)); \
     }
 
+#define DECLARE_INTERLOCKED_BIT_SET_RELEASE(TYPE, PREFIX) \
+    void PREFIX ## _interlocked_bit_set_release(volatile void *arr, size_t bit) \
+    { \
+        PREFIX ## _interlocked_or_release((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE))); \
+    }
+
 #define DECLARE_BIT_RESET(TYPE, PREFIX) \
     void PREFIX ## _bit_reset(TYPE *arr, size_t bit) \
     { \
         arr[bit / (CHAR_BIT * sizeof(TYPE))] &= ~((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE))); \
+    }
+
+#define DECLARE_INTERLOCKED_BIT_RESET_RELEASE(TYPE, PREFIX) \
+    void PREFIX ## _interlocked_bit_reset_release(volatile void *arr, size_t bit) \
+    { \
+        PREFIX ## _interlocked_and_release((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), ~((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)))); \
     }
 
 #define DECLARE_BIT_FETCH_BURST(TYPE, PREFIX, STRIDE) \
@@ -752,6 +717,12 @@ DECLARE_BIT_FETCH_SET_BURST(uint8_t, uint8, 2)
 DECLARE_BIT_FETCH_RESET_BURST(uint8_t, uint8, 2)
 DECLARE_BIT_SET_BURST(uint8_t, uint8, 2)
 DECLARE_BIT_RESET_BURST(uint8_t, uint8, 2)
+
+DECLARE_BIT_TEST_ACQUIRE(uint8_t, uint8)
+DECLARE_INTERLOCKED_BIT_SET_RELEASE(uint8_t, uint8)
+DECLARE_INTERLOCKED_BIT_RESET_RELEASE(uint8_t, uint8)
+DECLARE_INTERLOCKED_BIT_TEST_SET(uint8_t, uint8)
+DECLARE_INTERLOCKED_BIT_TEST_RESET(uint8_t, uint8)
 
 DECLARE_BIT_TEST(size_t, size)
 DECLARE_BIT_TEST_SET(size_t, size)

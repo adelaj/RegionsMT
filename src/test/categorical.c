@@ -27,11 +27,11 @@ bool test_categorical_generator_a(void *p_res, size_t *p_ind, struct log *log)
     size_t ind = *p_ind;
     if (!array_assert(log, CODE_METRIC, array_init(p_res, NULL, fam_countof(struct test_categorical_a, tbl, data[ind].cnt), fam_sizeof(struct test_categorical_a, tbl), fam_diffof(struct test_categorical_a, tbl, data[ind].cnt), ARRAY_STRICT))) return 0;
     struct test_categorical_a *res = *(struct test_categorical_a **) p_res;
-    res->pv = data->pv;
-    res->qas = data->qas;
-    res->dimx = data->dimx;
-    res->dimy = data->dimy;
-    res->cnt = data->cnt;
+    res->pv = data[ind].pv;
+    res->qas = data[ind].qas;
+    res->dimx = data[ind].dimx;
+    res->dimy = data[ind].dimy;
+    res->cnt = data[ind].cnt;
     memcpy(res->tbl, data[ind].tbl, data[ind].cnt * sizeof(*res->tbl));
     return 1;
 }

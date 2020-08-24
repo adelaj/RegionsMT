@@ -38,108 +38,108 @@ static bool test_main(size_t thread_cnt, struct log *log)
 {
     const struct test_group groupl[] = {
         {
-            //STRI("Low level facilities A"),
+            // Low level facilities A
             test_ll_dispose_a,
-            CLII((test_generator_callback []) {
-                test_ll_generator_a,
+            CLII((struct test_generator []) {
+                FSTRL(test_ll_generator_a)
             }),
-            CLII((test_callback[]) {
-                test_ll_a_1,
-                test_ll_a_2,
-                test_ll_a_3
+            CLII((struct test []) {
+                FSTRL(test_ll_a_1),
+                FSTRL(test_ll_a_2),
+                FSTRL(test_ll_a_3)
             })
         },
         {
-            //STRI("Low level facilities B"),
+            // Low level facilities B
             test_ll_dispose_b,
-            CLII((test_generator_callback []) {
-                test_ll_generator_b,
+            CLII((struct test_generator []) {
+                FSTRL(test_ll_generator_b),
             }),
-            CLII((test_callback []) {
-                test_ll_b,
+            CLII((struct test []) {
+                FSTRL(test_ll_b),
             })
         },
         {
-            //STRI("Emulation of the non-portable facilities"),
+            // Emulation of the non-portable facilities
             test_np_dispose_a,
-            CLII((test_generator_callback []) {
-                test_np_generator_a,
+            CLII((struct test_generator []) {
+                FSTRL(test_np_generator_a),
             }),
-            CLII((test_callback []) {
-                test_np_a,
+            CLII((struct test []) {
+                FSTRL(test_np_a),
             })
         },
         {
-            //STRI("Sorting routines A: sort algorithms"),
+            // Sorting routines A: sort algorithms
             test_sort_dispose_a,
-            CLII((test_generator_callback []) {
-                test_sort_generator_a_1,
-                test_sort_generator_a_2,
-                test_sort_generator_a_3
+            CLII((struct test_generator []) {
+                FSTRL(test_sort_generator_a_1),
+                FSTRL(test_sort_generator_a_2),
+                FSTRL(test_sort_generator_a_3)
             }),
-            CLII((test_callback []) {
-                test_sort_a,
+            CLII((struct test []) {
+                FSTRL(test_sort_a),
             })
         },
         {
-            //STRI("Sorting routines B: order computation"),
+            // Sorting routines B: order computation
             test_sort_dispose_b,
-            CLII((test_generator_callback []) {
-                test_sort_generator_b_1
+            CLII((struct test_generator []) {
+                FSTRL(test_sort_generator_b_1)
             }),
-            CLII((test_callback []) {
-                test_sort_b_1,
-                test_sort_b_2
+            CLII((struct test []) {
+                FSTRL(test_sort_b_1),
+                FSTRL(test_sort_b_2)
             })
         },
         {
-            //STRI("Sorting routines C: precise search"),
+            // Sorting routines C: precise search
             test_sort_dispose_c,
-            CLII((test_generator_callback []) {
-                test_sort_generator_c_1
+            CLII((struct test_generator []) {
+                FSTRL(test_sort_generator_c_1)
             }),
-            CLII((test_callback []) {
-                test_sort_c_1,
-                test_sort_c_2
+            CLII((struct test []) {
+                FSTRL(test_sort_c_1),
+                FSTRL(test_sort_c_2)
             })
         },
         {
-            //STRI("Sorting routines D: approximate search"),
+            // Sorting routines D: approximate search
             test_sort_dispose_d,
-            CLII((test_generator_callback []) {
-                test_sort_generator_d_1
+            CLII((struct test_generator []) {
+                FSTRL(test_sort_generator_d_1)
             }),
-            CLII((test_callback []) {
-                test_sort_d_1
+            CLII((struct test []) {
+                FSTRL(test_sort_d_1)
             })
         },
         {
-            //STRI("Unicode facilities"),
+            // Unicode facilities
             test_utf8_dispose,
-            CLII((test_generator_callback []) {
-                test_utf8_generator,
+            CLII((struct test_generator []) {
+                FSTRL(test_utf8_generator),
             }),
-            CLII((test_callback []) {
-                test_utf8_len,
-                test_utf8_encode,
-                test_utf8_decode,
-                test_utf16_encode,
-                test_utf16_decode
+            CLII((struct test []) {
+                FSTRL(test_utf8_len),
+                FSTRL(test_utf8_encode),
+                FSTRL(test_utf8_decode),
+                FSTRL(test_utf16_encode),
+                FSTRL(test_utf16_decode)
             })
-        },/*
+        },
         {
-            //STRI("Catigorical data analysis"),
+            // Categorical data analysis
             test_categorical_dispose_a,
-            CLII((test_generator_callback []) {
-                test_categorical_generator_a,
+            CLII((struct test_generator []) {
+                FSTRL(test_categorical_generator_a),
             }),
-            CLII((test_callback []) {
-                test_categorical_a,
+            CLII((struct test []) {
+                FSTRL(test_categorical_a),
             })
-        }*/
+        }
     };
     log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Test mode triggered. Notation: %~s*:%~s*:%~s*:%~s*.\n",
-        STRC("<group no.>"), STRC("<test no.>"), STRC("<generator no.>"), STRC("<generator instance no.>"));
+        STRC("<group no.>"), STRC("<test name>"), STRC("<generator name>"), STRC("<generator instance no.>"));
     return test(groupl, countof(groupl), thread_cnt, log);
 }
 

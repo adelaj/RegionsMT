@@ -60,11 +60,18 @@ struct task {
     struct task_aggr aggr;
 };
 
+enum {
+    DISPATCHED_TASK_BIT_NOT_GARBAGE = 0,
+    DISPATCHED_TASK_BIT_NOT_ORPHAN,
+    DISPATCHED_TASK_BIT_CNT
+};
+
 struct dispatched_task {
     task_callback callback;
     struct task_aggr aggr;
     void *arg, *context;
-    volatile bool ngarbage, norphan;
+    size_t reentrance;
+    volatile uint8_t bits[UINT8_CNT(DISPATCHED_TASK_BIT_CNT)];
 };
 
 // Opaque structure with OS-dependent implementation
