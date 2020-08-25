@@ -317,6 +317,54 @@ static void comb_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callba
     lin_sort(arr, tot, sz, cmp, context, swp, stride, gap);
 }
 
+static void median_of_three(void *restrict arr, size_t left, size_t pvt, size_t right, size_t sz, cmp_callback cmp, void *context, void *restrict swp)
+{
+    if (cmp((char *) arr + left, (char *) arr + pvt, context)) swap((char *) arr + left, (char *) arr + pvt, swp, sz);
+    if (cmp((char *) arr + pvt, (char *) arr + right, context))
+    {
+        swap((char *) arr + pvt, (char *) arr + right, swp, sz);
+        if (cmp((char *) arr + left, (char *) arr + pvt, context)) swap((char *) arr + left, (char *) arr + pvt, swp, sz);
+    }
+}
+
+size_t ind_split(size_t *arr, size_t cnt, size_t off, size_t tot, size_t stride)
+{
+    size_t ind = 0;
+    for (size_t i = cnt; i; i--)
+    {
+        size_t step = tot / (i * stride) * stride;
+        if (!step) continue;
+        arr[ind++] = off;
+        off += step;
+        tot -= step;
+    }
+    return ind;
+}
+
+// Warning: 'right - left > 2 * stride' (array has more than 2 elements) 
+static size_t median_of_nine(void *restrict arr, size_t left, size_t right, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t stride)
+{
+    size_t pvtl[8], cnt = ind_split(pvtl, countof(pvtl), left, right, stride);
+    if (cnt < countof(pvtl))
+    {
+        size_t pvt = left + ((right - left) / stride >> 1) * stride;
+        median_of_three(arr, left, pvt, right, sz, cmp, context, swp);
+        return pvt;
+    }
+    median_of_three(arr, pvtl[0], pvtl[1], pvtl[2], sz, cmp, context, swp);
+    median_of_three(arr, pvtl[3], pvtl[4], pvtl[5], sz, cmp, context, swp);
+    median_of_three(arr, pvtl[6], pvtl[7], right, sz, cmp, context, swp);
+    median_of_three(arr, pvtl[1], pvtl[4], pvtl[7], sz, cmp, context, swp);
+    return pvtl[4];
+}
+
+/*
+size_t quick_sort_partition()
+{
+
+}
+*/
+
 static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t stride, size_t lin_cutoff, lin_sort_callback lin_sort, size_t log_cutoff, sort_callback log_sort)
 {
     struct frm { size_t a, b; } *stk = Alloca(log_cutoff * sizeof(*stk));

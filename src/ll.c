@@ -126,13 +126,13 @@ DECLARE_INTERLOCKED_OP(void *, ptr, exchange, void *, _InterlockedExchangePointe
 uint32_t uint32_bit_scan_reverse(uint32_t x)
 {
     unsigned long res;
-    return (uint32_t) _BitScanReverse(&res, (unsigned long) x) ? (uint32_t) res : UINT32_MAX;
+    return _BitScanReverse(&res, (unsigned long) x) ? (uint32_t) res : UINT32_MAX;
 }
 
 uint32_t uint32_bit_scan_forward(uint32_t x)
 {
     unsigned long res;
-    return (uint32_t) _BitScanForward(&res, (unsigned long) x) ? (uint32_t) res : UINT32_MAX;
+    return _BitScanForward(&res, (unsigned long) x) ? (uint32_t) res : UINT32_MAX;
 }
 
 uint32_t uint32_pop_cnt(uint32_t x)
@@ -183,13 +183,13 @@ size_t size_sub(size_t *p_bor, size_t x, size_t y)
 size_t size_bit_scan_reverse(size_t x)
 {
     unsigned long res;
-    return (size_t) _BitScanReverse64(&res, (unsigned long long) x) ? (size_t) res : SIZE_MAX;
+    return _BitScanReverse64(&res, (unsigned long long) x) ? (size_t) res : SIZE_MAX;
 }
 
 size_t size_bit_scan_forward(size_t x)
 {
     unsigned long res;
-    return (size_t) _BitScanForward64(&res, (unsigned long long) x) ? (size_t) res : SIZE_MAX;
+    return _BitScanForward64(&res, (unsigned long long) x) ? (size_t) res : SIZE_MAX;
 }
 
 size_t size_pop_cnt(size_t x)
@@ -200,7 +200,7 @@ size_t size_pop_cnt(size_t x)
 #   elif defined _M_IX86
 
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, long, _InterlockedCompareExchange,)
-DECLARE_INTERLOCKED_OP(size_t, size, add, long long, _InterlockedExchangeAdd)
+DECLARE_INTERLOCKED_OP(size_t, size, add, long, _InterlockedExchangeAdd)
 
 #   endif
 #endif 

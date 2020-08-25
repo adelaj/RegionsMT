@@ -210,7 +210,7 @@ bool test_sort_b_2(void *In, struct log *log)
     if (array_assert(log, CODE_METRIC, array_init(&arr, NULL, in->cnt, sizeof(*arr), 0, ARRAY_STRICT)))
     {
         memcpy(arr, in->arr, in->cnt * sizeof(*arr));
-        size_t swp;
+        double swp;
         if (array_assert(log, CODE_METRIC, orders_apply(ord, ucnt, sizeof(*arr), arr, &swp, sizeof(*arr))))
         {
             size_t ind = 1;

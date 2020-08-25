@@ -73,7 +73,9 @@ bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct
         succ = i == cnt;
         uint64_t start = get_time();
         thread_pool_schedule(pool);
-        log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Execution of %~uz test(s) in %~uz thread(s) took %~T. Succeeded: %~uz, failed: %~uz.\n", size_load_acquire(&context.tot), thread_cnt, start, get_time(), size_load_acquire(&context.succ), size_load_acquire(&context.fail));
+        size_t fail = size_load_acquire(&context.fail);
+        log_message_fmt(log, CODE_METRIC, fail ? MESSAGE_WARNING : MESSAGE_INFO, "Execution of %~uz test(s) in %~uz thread(s) took %~T. Succeeded: %~uz, failed: %~uz.\n", size_load_acquire(&context.tot), thread_cnt, start, get_time(), size_load_acquire(&context.succ), fail);
+        succ = !fail;
     }
     while (ind--) log_close(&((struct test_tls *) thread_pool_fetch_tls(pool, ind))->log);
     thread_pool_dispose(pool);
