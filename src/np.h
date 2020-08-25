@@ -82,4 +82,6 @@ int64_t file_get_size(FILE *);
 size_t get_processor_count(void);
 size_t get_page_size(void);
 size_t get_process_id(void);
+
+// Return UNIX time in microseconds
 uint64_t get_time(void);

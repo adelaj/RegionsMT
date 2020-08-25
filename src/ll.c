@@ -35,6 +35,7 @@ static DECLARE_LOAD_ACQUIRE(int, spinlock)
 static DECLARE_STORE_RELEASE(int, spinlock)
 static DECLARE_INTERLOCKED_COMPARE_EXCHANGE(int, spinlock, _acquire, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)
 
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size,, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr,, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
 
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, __atomic_fetch_or, __ATOMIC_ACQ_REL)
@@ -141,6 +142,7 @@ uint32_t uint32_pop_cnt(uint32_t x)
 
 #   ifdef _M_X64
 
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, long long, _InterlockedCompareExchange64,)
 DECLARE_INTERLOCKED_OP(size_t, size, add, long long, _InterlockedExchangeAdd64)
 
 // Warning! 'y %= 64' is done internally!
@@ -197,6 +199,7 @@ size_t size_pop_cnt(size_t x)
 
 #   elif defined _M_IX86
 
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, long, _InterlockedCompareExchange,)
 DECLARE_INTERLOCKED_OP(size_t, size, add, long long, _InterlockedExchangeAdd)
 
 #   endif
@@ -273,6 +276,28 @@ size_t size_interlocked_inc(volatile void *mem)
 size_t size_interlocked_dec(volatile void *mem)
 {
     return size_interlocked_sub(mem, 1);
+}
+
+size_t size_interlocked_add_sat(volatile void *mem, size_t val)
+{
+    for (size_t tmp = size_load_acquire(&mem); tmp < SIZE_MAX;)
+    {
+        size_t res = size_interlocked_compare_exchange(mem, tmp, size_add_sat(tmp, val));
+        if (res == tmp) return res;
+        tmp = res;
+    }
+    return SIZE_MAX;
+}
+
+size_t size_interlocked_sub_sat(volatile void *mem, size_t val)
+{
+    for (size_t tmp = size_load_acquire(&mem); tmp;)
+    {
+        size_t res = size_interlocked_compare_exchange(mem, tmp, size_sub_sat(tmp, val));
+        if (res == tmp) return res;
+        tmp = res;
+    }
+    return 0;
 }
 
 size_t size_sum(size_t *p_hi, size_t *argl, size_t cnt)

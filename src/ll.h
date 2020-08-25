@@ -54,6 +54,7 @@ uint8_t uint8_interlocked_or(volatile void *, uint8_t);
 uint16_t uint16_interlocked_or(volatile void *, uint16_t);
 uint8_t uint8_interlocked_and(volatile void *, uint8_t);
 uint16_t uint16_interlocked_and(volatile void *, uint16_t);
+size_t size_interlocked_compare_exchange(volatile void *, size_t, size_t);
 void *ptr_interlocked_compare_exchange(volatile void *, void *, void *);
 void *ptr_interlocked_exchange(volatile void *, void *);
 
@@ -61,6 +62,8 @@ size_t size_interlocked_inc(volatile void *);
 size_t size_interlocked_dec(volatile void *);
 size_t size_interlocked_add(volatile void *, size_t);
 size_t size_interlocked_sub(volatile void *, size_t);
+size_t size_interlocked_add_sat(volatile void *, size_t);
+size_t size_interlocked_sub_sat(volatile void *, size_t);
 
 size_t size_shl(size_t *, size_t, uint8_t);
 size_t size_shr(size_t *, size_t, uint8_t);

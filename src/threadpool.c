@@ -105,7 +105,7 @@ static bool thread_pool_enqueue_impl(struct thread_pool *pool, size_t cnt, struc
     if (!crt_assert_impl(log, CODE_METRIC, car ? ERANGE : 0)) return 0;
     if (!array_assert(log, CODE_METRIC, persistent_array_test(&pool->dispatched_task, probe, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK))) return 0;
     for (size_t i = pool->task_cnt; i < probe; i++)
-        uint8_interlocked_bit_reset_release(((struct dispatched_task *) persistent_array_fetch(&pool->dispatched_task, i, sizeof(struct dispatched_task)))->bits, DISPATCHED_TASK_BIT_NOT_GARBAGE);
+        bool_store_release(&((struct dispatched_task *) persistent_array_fetch(&pool->dispatched_task, i, sizeof(struct dispatched_task)))->not_garbage, 0);
     if (pool->task_cnt < probe) pool->task_cnt = probe;
     size_interlocked_add(&pool->task_hint, cnt);
     return 1;
@@ -189,11 +189,15 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
         }
 
         // Execute the task
-        unsigned res = dispatched_task->callback ? dispatched_task->callback(dispatched_task->arg, dispatched_task->context, arg->tls): TASK_SUCCESS;
+        struct tls_base *tls = arg->tls;
+        tls->storage = dispatched_task->storage;
+        tls->reentrance = dispatched_task->reentrance;
+        unsigned res = dispatched_task->callback ? dispatched_task->callback(dispatched_task->arg, dispatched_task->context, tls): TASK_SUCCESS;
         if (res == TASK_YIELD)
         {
             dispatched_task->reentrance = size_add_sat(dispatched_task->reentrance, 1);
-            uint8_interlocked_bit_reset_release(dispatched_task->bits, DISPATCHED_TASK_BIT_NOT_ORPHAN);
+            dispatched_task->storage = tls->storage;
+            bool_store_release(&dispatched_task->not_orphan, 0);
             continue;
         }
         if (dispatched_task->aggr.callback) dispatched_task->aggr.callback(dispatched_task->aggr.mem, dispatched_task->aggr.arg, res);
@@ -201,8 +205,8 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
 
         // Inform scheduller that global queue state has been changed
         mutex_acquire(&pool->mutex);
-        uint8_interlocked_bit_reset_release(dispatched_task->bits, DISPATCHED_TASK_BIT_NOT_GARBAGE);
         pool->query_wake = 1;
+        bool_store_release(&dispatched_task->not_garbage, 0);
         condition_signal(&pool->condition);
         mutex_release(&pool->mutex);
     }
@@ -247,9 +251,9 @@ void thread_pool_schedule(struct thread_pool *pool)
             dispatched_task = persistent_array_fetch(&pool->dispatched_task, i, sizeof(*dispatched_task));
             if (!dispatch)
             {
-                if (uint8_bit_test_acquire(dispatched_task->bits, DISPATCHED_TASK_BIT_NOT_GARBAGE))
+                if (bool_load_acquire(&dispatched_task->not_garbage))
                 {
-                    if (!uint8_bit_test_acquire(dispatched_task->bits, DISPATCHED_TASK_BIT_NOT_ORPHAN))
+                    if (!bool_load_acquire(&dispatched_task->not_orphan))
                     {
                         orphan = 1;
                         break;
@@ -257,7 +261,7 @@ void thread_pool_schedule(struct thread_pool *pool)
                     garbage = 0;
                 }
             }
-            else if (!uint8_bit_test_acquire(dispatched_task->bits, DISPATCHED_TASK_BIT_NOT_GARBAGE)) break;
+            else if (!bool_load_acquire(&dispatched_task->not_garbage)) break;
         }
         
         if (!dispatched_task) exit(EXIT_FAILURE); // Never happens
@@ -269,11 +273,11 @@ void thread_pool_schedule(struct thread_pool *pool)
             dispatched_task->callback = task->callback;
             dispatched_task->context = task->context;
             dispatched_task->reentrance = 0;
-            uint8_interlocked_bit_set_release(dispatched_task->bits, DISPATCHED_TASK_BIT_NOT_GARBAGE);
-            uint8_interlocked_bit_set_release(dispatched_task->bits, DISPATCHED_TASK_BIT_NOT_ORPHAN);
+            bool_store_release(&dispatched_task->not_garbage, 1);
+            bool_store_release(&dispatched_task->not_orphan, 1);
             queue_dequeue(&pool->queue, off, sizeof(*task));
         }
-        else if (orphan) uint8_interlocked_bit_set_release(dispatched_task->bits, DISPATCHED_TASK_BIT_NOT_ORPHAN);
+        else if (orphan) bool_store_release(&dispatched_task->not_orphan, 1);
         
         // Unlocking the queue and the dispatch array
         spinlock_release(&pool->spinlock);
@@ -293,7 +297,7 @@ void thread_pool_schedule(struct thread_pool *pool)
                 break;
             }
             if (ind < cnt) continue; // Continue the outer loop
-            uint8_interlocked_bit_reset_release(dispatched_task->bits, DISPATCHED_TASK_BIT_NOT_ORPHAN);
+            bool_store_release(&dispatched_task->not_orphan, 0);
         }
 
         // Go to the sleep state

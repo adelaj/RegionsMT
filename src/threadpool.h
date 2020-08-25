@@ -38,7 +38,8 @@ void aggr_inc(volatile void *, const void *, unsigned);
 
 struct tls_base {
     struct thread_pool *pool;
-    size_t tid, pid, inc;
+    size_t tid, pid, inc, reentrance;
+    void *storage;
 };
 
 struct  task_cond {
@@ -60,18 +61,12 @@ struct task {
     struct task_aggr aggr;
 };
 
-enum {
-    DISPATCHED_TASK_BIT_NOT_GARBAGE = 0,
-    DISPATCHED_TASK_BIT_NOT_ORPHAN,
-    DISPATCHED_TASK_BIT_CNT
-};
-
 struct dispatched_task {
     task_callback callback;
     struct task_aggr aggr;
-    void *arg, *context;
+    void *arg, *context, *storage;
     size_t reentrance;
-    volatile uint8_t bits[UINT8_CNT(DISPATCHED_TASK_BIT_CNT)];
+    volatile bool not_garbage, not_orphan;
 };
 
 // Opaque structure with OS-dependent implementation
