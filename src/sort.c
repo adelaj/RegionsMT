@@ -317,7 +317,7 @@ static void comb_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callba
     lin_sort(arr, tot, sz, cmp, context, swp, stride, gap);
 }
 
-static void median_of_three(void *restrict arr, size_t left, size_t pvt, size_t right, size_t sz, cmp_callback cmp, void *context, void *restrict swp)
+static void median_of_three_swap(void *restrict arr, size_t left, size_t pvt, size_t right, size_t sz, cmp_callback cmp, void *context, void *restrict swp)
 {
     if (cmp((char *) arr + left, (char *) arr + pvt, context)) swap((char *) arr + left, (char *) arr + pvt, swp, sz);
     if (cmp((char *) arr + pvt, (char *) arr + right, context))
@@ -327,35 +327,29 @@ static void median_of_three(void *restrict arr, size_t left, size_t pvt, size_t 
     }
 }
 
-size_t ind_split(size_t *arr, size_t cnt, size_t off, size_t tot, size_t stride)
+static size_t median_of_three(void *restrict arr, size_t left, size_t pvt, size_t right, cmp_callback cmp, void *context)
+{
+    return cmp((char *) arr + left, (char *) arr + pvt, context) ?
+        cmp((char *) arr + pvt, (char *) arr + right, context) ? pvt : cmp((char *) arr + left, (char *) arr + right, context) ? right : left :
+        cmp((char *) arr + pvt, (char *) arr + right, context) ? cmp((char *) arr + left, (char *) arr + right, context) ? left : right : pvt;
+}
+
+size_t split_range(size_t *arr, size_t cnt, size_t off, size_t tot, size_t stride, bool inst)
 {
     size_t ind = 0;
     for (size_t i = cnt; i; i--)
     {
         size_t step = tot / (i * stride) * stride;
-        if (!step) continue;
+        if (!step)
+        {
+            if (inst) break;
+            else continue;
+        }
         arr[ind++] = off;
         off += step;
         tot -= step;
     }
     return ind;
-}
-
-// Warning: 'right - left > 2 * stride' (array has more than 2 elements) 
-static size_t median_of_nine(void *restrict arr, size_t left, size_t right, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t stride)
-{
-    size_t pvtl[8], cnt = ind_split(pvtl, countof(pvtl), left, right, stride);
-    if (cnt < countof(pvtl))
-    {
-        size_t pvt = left + ((right - left) / stride >> 1) * stride;
-        median_of_three(arr, left, pvt, right, sz, cmp, context, swp);
-        return pvt;
-    }
-    median_of_three(arr, pvtl[0], pvtl[1], pvtl[2], sz, cmp, context, swp);
-    median_of_three(arr, pvtl[3], pvtl[4], pvtl[5], sz, cmp, context, swp);
-    median_of_three(arr, pvtl[6], pvtl[7], right, sz, cmp, context, swp);
-    median_of_three(arr, pvtl[1], pvtl[4], pvtl[7], sz, cmp, context, swp);
-    return pvtl[4];
 }
 
 /*
@@ -371,15 +365,18 @@ static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callb
     size_t frm = 0, a = 0, b = tot - stride;
     for (;;)
     {
-        size_t left = a, right = b, pvt = a + ((b - a) / stride >> 1) * stride;
-        if (cmp((char *) arr + left, (char *) arr + pvt, context)) swap((char *) arr + left, (char *) arr + pvt, swp, sz);
-        if (cmp((char *) arr + pvt, (char *) arr + right, context))
+        size_t left = a, right = b, diff = right - left, pvtl[8], pvt;
+        if (split_range(pvtl, countof(pvtl), left, diff, stride, 1) < countof(pvtl))
         {
-            swap((char *) arr + pvt, (char *) arr + right, swp, sz);
-            if (cmp((char *) arr + left, (char *) arr + pvt, context)) swap((char *) arr + left, (char *) arr + pvt, swp, sz);
+            pvt = left + (diff / stride >> 1) * stride;
+            median_of_three_swap(arr, left, pvt, right, sz, cmp, context, swp);
+            left += stride;
+            right -= stride;
         }
-        left += stride;
-        right -= stride;
+        else pvt = median_of_three(arr,
+            median_of_three(arr, pvtl[0], pvtl[1], pvtl[2], cmp, context), 
+            median_of_three(arr, pvtl[3], pvtl[4], pvtl[5], cmp, context),
+            median_of_three(arr, pvtl[6], pvtl[7], right, cmp, context), cmp, context);    
         do {
             while (cmp((char *) arr + pvt, (char *) arr + left, context)) left += stride;
             while (cmp((char *) arr + right, (char *) arr + pvt, context)) right -= stride;

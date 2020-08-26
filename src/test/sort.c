@@ -158,7 +158,7 @@ bool test_sort_generator_d_1(void *p_res, size_t *p_ind, struct log *log)
     return 1;
 }
 
-struct flt64_cmp_asc_test {
+struct size_cmp_asc_test {
     size_t cnt;
     void *a, *b;
     bool succ;
@@ -166,7 +166,7 @@ struct flt64_cmp_asc_test {
 
 static bool size_cmp_asc_test(const void *a, const void *b, void *Context)
 {
-    struct flt64_cmp_asc_test *context = Context;
+    struct size_cmp_asc_test *context = Context;
     context->cnt++;
     if (a < context->a || b < context->a || context->b < a || context->b < b) context->succ = 0;
     return size_cmp_asc(a, b, context);
@@ -178,7 +178,7 @@ bool test_sort_a(void *In, struct log *log)
     size_t *arr;
     if (!array_assert(log, CODE_METRIC, array_init(&arr, NULL, in->cnt, sizeof(*arr), 0, ARRAY_STRICT))) return 0;
     memcpy(arr, in->arr, in->cnt * sizeof(*arr));
-    struct flt64_cmp_asc_test context = { .a = arr, .b = arr + in->cnt * sizeof(*arr) - sizeof(*arr), .succ = 1 };
+    struct size_cmp_asc_test context = { .a = arr, .b = arr + in->cnt * sizeof(*arr) - sizeof(*arr), .succ = 1 };
     size_t swp;
     quick_sort(arr, in->cnt, sizeof(*arr), size_cmp_asc_test, &context, &swp, sizeof(*arr));
     size_t ind = 1;
