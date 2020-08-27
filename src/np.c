@@ -8,9 +8,19 @@
 
 #if defined _MSC_BUILD || defined __MINGW32__
 
-void *Aligned_alloc(size_t al, size_t sz)
+void *Aligned_malloc(size_t al, size_t sz)
 {
     return _aligned_malloc(sz, al);
+}
+
+void *Aligned_realloc(void *ptr, size_t al, size_t sz)
+{
+    return _aligned_realloc(ptr, sz, al);
+}
+
+void *Aligned_calloc(size_t al, size_t cnt, size_t sz)
+{
+    return _aligned_recalloc(NULL, cnt, sz, al);
 }
 
 void Aligned_free(void *ptr)
@@ -52,11 +62,34 @@ int Strnicmp(const char *a, const char *b, size_t len)
 #   include <stdlib.h>
 #   include <strings.h>
 
-void *Aligned_alloc(size_t al, size_t sz)
+void *Aligned_malloc(size_t al, size_t sz)
 {
     void *res;
     int code = posix_memalign(&res, al, sz);
     if (code) errno = code;
+    return res;
+}
+
+void *Aligned_realloc(void *ptr, size_t al, size_t sz)
+{
+    void *res = Aligned_malloc(al, sz);
+    if (!res) return NULL;
+    memcpy(res, ptr, sz);
+    Aligned_free(ptr);
+    return res;
+}
+
+void *Aligned_calloc(size_t al, size_t cnt, size_t sz)
+{
+    size_t hi, tot = size_mul(&hi, cnt, sz);
+    if (hi)
+    {
+        errno = ENOMEM;
+        return NULL;
+    }
+    void *res = Aligned_malloc(al, tot);
+    if (!res) return NULL;
+    memset(res, 0, tot);
     return res;
 }
 
@@ -142,6 +175,7 @@ FILE *Fopen(const char *path, const char *mode)
     FILE *f = NULL;
     wchar_t *wpath = NULL, *wmode = NULL;
     if (utf8_str_to_wstr(path, &wpath, NULL) && utf8_str_to_wstr(mode, &wmode, NULL)) f = _wfopen(wpath, wmode);
+    else if (!errno) errno = EINVAL;
     free(wpath);
     free(wmode);
     return f;
@@ -245,11 +279,6 @@ uint64_t get_time()
 }
 
 #endif
-
-bool aligned_alloca_chk(size_t cnt, size_t sz, size_t al)
-{
-    return size_mul_add_test(&cnt, sz, al - 1);
-}
 
 int Fclose(FILE *f)
 {

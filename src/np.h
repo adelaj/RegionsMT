@@ -51,11 +51,12 @@ typedef struct { va_list va_list; } Va_list;
 #define Va_end(AP) va_end((AP).va_list)
 #define Va_copy(DST, SRC) va_copy((DST).va_list, (SRC).va_list)
 
-bool aligned_alloca_chk(size_t, size_t, size_t);
-#define aligned_alloca(SZ, ALIGN) ((void *) ((((uintptr_t) Alloca((SZ) + (ALIGN) - 1) + (ALIGN) - 1) / (ALIGN)) * (ALIGN)))
+#define Aligned_alloca(SZ, ALIGN) ((void *) ((((uintptr_t) Alloca((SZ) + (ALIGN) - 1) + (ALIGN) - 1) / (ALIGN)) * (ALIGN)))
 
 // Aligned memory allocation/deallocation
-void *Aligned_alloc(size_t, size_t);
+void *Aligned_malloc(size_t, size_t);
+void *Aligned_realloc(void *, size_t, size_t);
+void *Aligned_calloc(size_t, size_t, size_t);
 void Aligned_free(void *);
 
 // File operations
