@@ -317,21 +317,21 @@ static void comb_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callba
     lin_sort(arr, tot, sz, cmp, context, swp, stride, gap);
 }
 
-static void median_of_three_swap(void *restrict arr, size_t left, size_t pvt, size_t right, size_t sz, cmp_callback cmp, void *context, void *restrict swp)
+static void median_of_three_swap(void *restrict arr, size_t a, size_t pvt, size_t b, size_t sz, cmp_callback cmp, void *context, void *restrict swp)
 {
-    if (cmp((char *) arr + left, (char *) arr + pvt, context)) swap((char *) arr + left, (char *) arr + pvt, swp, sz);
-    if (cmp((char *) arr + pvt, (char *) arr + right, context))
+    if (cmp((char *) arr + a, (char *) arr + pvt, context)) swap((char *) arr + a, (char *) arr + pvt, swp, sz);
+    if (cmp((char *) arr + pvt, (char *) arr + b, context))
     {
-        swap((char *) arr + pvt, (char *) arr + right, swp, sz);
-        if (cmp((char *) arr + left, (char *) arr + pvt, context)) swap((char *) arr + left, (char *) arr + pvt, swp, sz);
+        swap((char *) arr + pvt, (char *) arr + b, swp, sz);
+        if (cmp((char *) arr + a, (char *) arr + pvt, context)) swap((char *) arr + a, (char *) arr + pvt, swp, sz);
     }
 }
 
-static size_t median_of_three(void *restrict arr, size_t left, size_t pvt, size_t right, cmp_callback cmp, void *context)
+static size_t median_of_three(void *restrict arr, size_t a, size_t pvt, size_t b, cmp_callback cmp, void *context)
 {
-    return cmp((char *) arr + left, (char *) arr + pvt, context) ?
-        cmp((char *) arr + pvt, (char *) arr + right, context) ? pvt : cmp((char *) arr + left, (char *) arr + right, context) ? right : left :
-        cmp((char *) arr + pvt, (char *) arr + right, context) ? cmp((char *) arr + left, (char *) arr + right, context) ? left : right : pvt;
+    return cmp((char *) arr + a, (char *) arr + pvt, context) ?
+        cmp((char *) arr + pvt, (char *) arr + b, context) ? pvt : cmp((char *) arr + a, (char *) arr + b, context) ? b : a :
+        cmp((char *) arr + pvt, (char *) arr + b, context) ? cmp((char *) arr + a, (char *) arr + b, context) ? a : b : pvt;
 }
 
 size_t split_range(size_t *arr, size_t cnt, size_t off, size_t tot, size_t stride, bool inst)
@@ -352,80 +352,79 @@ size_t split_range(size_t *arr, size_t cnt, size_t off, size_t tot, size_t strid
     return ind;
 }
 
-/*
-size_t quick_sort_partition()
+struct quick_sort_partition quick_sort_partition(void *restrict arr, size_t a, size_t b, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t stride)
 {
-
+    size_t diff = b - a, pvtl[8], pvt;
+    if (split_range(pvtl, countof(pvtl), a, diff, stride, 1) < countof(pvtl))
+    {
+        pvt = a + (diff / stride >> 1) * stride;
+        median_of_three_swap(arr, a, pvt, b, sz, cmp, context, swp);
+        a += stride;
+        b -= stride;
+    }
+    else pvt = median_of_three(arr,
+        median_of_three(arr, pvtl[0], pvtl[1], pvtl[2], cmp, context),
+        median_of_three(arr, pvtl[3], pvtl[4], pvtl[5], cmp, context),
+        median_of_three(arr, pvtl[6], pvtl[7], b, cmp, context), cmp, context);
+    do {
+        while (cmp((char *) arr + pvt, (char *) arr + a, context)) a += stride;
+        while (cmp((char *) arr + b, (char *) arr + pvt, context)) b -= stride;
+        if (a == b)
+        {
+            a += stride;
+            b -= stride;
+            break;
+        }
+        else if (a > b) break;
+        swap((char *) arr + a, (char *) arr + b, swp, sz);
+        if (a == pvt) pvt = b;
+        else if (pvt == b) pvt = a;
+        a += stride;
+        b -= stride;
+    } while (a <= b);
+    return (struct quick_sort_partition) { .a = a, .b = b };
 }
-*/
 
 static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t stride, size_t lin_cutoff, lin_sort_callback lin_sort, size_t log_cutoff, sort_callback log_sort)
 {
-    struct frm { size_t a, b; } *stk = Alloca(log_cutoff * sizeof(*stk));
+    struct quick_sort_partition *stk = Alloca(log_cutoff * sizeof(*stk));
     size_t frm = 0, a = 0, b = tot - stride;
     for (;;)
     {
-        size_t left = a, right = b, diff = right - left, pvtl[8], pvt;
-        if (split_range(pvtl, countof(pvtl), left, diff, stride, 1) < countof(pvtl))
+        struct quick_sort_partition prt = quick_sort_partition(arr, a, b, sz, cmp, context, swp, stride);
+        if (prt.b - a < lin_cutoff)
         {
-            pvt = left + (diff / stride >> 1) * stride;
-            median_of_three_swap(arr, left, pvt, right, sz, cmp, context, swp);
-            left += stride;
-            right -= stride;
-        }
-        else pvt = median_of_three(arr,
-            median_of_three(arr, pvtl[0], pvtl[1], pvtl[2], cmp, context), 
-            median_of_three(arr, pvtl[3], pvtl[4], pvtl[5], cmp, context),
-            median_of_three(arr, pvtl[6], pvtl[7], right, cmp, context), cmp, context);    
-        do {
-            while (cmp((char *) arr + pvt, (char *) arr + left, context)) left += stride;
-            while (cmp((char *) arr + right, (char *) arr + pvt, context)) right -= stride;
-            if (left == right)
-            {
-                left += stride;
-                right -= stride;
-                break;
-            }
-            else if (left > right) break;
-            swap((char *) arr + left, (char *) arr + right, swp, sz);
-            if (left == pvt) pvt = right;
-            else if (pvt == right) pvt = left;
-            left += stride;
-            right -= stride;
-        } while (left <= right);
-        if (right - a < lin_cutoff)
-        {
-            size_t tmp = right - a + stride;
+            size_t tmp = prt.b - a + stride;
             lin_sort((char *) arr + a, tmp, sz, cmp, context, swp, stride, tmp);
-            if (b - left < lin_cutoff)
+            if (b - prt.a < lin_cutoff)
             {
-                tmp = b - left + stride;
-                lin_sort((char *) arr + left, tmp, sz, cmp, context, swp, stride, tmp);
+                tmp = b - prt.a + stride;
+                lin_sort((char *) arr + prt.a, tmp, sz, cmp, context, swp, stride, tmp);
                 if (!frm--) break;
                 a = stk[frm].a;
                 b = stk[frm].b;
             }
-            else a = left;
+            else a = prt.a;
         }
-        else if (b - left < lin_cutoff)
+        else if (b - prt.a < lin_cutoff)
         {
-            size_t tmp = b - left + stride;
-            lin_sort((char *) arr + left, tmp, sz, cmp, context, swp, stride, tmp);
-            b = right;
+            size_t tmp = b - prt.a + stride;
+            lin_sort((char *) arr + prt.a, tmp, sz, cmp, context, swp, stride, tmp);
+            b = prt.b;
         }
         else
         {
-            if (right - a > b - left)
+            if (prt.b - a > b - prt.a)
             {
-                if (frm < log_cutoff) stk[frm++] = (struct frm) { .a = a, .b = right };
-                else log_sort((char *) arr + a, right - a + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
-                a = left;
+                if (frm < log_cutoff) stk[frm++] = (struct quick_sort_partition) { .a = a, .b = prt.b };
+                else log_sort((char *) arr + a, prt.b - a + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
+                a = prt.a;
             }
             else
             {
-                if (frm < log_cutoff) stk[frm++] = (struct frm) { .a = left, .b = b };
-                else log_sort((char *) arr + left, b - left + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
-                b = right;
+                if (frm < log_cutoff) stk[frm++] = (struct quick_sort_partition) { .a = prt.a, .b = b };
+                else log_sort((char *) arr + prt.a, b - prt.a + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
+                b = prt.b;
             }
         }
     }

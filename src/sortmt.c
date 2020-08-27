@@ -73,6 +73,11 @@ void sort_mt_dispose(struct sort_mt *arg)
     free(arg);
 }
 
+void partition_thread()
+{
+
+}
+
 struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cmp, void *context, struct thread_pool *pool, struct sort_mt_sync *sync)
 {
     struct sort_mt_sync *snc = sync ? sync : &(struct sort_mt_sync) { 0 };
