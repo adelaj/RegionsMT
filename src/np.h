@@ -53,9 +53,13 @@ typedef struct { va_list va_list; } Va_list;
 
 #define Aligned_alloca(SZ, ALIGN) ((void *) ((((uintptr_t) Alloca((SZ) + (ALIGN) - 1) + (ALIGN) - 1) / (ALIGN)) * (ALIGN)))
 
+#if defined _MSC_BUILD || defined __MINGW32__
+#   define HAS_ALIGNED_REALLOC
+#endif
+
 // Aligned memory allocation/deallocation
 void *Aligned_malloc(size_t, size_t);
-void *Aligned_realloc(void *, size_t, size_t);
+void *Aligned_realloc(void *, size_t, size_t); // Warning! This function returns NULL on all platforms except Windows!
 void *Aligned_calloc(size_t, size_t, size_t);
 void Aligned_free(void *);
 

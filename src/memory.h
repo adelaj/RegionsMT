@@ -12,7 +12,8 @@ enum array_flags {
     ARRAY_STRICT = 2,
     ARRAY_REDUCE = 4,
     ARRAY_REALLOC = 8, // Default in 'array_test'
-    ARRAY_FAILSAFE = 16 // Disables internal checks
+    ARRAY_FAILSAFE = 16, // Disables internal checks
+    ARRAY_ALIGN = 32
 };
 
 struct array_result {
@@ -37,6 +38,7 @@ enum array_error {
 void array_broadcast(void *, size_t, size_t, void *);
 
 struct array_result matrix_init(void *, size_t *restrict, size_t, size_t, size_t, size_t, size_t, enum array_flags);
+struct array_result array_init_impl(void *, size_t *restrict, size_t, size_t, size_t, size_t, enum array_flags);
 struct array_result array_init(void *, size_t *restrict, size_t, size_t, size_t, enum array_flags);
 struct array_result array_test_impl(void *, size_t *restrict, size_t, size_t, enum array_flags, size_t *restrict, size_t);
 

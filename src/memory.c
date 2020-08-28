@@ -25,10 +25,27 @@ struct array_result matrix_init(void *p_Src, size_t *restrict p_cap, size_t xdim
     return res;
 }
 
+static void *Aligned_realloc_impl(void *ptr, size_t *restrict p_cap, size_t al, size_t tot)
+{
+#ifdef HAS_ALIGNED_REALLOC
+    (void) p_cap;
+    return Aligned_realloc(ptr, al, tot);
+#else
+    if (!p_cap) return Aligned_realloc(ptr, al, tot); // This will return 'NULL' and set 'errno'
+    void *res = Aligned_malloc(al, tot);
+    if (!res) return NULL;
+    memcpy(res, ptr, *p_cap);
+    Aligned_free(ptr);
+    return res;
+#endif
+}
+
+// 'al' -- alignment of array, used only when 'ARRAY_ALIGNED' flag is set
 // 'p_cap' -- pointer to initial capacity
 // 'cnt' -- desired capacity
 // On error 'p_Src' and 'p_cap' are untouched
-struct array_result array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, size_t diff, enum array_flags flags)
+// Warning! 'ARRAY_ALIGNED | ARRAY_REALLOC' will yield an error on most platforms when 'p_cap' is not specified!
+struct array_result array_init_impl(void *p_Src, size_t *restrict p_cap, size_t al, size_t cnt, size_t sz, size_t diff, enum array_flags flags)
 {
     void **restrict p_src = p_Src, *src = *p_src;
     if (src && p_cap && (flags & ARRAY_REALLOC))
@@ -38,7 +55,7 @@ struct array_result array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, 
         {
             if (!(flags & ARRAY_REDUCE)) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
             size_t tot = cnt * sz + diff; // No checks for overflows
-            void *res = realloc(src, tot); // Array shrinking
+            void *res = flags & ARRAY_ALIGN ? Aligned_realloc_impl(src, p_cap, al, tot) : realloc(src, tot); // Array shrinking
             if (tot && !res) return (struct array_result) { .error = ARRAY_OUT_OF_MEMORY, .tot = tot };
             *p_cap = cnt;
             *p_src = res;
@@ -57,18 +74,25 @@ struct array_result array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, 
     void *res;
     if (src && (flags & ARRAY_REALLOC))
     {
-        res = realloc(src, tot);
+        res = flags & ARRAY_ALIGN ? Aligned_realloc_impl(src, p_cap, al, tot) : realloc(src, tot);
         if (res && p_cap && (flags & ARRAY_CLEAR))
         {
             size_t off = *p_cap * sz + diff;
             memset((char *) res + off, 0, tot - off);
         }
     }
-    else res = flags & ARRAY_CLEAR ? calloc(tot, 1) : malloc(tot);
+    else res = flags & ARRAY_ALIGN ? 
+        flags & ARRAY_CLEAR ? Aligned_calloc(al, 1, tot) : Aligned_malloc(al, tot) :
+        flags & ARRAY_CLEAR ? calloc(1, tot) : malloc(tot);
     if (tot && !res) return (struct array_result) { .error = ARRAY_OUT_OF_MEMORY, .tot = tot };
     *p_src = res;
     if (p_cap) *p_cap = cnt;
     return (struct array_result) { .status = ARRAY_SUCCESS, .tot = tot };
+}
+
+struct array_result array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, size_t diff, enum array_flags flags)
+{
+    return array_init_impl(p_Src, p_cap, 0, cnt, sz, diff, flags & ~(enum array_flags) ARRAY_ALIGN);
 }
 
 struct array_result array_test_impl(void *p_Arr, size_t *restrict p_cap, size_t sz, size_t diff, enum array_flags flags, size_t *restrict cntl, size_t cnt)

@@ -72,11 +72,11 @@ void *Aligned_malloc(size_t al, size_t sz)
 
 void *Aligned_realloc(void *ptr, size_t al, size_t sz)
 {
-    void *res = Aligned_malloc(al, sz);
-    if (!res) return NULL;
-    memcpy(res, ptr, sz);
-    Aligned_free(ptr);
-    return res;
+    (void) ptr;
+    (void) al;
+    (void) sz;
+    errno = ENOSYS; // Function not implemented
+    return NULL;
 }
 
 void *Aligned_calloc(size_t al, size_t cnt, size_t sz)
