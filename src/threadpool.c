@@ -75,8 +75,10 @@ bool loop_init(struct thread_pool *pool, task_callback callback, struct task_con
     size_store_release(&data->mem.drop, 0);
     data->prod = prod;
     if (prod) // Building index set
+    {
         if (offl) memcpy(data->ind, offl, cnt * sizeof(*data->ind));
         else memset(data->ind, 0, cnt * sizeof(*data->ind));
+    }
     for (size_t i = 1, j = cnt; i < prod; i++, j += cnt)
     {
         size_t k = 0;
@@ -88,7 +90,7 @@ bool loop_init(struct thread_pool *pool, task_callback callback, struct task_con
 }
 
 struct thread_pool {
-    spinlock_handle spinlock, add;
+    spinlock spinlock, add;
     mutex_handle mutex;
     condition_handle condition;
     struct queue queue;
@@ -289,7 +291,7 @@ void thread_pool_schedule(struct thread_pool *pool)
             for (; ind < cnt; ind++)
             {
                 struct thread_arg *arg = persistent_array_fetch(&pool->arg, ind, sizeof(struct thread_arg));
-                if (ptr_interlocked_compare_exchange(&arg->dispatched_task, NULL, dispatched_task)) continue;
+                if (!ptr_interlocked_compare_exchange(&arg->dispatched_task, &(void *) { NULL }, dispatched_task)) continue;
                 mutex_acquire(&arg->mutex);
                 uint8_bit_set(arg->bits, THREAD_BIT_QUERY_WAKE);
                 condition_signal(&arg->condition);

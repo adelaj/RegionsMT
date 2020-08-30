@@ -7,6 +7,7 @@ typedef void (*test_dispose_callback)(void *);
 typedef bool (*test_callback)(void *, struct log *);
 
 #define FSTRL(F) { F, STRI(#F) } 
+#define TEST_GENERATOR_THRESHOLD 255
 
 struct test_group {
     test_dispose_callback dispose;

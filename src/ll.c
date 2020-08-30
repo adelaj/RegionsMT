@@ -19,10 +19,9 @@
         }
 
 #   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX, SUFFIX, MEM_ORD_SUCC, MEM_ORD_FAIL) \
-        TYPE PREFIX ## _interlocked_compare_exchange ## SUFFIX(volatile void *dst, TYPE cmp, TYPE xchg) \
+        bool PREFIX ## _interlocked_compare_exchange ## SUFFIX(volatile void *dst, TYPE *p_cmp, TYPE xchg) \
         { \
-            __atomic_compare_exchange_n((TYPE volatile *) dst, &cmp, xchg, 0, MEM_ORD_SUCC, MEM_ORD_FAIL); \
-            return cmp;\
+            return __atomic_compare_exchange_n((TYPE volatile *) dst, p_cmp, xchg, 0, MEM_ORD_SUCC, MEM_ORD_FAIL); \
         }
 
 #   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND, MEM_ORD) \
@@ -35,8 +34,9 @@ static DECLARE_LOAD_ACQUIRE(int, spinlock)
 static DECLARE_STORE_RELEASE(int, spinlock)
 static DECLARE_INTERLOCKED_COMPARE_EXCHANGE(int, spinlock, _acquire, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)
 
-DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size,, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
-DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr,, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
 
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, __atomic_fetch_or, __ATOMIC_ACQ_REL)
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, or_release, __atomic_fetch_or, __ATOMIC_RELEASE)
@@ -98,9 +98,13 @@ size_t size_pop_cnt(size_t x)
         }
 
 #   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX, BACKEND_CAST, BACKEND, SUFFIX) \
-        TYPE PREFIX ## _interlocked_compare_exchange ## SUFFIX(volatile void *dst, TYPE cmp, TYPE xchg) \
+        bool PREFIX ## _interlocked_compare_exchange ## SUFFIX(volatile void *dst, TYPE *p_cmp, TYPE xchg) \
         { \
-            return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, (BACKEND_CAST) xchg, (BACKEND_CAST) cmp);\
+            TYPE cmp = *p_cmp; \
+            TYPE res = (TYPE) BACKEND((BACKEND_CAST volatile *) dst, (BACKEND_CAST) xchg, (BACKEND_CAST) cmp); \
+            if (res == cmp) return 1; \
+            *p_cmp = res; \
+            return 0; \
         }
 
 #   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND_CAST, BACKEND) \
@@ -144,6 +148,11 @@ uint32_t uint32_pop_cnt(uint32_t x)
 
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, long long, _InterlockedCompareExchange64,)
 DECLARE_INTERLOCKED_OP(size_t, size, add, long long, _InterlockedExchangeAdd64)
+
+bool Dsize_interlocked_compare_exchange(volatile void *dst, Dsize_t *p_cmp, Dsize_t xchg)
+{
+    return _InterlockedCompareExchange128(dst, DSIZE_HI(xchg), DSIZE_LO(xchg), (long long *) p_cmp->s);
+}
 
 // Warning! 'y %= 64' is done internally!
 size_t size_shl(size_t *p_hi, size_t x, uint8_t y)
@@ -199,53 +208,48 @@ size_t size_pop_cnt(size_t x)
 
 #   elif defined _M_IX86
 
-DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, long, _InterlockedCompareExchange,)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, long, _InterlockedCompareExchange, )
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize, long long, _InterlockedCompareExchange64, )
 DECLARE_INTERLOCKED_OP(size_t, size, add, long, _InterlockedExchangeAdd)
 
 #   endif
 #endif 
 
-// Warning! 'Dsize_t' is not defined for MSVC under x86_64
 #if defined __GNUC__ || defined __clang__ || defined _M_IX86 || defined __i386__
-#   if defined _M_X64 || defined __x86_64__
-typedef unsigned __int128 Dsize_t;
-#   elif defined _M_IX86 || defined __i386__
-typedef unsigned long long Dsize_t;
-#   endif
 
 size_t size_shl(size_t *p_hi, size_t x, uint8_t y)
 {
     Dsize_t val = (Dsize_t) x << (y % SIZE_BIT);
-    *p_hi = (size_t) (val >> SIZE_BIT);
-    return (size_t) val;
+    *p_hi = DSIZE_HI(val);
+    return DSIZE_LO(val);
 }
 
 size_t size_shr(size_t *p_lo, size_t x, uint8_t y)
 {
     Dsize_t val = ((Dsize_t) x << SIZE_BIT) >> (y % SIZE_BIT);
-    *p_lo = (size_t) val;
-    return (size_t) (val >> SIZE_BIT);
+    *p_lo = DSIZE_LO(val);
+    return DSIZE_HI(val);
 }
 
 size_t size_mul(size_t *p_hi, size_t x, size_t y)
 {
     Dsize_t val = (Dsize_t) x * (Dsize_t) y;
-    *p_hi = (size_t) (val >> SIZE_BIT);
-    return (size_t) val;
+    *p_hi = DSIZE_HI(val);
+    return DSIZE_LO(val);
 }
 
 size_t size_add(size_t *p_car, size_t x, size_t y)
 {
     Dsize_t val = (Dsize_t) x + (Dsize_t) y;
-    *p_car = (size_t) (val >> SIZE_BIT);
-    return (size_t) val;
+    *p_car = DSIZE_HI(val);
+    return DSIZE_LO(val);
 }
 
 size_t size_sub(size_t *p_bor, size_t x, size_t y)
 {
     Dsize_t val = (Dsize_t) x - (Dsize_t) y;
-    *p_bor = 0 - (size_t) (val >> SIZE_BIT);
-    return (size_t) val;
+    *p_bor = 0 - DSIZE_HI(val);
+    return DSIZE_LO(val);
 }
 
 #endif
@@ -280,24 +284,16 @@ size_t size_interlocked_dec(volatile void *mem)
 
 size_t size_interlocked_add_sat(volatile void *mem, size_t val)
 {
-    for (size_t tmp = size_load_acquire(&mem); tmp < SIZE_MAX;)
-    {
-        size_t res = size_interlocked_compare_exchange(mem, tmp, size_add_sat(tmp, val));
-        if (res == tmp) return res;
-        tmp = res;
-    }
-    return SIZE_MAX;
+    size_t tmp = size_load_acquire(mem);
+    while (tmp < SIZE_MAX && !size_interlocked_compare_exchange(mem, &tmp, size_add_sat(tmp, val))) tmp = size_load_acquire(mem);
+    return tmp;
 }
 
 size_t size_interlocked_sub_sat(volatile void *mem, size_t val)
 {
-    for (size_t tmp = size_load_acquire(&mem); tmp;)
-    {
-        size_t res = size_interlocked_compare_exchange(mem, tmp, size_sub_sat(tmp, val));
-        if (res == tmp) return res;
-        tmp = res;
-    }
-    return 0;
+    size_t tmp = size_load_acquire(mem);
+    while (tmp && !size_interlocked_compare_exchange(mem, &tmp, size_sub_sat(tmp, val))) tmp = size_load_acquire(mem);
+    return tmp;
 }
 
 size_t size_sum(size_t *p_hi, size_t *argl, size_t cnt)
@@ -466,23 +462,23 @@ size_t m128i_byte_scan_forward(__m128i a)
     return res;
 }
 
-void spinlock_acquire(spinlock_handle *p_spinlock)
+void spinlock_acquire(spinlock *p_spinlock)
 {
-    while (spinlock_interlocked_compare_exchange_acquire(p_spinlock, 0, 1)) while (spinlock_load_acquire(p_spinlock)) _mm_pause();
+    while (!spinlock_interlocked_compare_exchange_acquire(p_spinlock, &(spinlock_base) { 0 }, 1)) while (spinlock_load_acquire(p_spinlock)) _mm_pause();
 }
 
-void spinlock_release(spinlock_handle *p_spinlock)
+void spinlock_release(spinlock *p_spinlock)
 {
     spinlock_store_release(p_spinlock, 0);
 }
 
-void *double_lock_execute(spinlock_handle *p_spinlock, double_lock_callback init, double_lock_callback comm, void *init_args, void *comm_args)
+void *double_lock_execute(spinlock *p_spinlock, double_lock_callback init, double_lock_callback comm, void *init_args, void *comm_args)
 {
     void *res = NULL;
     switch (spinlock_load_acquire(p_spinlock))
     {
     case 0:
-        if (!spinlock_interlocked_compare_exchange_acquire(p_spinlock, 0, 1))
+        if (spinlock_interlocked_compare_exchange_acquire(p_spinlock, &(spinlock_base) { 0 }, 1)) // Strong CAS required here!
         {
             if (init) res = init(init_args);
             spinlock_store_release(p_spinlock, 2);

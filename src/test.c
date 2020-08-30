@@ -31,7 +31,19 @@ static unsigned test_thread(void *Indl, void *Context, void *Tls)
     struct test_tls *tls = Tls;
     void *data;
     uint64_t start = get_time();
-    if (!context->groupl[w].generator[y].callback(&data, &z, &tls->log)) return 0;
+    if (!context->groupl[w].generator[y].callback(&data, &z, &tls->log))
+    {
+        if (tls->base.reentrance < TEST_GENERATOR_THRESHOLD)
+        {
+            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Generator for the test %~uz:%''~s*:%''~s*:%~uz will be retriggered elsewhen. Available attempts: %~zu.\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1, TEST_GENERATOR_THRESHOLD - tls->base.reentrance - 1);
+            return TASK_YIELD;
+        }
+        else
+        {
+            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts for the test %~uz:%''~s*:%''~s*:%~uz exhausted!\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1);
+            return TASK_FAIL;
+        }
+    }
     bool succ = context->groupl[w].test[x].callback(data, &tls->log);
     if (!succ) log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_WARNING, "Test %~uz:%''~s*:%''~s*:%~uz failed!\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1);
     else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %~uz:%''~s*:%''~s*:%~uz took %~T.\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1, start, get_time());

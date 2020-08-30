@@ -10,9 +10,31 @@
 #include <immintrin.h>
 
 #if defined __GNUC__ || defined __clang__
-typedef volatile int spinlock_handle;
+typedef int spinlock_base;
 #elif defined _MSC_BUILD
-typedef volatile long spinlock_handle;
+typedef long spinlock_base;
+#endif
+
+typedef volatile spinlock_base spinlock;
+
+#if defined __GNUC__ || defined __clang__ || defined _M_IX86 || defined __i386__
+#   if defined _M_X64 || defined __x86_64__
+typedef unsigned __int128 Dsize_t;
+#   elif defined _M_IX86 || defined __i386__
+typedef unsigned long long Dsize_t;
+#   endif
+#elif defined _MSC_BUILD
+typedef struct { size_t s[2]; } Dsize_t;
+#endif
+
+#if defined _MSC_BUILD && defined _M_X64
+#   define DSIZEC(LO, HO) ((Dsize_t) { (LO), (HI) })
+#   define DSIZE_LO(D) (D.s[0])
+#   define DSIZE_HI(D) (D.s[1])
+#else
+#   define DSIZEC(LO, HI) ((Dsize_t) (LO) | (((Dsize_t) (HI)) << SIZE_BIT))
+#   define DSIZE_LO(D) ((size_t) (D))
+#   define DSIZE_HI(D) ((size_t) ((D) >> SIZE_BIT))
 #endif
 
 // Rounding down/up to the nearest power of 2 for the inline usage 
@@ -54,8 +76,9 @@ uint8_t uint8_interlocked_or(volatile void *, uint8_t);
 uint16_t uint16_interlocked_or(volatile void *, uint16_t);
 uint8_t uint8_interlocked_and(volatile void *, uint8_t);
 uint16_t uint16_interlocked_and(volatile void *, uint16_t);
-size_t size_interlocked_compare_exchange(volatile void *, size_t, size_t);
-void *ptr_interlocked_compare_exchange(volatile void *, void *, void *);
+bool size_interlocked_compare_exchange(volatile void *, size_t *, size_t);
+bool ptr_interlocked_compare_exchange(volatile void *, void **, void *);
+bool Dsize_interlocked_compare_exchange(volatile void *, Dsize_t *, Dsize_t);
 void *ptr_interlocked_exchange(volatile void *, void *);
 
 size_t size_interlocked_inc(volatile void *);
@@ -95,11 +118,11 @@ size_t size_hash_inv(size_t);
 size_t m128i_byte_scan_forward(__m128i a);
 
 #define SPINLOCK_INIT 0
-void spinlock_acquire(spinlock_handle *);
-void spinlock_release(spinlock_handle *);
+void spinlock_acquire(spinlock *);
+void spinlock_release(spinlock *);
 
 typedef void *(*double_lock_callback)(void *);
-void *double_lock_execute(spinlock_handle *, double_lock_callback, double_lock_callback, void *, void *);
+void *double_lock_execute(spinlock *, double_lock_callback, double_lock_callback, void *, void *);
 
 uint8_t uint8_bit_scan_reverse(uint8_t);
 uint8_t uint8_bit_scan_forward(uint8_t);

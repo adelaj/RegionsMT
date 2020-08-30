@@ -114,17 +114,12 @@ struct array_result ranks_from_orders(size_t **p_rnk, const uintptr_t *ord, size
 
 struct array_result ranks_unique(size_t **p_rnk, const void *arr, size_t *p_cnt, size_t stride, cmp_callback cmp, void *context)
 {
-    bool succ = 0;
     size_t *rnk;
     uintptr_t *ptr = NULL;
     struct array_result res = pointers(&ptr, arr, *p_cnt, stride, cmp, context);
     if (!res.status) return res;
     res = ranks_unique_from_pointers(&rnk, ptr, (uintptr_t) arr, p_cnt, stride, cmp, context);
-    if (res.status)
-    {
-        *p_rnk = rnk;
-        succ = 1;
-    }
+    if (res.status) *p_rnk = rnk;
     free(ptr);
     return res;
 }

@@ -31,6 +31,8 @@ $(call var_reg,-D_UCRT -D__MSVCRT_VERSION__=0x1400 -D_UNICODE -D__USE_MINGW_ANSI
 $(call var_reg,-mcrtdll=ucrt,$$1,LDLIB:%:gcc@mingw:%:%)
 # See https://sourceforge.net/p/mingw-w64/mailman/message/36621319/ for the details on how to use clang against ucrt
 $(call var_reg,-lucrt,$$1,LDLIB:%:clang@mingw:%:%)
+# https://sourceforge.net/p/mingw-w64/mailman/message/33154210/
+$(call var_reg,-Wl$$$$(COMMA)--large-address-aware,$$1,LDFLAGS:%,gcc@mingw clang@mingw,i386 i686,%)
 
 # Warning! Add "/D_DLL" if using "/MD" instead of "/MT"
 $(call var_reg,/MP /arch:AVX /volatile:ms /D_UNICODE /D_CRT_SECURE_NO_WARNINGS,$$1,CFLAGS:%:msvc:%:%)
@@ -40,6 +42,7 @@ $(call var_reg,/LTCG,$$1,LDFLAGS ARFLAGS,%:msvc:%:Release)
 $(call var_reg,/SUBSYSTEM:CONSOLE,$$1,LDFLAGS:%:msvc:%:%)
 $(call var_reg,/DEBUG /INCREMENTAL,$$1,LDFLAGS:%:msvc:%:Debug)
 $(call var_reg,/INCREMENTAL:NO,$$1,LDFLAGS:%:msvc:%:Release)
+$(call var_reg,/LARGEADDRESSAWARE,$$1,LDFLAGS:%:msvc:Win32:%)
 
 $(call var_reg,/p:CharacterSet=Unicode,$$1,MSBUILDFLAGS:%:msvc:%:%)
 $(call var_reg,/p:WholeProgramOptimization=true,$$1,MSBUILDFLAGS:%:msvc:%:Release)

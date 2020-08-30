@@ -203,7 +203,7 @@ void *b(struct memory_chunk *a)
 
 bool test_ll_3()
 {
-    spinlock_handle sp = SPINLOCK_INIT;
+    spinlock sp = SPINLOCK_INIT;
     struct memory_chunk chunk = { .sz = 100 };
     void *res;
     for (size_t i = 0; i < 10; i++)
