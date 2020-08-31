@@ -24,6 +24,16 @@
             return __atomic_compare_exchange_n((TYPE volatile *) dst, p_cmp, xchg, 0, MEM_ORD_SUCC, MEM_ORD_FAIL); \
         }
 
+#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE_GCC(TYPE, PREFIX, SUFFIX) \
+        bool PREFIX ## _interlocked_compare_exchange ## SUFFIX(volatile void *dst, TYPE *p_cmp, TYPE xchg) \
+        { \
+            TYPE cmp = *p_cmp; \
+            TYPE res = __sync_val_compare_and_swap((TYPE volatile *) dst, cmp, xchg); \
+            if (res == cmp) return 1; \
+            *p_cmp = res; \
+            return 0; \
+        }
+
 #   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND, MEM_ORD) \
         TYPE PREFIX ## _interlocked_ ## SUFFIX(volatile void *dst, TYPE arg) \
         { \
@@ -36,7 +46,15 @@ static DECLARE_INTERLOCKED_COMPARE_EXCHANGE(int, spinlock, _acquire, __ATOMIC_AC
 
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
-DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
+
+#       if defined __GNUC__ && defined __x86_64__
+// For some reason gcc does not emit 'cmpxchg16b' even when '-mcx16' is enabled 
+// with ordinary 'DECLARE_INTERLOCKED_COMPARE_EXCHANGE' macro.
+// See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84522 for more details
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE_GCC(Dsize_t, Dsize, )
+#       else
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize, )
+#       endif
 
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, __atomic_fetch_or, __ATOMIC_ACQ_REL)
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, or_release, __atomic_fetch_or, __ATOMIC_RELEASE)
