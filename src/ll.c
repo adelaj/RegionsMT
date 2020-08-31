@@ -53,7 +53,7 @@ DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, , __ATOMIC_ACQ_REL, __ATOMIC_A
 // See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84522 for more details
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE_GCC(Dsize_t, Dsize, )
 #       else
-DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize, )
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
 #       endif
 
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, __atomic_fetch_or, __ATOMIC_ACQ_REL)
