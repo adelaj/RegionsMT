@@ -174,6 +174,7 @@ static bool size_cmp_asc_test(const void *a, const void *b, void *Context)
 
 bool test_sort_a(void *In, struct log *log)
 {
+    (void) log;
     struct test_sort_a *in = In;
     struct size_cmp_asc_test context = { .a = in->arr, .b = in->arr + in->cnt * sizeof(*in->arr) - sizeof(*in->arr), .succ = 1 };
     size_t swp;

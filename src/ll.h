@@ -36,9 +36,9 @@ typedef struct { size_t s[2]; } Dsize_t;
 #endif
 
 #if defined _MSC_BUILD && defined _M_X64
-#   define DSIZEC(LO, HO) ((Dsize_t) { (LO), (HI) })
-#   define DSIZE_LO(D) (D.s[0])
-#   define DSIZE_HI(D) (D.s[1])
+#   define DSIZEC(LO, HI) ((Dsize_t) { (LO), (HI) })
+#   define DSIZE_LO(D) ((D).s[0])
+#   define DSIZE_HI(D) ((D).s[1])
 #else
 #   define DSIZEC(LO, HI) ((Dsize_t) (LO) | (((Dsize_t) (HI)) << SIZE_BIT))
 #   define DSIZE_LO(D) ((size_t) (D))

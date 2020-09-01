@@ -751,7 +751,7 @@ bool log_dup(struct log *restrict dst, struct log *restrict src)
         dst->lim = src->lim;
         dst->file = f;
         dst->tot = 0;
-        dst->fallback = NULL; // User should set this manyally
+        dst->fallback = NULL; // User should set this manually
         return 1;
     }
     Fclose(f);

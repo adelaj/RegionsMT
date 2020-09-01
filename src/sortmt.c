@@ -110,7 +110,8 @@ bool sort_mt_init(struct thread_pool *pool,  struct log *log)
 {
     size_t dep = size_log2(thread_pool_get_count(pool), 0), task_cnt = (size_t) 1 << dep, cnt = task_cnt - 1;
     struct sort_mt *data;
-    if (!array_assert(log, CODE_METRIC, array_init_impl(&data, NULL, alignof(struct sort_mt), fam_countof(struct sort_mt, ran, cnt), fam_sizeof(struct sort_mt, ran), fam_diffof(struct sort_mt, ran, cnt), ARRAY_STRICT))) return 0;
+    // Note that aligned allocation below is superfluous on all platforms under consideration
+    if (!array_assert(log, CODE_METRIC, array_init_impl(&data, NULL, alignof(struct sort_mt), fam_countof(struct sort_mt, ran, cnt), fam_sizeof(struct sort_mt, ran), fam_diffof(struct sort_mt, ran, cnt), ARRAY_STRICT | ARRAY_ALIGN))) return 0;
 
 }
 
