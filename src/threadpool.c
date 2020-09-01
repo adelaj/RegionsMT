@@ -20,26 +20,26 @@ unsigned cond_inc(volatile void *Mem, const void *Tot)
     return size_load_acquire(&mem->success) + size_load_acquire(&mem->fail) + size_load_acquire(&mem->drop) == *(size_t *) Tot;
 }
 
-struct loop_data {
+struct loop_mt {
     volatile struct inc_mem mem;
     size_t prod;
     size_t ind[];
 };
 
-struct loop_generator_context {
+struct loop_mt_generator_context {
     task_callback callback;
     struct task_cond cond;
     struct task_aggr aggr;
     size_t cnt;
     void *context;
-    struct loop_data *data;
+    struct loop_mt *data;
 };
 
 static unsigned loop_tread_close(void *Data, void *context, void *tls)
 {
     (void) context;
     (void) tls;
-    volatile struct loop_data *data = Data;
+    volatile struct loop_mt *data = Data;
     bool fail = size_load_acquire(&data->mem.fail), drop = size_load_acquire(&data->mem.drop);
     free(Data);
     return drop ? TASK_DROP : !fail;
@@ -47,7 +47,7 @@ static unsigned loop_tread_close(void *Data, void *context, void *tls)
 
 void loop_generator(void *Task, size_t ind, void *Context)
 {
-    struct loop_generator_context *context = Context;
+    struct loop_mt_generator_context *context = Context;
     *(struct task *) Task = ind < context->data->prod ?
         (struct task) {
             .callback = context->callback,
@@ -64,12 +64,12 @@ void loop_generator(void *Task, size_t ind, void *Context)
         };
 }
 
-bool loop_init(struct thread_pool *pool, task_callback callback, struct task_cond cond, struct task_aggr aggr, void *context, size_t *restrict cntl, size_t cnt, size_t *restrict offl, bool hi, struct log *log)
+bool loop_mt(struct thread_pool *pool, task_callback callback, struct task_cond cond, struct task_aggr aggr, void *context, size_t *restrict cntl, size_t cnt, size_t *restrict offl, bool hi, struct log *log)
 {
     size_t prod, tot = 0;
     if (!crt_assert_impl(log, CODE_METRIC, !SIZE_PROD_TEST(&prod, cntl, cnt) || prod == SIZE_MAX || !SIZE_PROD_TEST_VA(&tot, prod, cnt) ? ERANGE : 0)) return 0;
-    struct loop_data *data;
-    if (!array_assert(log, CODE_METRIC, array_init(&data, NULL, fam_countof(struct loop_data, ind, tot), fam_sizeof(struct loop_data, ind), fam_diffof(struct loop_data, ind, tot), ARRAY_STRICT))) return 0;
+    struct loop_mt *data;
+    if (!array_assert(log, CODE_METRIC, array_init(&data, NULL, fam_countof(struct loop_mt, ind, tot), fam_sizeof(struct loop_mt, ind), fam_diffof(struct loop_mt, ind, tot), ARRAY_STRICT))) return 0;
     size_store_release(&data->mem.fail, 0);
     size_store_release(&data->mem.success, 0);
     size_store_release(&data->mem.drop, 0);
@@ -86,7 +86,9 @@ bool loop_init(struct thread_pool *pool, task_callback callback, struct task_con
         else for (; k < cnt && (data->ind[j + k] = data->ind[j + k - cnt] + 1) == cntl[k]; data->ind[j + k] = 0, k++);
         for (k++; k < cnt; data->ind[j + k] = data->ind[j + k - cnt], k++);
     }
-    return thread_pool_enqueue_yield(pool, loop_generator, &(struct loop_generator_context) { .callback = callback, .cond = cond, .aggr = aggr, .cnt = cnt, .context = context, .data = data }, prod + 1, hi, log);
+    if (thread_pool_enqueue_yield(pool, loop_generator, &(struct loop_mt_generator_context) { .callback = callback, .cond = cond, .aggr = aggr, .cnt = cnt, .context = context, .data = data }, prod + 1, hi, log)) return 1;
+    free(data);
+    return 0;
 }
 
 struct thread_pool {
@@ -200,15 +202,17 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
             dispatched_task->reentrance = size_add_sat(dispatched_task->reentrance, 1);
             dispatched_task->storage = tls->storage;
             bool_store_release(&dispatched_task->not_orphan, 0);
-            continue;
         }
-        if (dispatched_task->aggr.callback) dispatched_task->aggr.callback(dispatched_task->aggr.mem, dispatched_task->aggr.arg, res);
-        size_interlocked_dec(&pool->task_hint);
+        else
+        {
+            if (dispatched_task->aggr.callback) dispatched_task->aggr.callback(dispatched_task->aggr.mem, dispatched_task->aggr.arg, res);
+            size_interlocked_dec(&pool->task_hint);
+        }
 
-        // Inform scheduller that global queue state has been changed
+        // Inform scheduller that global state has been changed
         mutex_acquire(&pool->mutex);
         pool->query_wake = 1;
-        bool_store_release(&dispatched_task->not_garbage, 0);
+        if (res != TASK_YIELD) bool_store_release(&dispatched_task->not_garbage, 0);
         condition_signal(&pool->condition);
         mutex_release(&pool->mutex);
     }

@@ -17,6 +17,7 @@
 #       define restrict __restrict
 #       define inline __inline
 #       define alignof __alignof
+#       define alignas(N) __declspec(align(N)) // Warning! This do not handle expressions, only numeric literals
 #       define _Static_assert static_assert
 #       define _Thread_local __declspec(thread)
 #   endif

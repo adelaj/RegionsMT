@@ -23,6 +23,7 @@ struct merge_args {
     size_t off, mid, len;
 };
 
+/*
 struct sort_mt
 {
     struct sort_context context;
@@ -32,6 +33,7 @@ struct sort_mt
     uint8_t *sync; // Last two bits in 'res->sync' are not in use!
     size_t *args;
 };
+*/
 
 static void merge_arrays(void *restrict arr, void *restrict temp, size_t mid, size_t cnt, size_t sz, cmp_callback cmp, void *context)
 {
@@ -61,6 +63,7 @@ static bool sort_thread_proc(void *Args, void *Context)
     return 1;
 }
 
+/*
 void sort_mt_dispose(struct sort_mt *arg)
 {
     if (!arg) return;    
@@ -72,13 +75,47 @@ void sort_mt_dispose(struct sort_mt *arg)
     free(arg->context.temp);
     free(arg);
 }
+*/
 
-void partition_thread()
+struct sort_mt {
+    void *arr;
+    size_t cnt;
+    alignas(DSIZE_ALIGN) volatile Dsize_t ran[];
+};
+
+static unsigned sort_thread(void *Ind, void *Data, void *tls)
 {
+    (void) tls;
+    struct sort_mt *data = Data;
+    size_t ind = (size_t) Ind, lev = size_log2(ind, 0) + 1, a, b;
+    if (ind)
+    {
+        // Warning! Acquire semantic is provided by 'Dsize_interlocked_compare_exchange' in task condition
+        // This operation need not to be atomic
+        Dsize_t ran = data->ran[ind - 1];
+        a = DSIZE_LO(ran);
+        b = DSIZE_HI(ran);
+    }
+    else
+    {
+        a = 0;
+        b = data->cnt - 1;
+    }
+
+
+    return 1;
+}
+
+bool sort_mt_init(struct thread_pool *pool,  struct log *log)
+{
+    size_t dep = size_log2(thread_pool_get_count(pool), 0), task_cnt = (size_t) 1 << dep, cnt = task_cnt - 1;
+    struct sort_mt *data;
+    if (!array_assert(log, CODE_METRIC, array_init_impl(&data, NULL, alignof(struct sort_mt), fam_countof(struct sort_mt, ran, cnt), fam_sizeof(struct sort_mt, ran), fam_diffof(struct sort_mt, ran, cnt), ARRAY_STRICT))) return 0;
 
 }
 
-struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cmp, void *context, struct thread_pool *pool, struct sort_mt_sync *sync)
+/*
+bool sort_mt_init(void *arr, size_t cnt, size_t sz, cmp_callback cmp, void *context, struct thread_pool *pool, struct sort_mt_sync *sync)
 {
     struct sort_mt_sync *snc = sync ? sync : &(struct sort_mt_sync) { 0 };
     size_t dep = size_bit_scan_reverse(thread_pool_get_count(pool)); // Max value of 'dep' is 63 under x86_64 and 31 under x86 
@@ -185,3 +222,4 @@ struct sort_mt *sort_mt_create(void *arr, size_t cnt, size_t sz, cmp_callback cm
     }   
     return NULL;
 }
+*/

@@ -347,7 +347,7 @@ size_t split_range(size_t *arr, size_t cnt, size_t off, size_t tot, size_t strid
     return ind;
 }
 
-struct quick_sort_partition quick_sort_partition(void *restrict arr, size_t a, size_t b, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t stride)
+Dsize_t quick_sort_partition(void *restrict arr, size_t a, size_t b, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t stride)
 {
     size_t diff = b - a, pvtl[8], pvt;
     if (split_range(pvtl, countof(pvtl), a, diff, stride, 1) < countof(pvtl))
@@ -377,49 +377,51 @@ struct quick_sort_partition quick_sort_partition(void *restrict arr, size_t a, s
         a += stride;
         b -= stride;
     } while (a <= b);
-    return (struct quick_sort_partition) { .a = a, .b = b };
+    return DSIZEC(a, b);
 }
 
 static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t stride, size_t lin_cutoff, lin_sort_callback lin_sort, size_t log_cutoff, sort_callback log_sort)
 {
-    struct quick_sort_partition *stk = Alloca(log_cutoff * sizeof(*stk));
+    Dsize_t *stk = Alloca(log_cutoff * sizeof(*stk));
     size_t frm = 0, a = 0, b = tot - stride;
     for (;;)
     {
-        struct quick_sort_partition prt = quick_sort_partition(arr, a, b, sz, cmp, context, swp, stride);
-        if (prt.b - a < lin_cutoff)
+        Dsize_t prt = quick_sort_partition(arr, a, b, sz, cmp, context, swp, stride);
+        size_t pa = DSIZE_LO(prt), pb = DSIZE_HI(prt);
+        if (pb - a < lin_cutoff)
         {
-            size_t tmp = prt.b - a + stride;
+            size_t tmp = pb - a + stride;
             lin_sort((char *) arr + a, tmp, sz, cmp, context, swp, stride, tmp);
-            if (b - prt.a < lin_cutoff)
+            if (b - pa < lin_cutoff)
             {
-                tmp = b - prt.a + stride;
-                lin_sort((char *) arr + prt.a, tmp, sz, cmp, context, swp, stride, tmp);
+                tmp = b - pa + stride;
+                lin_sort((char *) arr + pa, tmp, sz, cmp, context, swp, stride, tmp);
                 if (!frm--) break;
-                a = stk[frm].a;
-                b = stk[frm].b;
+                Dsize_t pop = stk[frm];
+                a = DSIZE_LO(pop);
+                b = DSIZE_HI(pop);
             }
-            else a = prt.a;
+            else a = pa;
         }
-        else if (b - prt.a < lin_cutoff)
+        else if (b - pa < lin_cutoff)
         {
-            size_t tmp = b - prt.a + stride;
-            lin_sort((char *) arr + prt.a, tmp, sz, cmp, context, swp, stride, tmp);
-            b = prt.b;
+            size_t tmp = b - pa + stride;
+            lin_sort((char *) arr + pa, tmp, sz, cmp, context, swp, stride, tmp);
+            b = pb;
         }
         else
         {
-            if (prt.b - a > b - prt.a)
+            if (pb - a > b - pa)
             {
-                if (frm < log_cutoff) stk[frm++] = (struct quick_sort_partition) { .a = a, .b = prt.b };
-                else log_sort((char *) arr + a, prt.b - a + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
-                a = prt.a;
+                if (frm < log_cutoff) stk[frm++] = DSIZEC(a, pb);
+                else log_sort((char *) arr + a, pb - a + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
+                a = pa;
             }
             else
             {
-                if (frm < log_cutoff) stk[frm++] = (struct quick_sort_partition) { .a = prt.a, .b = b };
-                else log_sort((char *) arr + prt.a, b - prt.a + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
-                b = prt.b;
+                if (frm < log_cutoff) stk[frm++] = DSIZEC(pa, b);
+                else log_sort((char *) arr + pa, b - pa + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
+                b = pb;
             }
         }
     }
@@ -433,7 +435,7 @@ void quick_sort(void *restrict arr, size_t cnt, size_t sz, cmp_callback cmp, voi
         size_t tot = cnt * stride;
         if (cnt > QUICK_SORT_CUTOFF)
         {
-            size_t lin_cutoff = QUICK_SORT_CUTOFF * stride, log_cutoff = size_sub_sat(size_log2(cnt, 1), size_bit_scan_reverse(QUICK_SORT_CUTOFF) << 1);
+            size_t lin_cutoff = QUICK_SORT_CUTOFF * stride, log_cutoff = size_sub_sat(size_log2(cnt, 1), size_log2(QUICK_SORT_CUTOFF, 0) << 1);
 #       ifdef QUICK_SORT_CACHED
             quick_sort_impl(arr, tot, sz, cmp, context, swp, stride, lin_cutoff, insertion_sort_impl, log_cutoff, comb_sort_impl);
 #       else

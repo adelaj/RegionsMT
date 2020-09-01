@@ -48,14 +48,13 @@ DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, , __ATOMIC_ACQ_REL, __ATOMIC_
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
 
 #       if (defined __GNUC__ && defined __x86_64__) || (defined __clang__ && defined __i386__)
-// For some reason gcc does not emit 'cmpxchg16b' (even when '-mcx16' is passed to it) 
-// via ordinary 'DECLARE_INTERLOCKED_COMPARE_EXCHANGE' macro.
+// For some reason gcc does not emit 'cmpxchg16b' (even when '-mcx16' is passed to it) via 'DECLARE_INTERLOCKED_COMPARE_EXCHANGE' macro.
 // See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84522 for more details.
 // The same applies for the 'cmpxchg8b' under i386 clang.
-// Thus the following different method is used
+// Thus the different method is used
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE_2(Dsize_t, Dsize, )
 #       else
-// This has less overhead than 'DECLARE_INTERLOCKED_COMPARE_EXCHANGE_2'
+// This has lower overhead than 'DECLARE_INTERLOCKED_COMPARE_EXCHANGE_2'
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
 #       endif
 
@@ -604,6 +603,7 @@ DECLARE_FLT64_STABLE_CMP_NAN(_dsc, _CMP_NLE_UQ)
 DECLARE_FLT64_STABLE_CMP_NAN(_asc, _CMP_NGE_UQ)
 
 // Returns correct sign even for a NaN
+// x == 0. ? 0 : 1 - 2 * signbit(x)
 int flt64_sign(double x)
 {
     __m128i res = _mm_cmpeq_epi64(_mm_and_si128(_mm_castpd_si128(_mm_loaddup_pd(&x)), _mm_set_epi64x(0x8000000000000000, 0x7fffffffffffffff)), _mm_set_epi64x(0, 0));

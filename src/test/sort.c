@@ -175,20 +175,17 @@ static bool size_cmp_asc_test(const void *a, const void *b, void *Context)
 bool test_sort_a(void *In, struct log *log)
 {
     struct test_sort_a *in = In;
-    size_t *arr;
-    if (!array_assert(log, CODE_METRIC, array_init(&arr, NULL, in->cnt, sizeof(*arr), 0, ARRAY_STRICT))) return 0;
-    memcpy(arr, in->arr, in->cnt * sizeof(*arr));
-    struct size_cmp_asc_test context = { .a = arr, .b = arr + in->cnt * sizeof(*arr) - sizeof(*arr), .succ = 1 };
+    struct size_cmp_asc_test context = { .a = in->arr, .b = in->arr + in->cnt * sizeof(*in->arr) - sizeof(*in->arr), .succ = 1 };
     size_t swp;
-    quick_sort(arr, in->cnt, sizeof(*arr), size_cmp_asc_test, &context, &swp, sizeof(*arr));
+    quick_sort(in->arr, in->cnt, sizeof(*in->arr), size_cmp_asc_test, &context, &swp, sizeof(*in->arr));
     size_t ind = 1;
-    for (; ind < in->cnt; ind++) if (arr[ind - 1] > arr[ind]) break;
-    free(arr);
+    for (; ind < in->cnt; ind++) if (in->arr[ind - 1] > in->arr[ind]) break;
     return (!in->cnt || ind == in->cnt) && context.succ;
 }
 
 bool test_sort_b_1(void *In, struct log *log)
 {
+    (void) log;
     struct test_sort_b *in = In;
     size_t ucnt = in->cnt;
     uintptr_t *ord;

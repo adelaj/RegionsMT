@@ -1,6 +1,7 @@
 #pragma once
 
 #include "common.h"
+#include "ll.h"
 #include "memory.h"
 
 typedef bool (*cmp_callback)(const void *, const void *, void *); // Functional type for compare callbacks
@@ -28,9 +29,7 @@ struct array_result orders_apply(uintptr_t *restrict, size_t, size_t, void *rest
 #define QUICK_SORT_CUTOFF 20 // The actual quick sort is applied only for arrays of counts, greater than this value
 #define QUICK_SORT_CACHED // Enables the more optimal utilization of the CPU caches
 
-struct quick_sort_partition { size_t a, b; };
-
-struct quick_sort_partition quick_sort_partition(void *restrict, size_t, size_t, size_t, cmp_callback, void *, void *restrict, size_t);
+Dsize_t quick_sort_partition(void *restrict, size_t, size_t, size_t, cmp_callback, void *, void *restrict, size_t);
 void quick_sort(void *restrict, size_t, size_t, cmp_callback, void *, void *restrict, size_t);
 void sort_unique(void *restrict, size_t *, size_t, cmp_callback, void *, void *restrict, size_t);
 

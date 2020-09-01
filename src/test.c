@@ -31,23 +31,23 @@ static unsigned test_thread(void *Indl, void *Context, void *Tls)
     struct test_tls *tls = Tls;
     void *data;
     uint64_t start = get_time();
+    bool succ = 0;
     if (!context->groupl[w].generator[y].callback(&data, &z, &tls->log))
     {
         if (tls->base.reentrance < TEST_GENERATOR_THRESHOLD)
         {
-            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Generator for the test %~uz:%''~s*:%''~s*:%~uz will be retriggered elsewhen. Available attempts: %~zu.\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1, TEST_GENERATOR_THRESHOLD - tls->base.reentrance - 1);
+            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Generator for the test %~uz:%''~s*:%''~s*:%~uz reported failure and will be retriggered elsewhen. Available attempts: %~uz.\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1, TEST_GENERATOR_THRESHOLD - tls->base.reentrance);
             return TASK_YIELD;
         }
-        else
-        {
-            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts for the test %~uz:%''~s*:%''~s*:%~uz exhausted!\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1);
-            return TASK_FAIL;
-        }
+        else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts for the test %~uz:%''~s*:%''~s*:%~uz exhausted!\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1);
     }
-    bool succ = context->groupl[w].test[x].callback(data, &tls->log);
-    if (!succ) log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_WARNING, "Test %~uz:%''~s*:%''~s*:%~uz failed!\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1);
-    else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %~uz:%''~s*:%''~s*:%~uz took %~T.\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1, start, get_time());
-    if (context->groupl[w].dispose) context->groupl[w].dispose(data);
+    else
+    {
+        succ = context->groupl[w].test[x].callback(data, &tls->log);
+        if (!succ) log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_WARNING, "Test %~uz:%''~s*:%''~s*:%~uz failed!\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1);
+        else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %~uz:%''~s*:%''~s*:%~uz took %~T.\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1, start, get_time());
+        if (context->groupl[w].dispose) context->groupl[w].dispose(data);
+    }
     size_interlocked_add_sat((volatile void *[]) { &context->fail, &context->succ }[succ], 1);
     return succ;
 }
@@ -61,7 +61,7 @@ static unsigned group_thread(void *Indl, void *Context, void *Tls)
     size_t cnt = 1;
     for (size_t i = 0; context->groupl[w].generator[y].callback(NULL, &i, &tls->log), i; cnt++);
     size_interlocked_add_sat(&context->tot, cnt);
-    return loop_init(tls->base.pool, test_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, Context, ARG(size_t, 1, 1, 1, cnt), (size_t []) { w, x, y, 0 }, 0, &tls->log);
+    return loop_mt(tls->base.pool, test_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, Context, ARG(size_t, 1, 1, 1, cnt), (size_t []) { w, x, y, 0 }, 0, &tls->log);
 }
 
 bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct log *log)
@@ -81,7 +81,7 @@ bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct
     {
         size_t i = 0;
         for (; i < cnt; i++)
-            if (!loop_init(pool, group_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, &context, ARG(size_t, 1, groupl[i].test_cnt, groupl[i].generator_cnt), (size_t []) { i, 0, 0 }, 0, log)) break;
+            if (!loop_mt(pool, group_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, &context, ARG(size_t, 1, groupl[i].test_cnt, groupl[i].generator_cnt), (size_t []) { i, 0, 0 }, 0, log)) break;
         succ = i == cnt;
         uint64_t start = get_time();
         thread_pool_schedule(pool);
