@@ -10,5 +10,5 @@ struct test_categorical_a {
 #define REL_ERROR 1e-6
 
 bool test_categorical_generator_a(void *, size_t *, struct log *);
-bool test_categorical_a(void *, struct log *);
+unsigned test_categorical_a(void *, void *, void *);
 #define test_categorical_dispose_a test_dispose

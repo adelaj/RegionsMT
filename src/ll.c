@@ -605,8 +605,10 @@ DECLARE_FLT64_STABLE_CMP_NAN(_asc, _CMP_NGE_UQ)
 // Returns correct sign even for a NaN: 'return x == 0. ? 0 : 1 - 2 * signbit(x)'
 int flt64_sign(double x)
 {
-    __m128i res = _mm_cmpeq_epi64(_mm_and_si128(_mm_castpd_si128(_mm_loaddup_pd(&x)), _mm_set_epi64x(0x8000000000000000, 0x7fffffffffffffff)), _mm_set_epi64x(0, 0));
-    return _mm_cvtsi128_si32(res) + 1 ? -(_mm_extract_epi32(res, 2) << 1) - 1 : 0;
+    int res = _mm_movemask_pd(_mm_castsi128_pd(_mm_cmpeq_epi64(
+        _mm_and_si128(_mm_castpd_si128(_mm_loaddup_pd(&x)), _mm_set_epi64x(0x8000000000000000, 0x7fffffffffffffff)), 
+        _mm_set_epi64x(0, 0))));
+    return res & 1 ? 0 : res - 1;
 }
 
 size_t size_fused_mul_add(size_t *p_res, size_t m, size_t a)

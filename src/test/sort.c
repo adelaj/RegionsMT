@@ -2,6 +2,7 @@
 #include "../ll.h"
 #include "../memory.h"
 #include "../sort.h"
+#include "../test.h"
 #include "sort.h"
 
 #include <string.h> 
@@ -172,9 +173,10 @@ static bool size_cmp_asc_test(const void *a, const void *b, void *Context)
     return size_cmp_asc(a, b, context);
 }
 
-bool test_sort_a(void *In, struct log *log)
+unsigned test_sort_a(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     struct test_sort_a *in = In;
     struct size_cmp_asc_test context = { .a = in->arr, .b = in->arr + in->cnt * sizeof(*in->arr) - sizeof(*in->arr), .succ = 1 };
     size_t swp;
@@ -184,46 +186,50 @@ bool test_sort_a(void *In, struct log *log)
     return (!in->cnt || ind == in->cnt) && context.succ;
 }
 
-bool test_sort_b_1(void *In, struct log *log)
+unsigned test_sort_b_1(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
     struct test_sort_b *in = In;
+    struct test_tls *tls = Tls;
     size_t ucnt = in->cnt;
     uintptr_t *ord;
-    if (!array_assert(log, CODE_METRIC, orders_stable_unique(&ord, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL))) return 0;
+    if (!array_assert(&tls->log, CODE_METRIC, orders_stable_unique(&ord, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL))) return TEST_RETRY;
     size_t ind = 1;
     for (; ind < ucnt; ind++) if (in->arr[ord[ind - 1]] <= in->arr[ord[ind]]) break;
     free(ord);
     return ucnt == in->ucnt && (!ucnt || ind == ucnt);
 }
 
-bool test_sort_b_2(void *In, struct log *log)
+unsigned test_sort_b_2(void *In, void *Context, void *Tls)
 {
+    (void) Context;
     struct test_sort_b *in = In;
+    struct test_tls *tls = Tls;
     size_t ucnt = in->cnt;
     uintptr_t *ord;
-    if (!array_assert(log, CODE_METRIC, orders_stable_unique(&ord, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL))) return 0;
-    bool succ = 0;
+    if (!array_assert(&tls->log, CODE_METRIC, orders_stable_unique(&ord, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL))) return TEST_RETRY;
+    unsigned res = TEST_RETRY;
     double *arr;
-    if (array_assert(log, CODE_METRIC, array_init(&arr, NULL, in->cnt, sizeof(*arr), 0, ARRAY_STRICT)))
+    if (array_assert(&tls->log, CODE_METRIC, array_init(&arr, NULL, in->cnt, sizeof(*arr), 0, ARRAY_STRICT)))
     {
         memcpy(arr, in->arr, in->cnt * sizeof(*arr));
         double swp;
-        if (array_assert(log, CODE_METRIC, orders_apply(ord, ucnt, sizeof(*arr), arr, &swp, sizeof(*arr))))
+        if (array_assert(&tls->log, CODE_METRIC, orders_apply(ord, ucnt, sizeof(*arr), arr, &swp, sizeof(*arr))))
         {
             size_t ind = 1;
             for (; ind < ucnt; ind++) if (in->arr[ord[ind]] != arr[ind]) break;
-            succ = !ucnt || ind == ucnt;
+            res = !ucnt || ind == ucnt;
         }
         free(arr);
     }
     free(ord);
-    return succ;
+    return res;
 }
 
-bool test_sort_c_1(void *In, struct log *log)
+unsigned test_sort_c_1(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     struct test_sort_c *in = In;
     if (!in->cnt) return 1;
     for (size_t i = 1, j = 0; i < in->cnt; i++)
@@ -236,9 +242,10 @@ bool test_sort_c_1(void *In, struct log *log)
     return 1;
 }
 
-bool test_sort_c_2(void *In, struct log *log)
+unsigned test_sort_c_2(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     struct test_sort_c *in = In;
     if (!in->cnt) return 1;
     for (size_t i = in->cnt, j = in->cnt - 1; --i;)
@@ -258,9 +265,10 @@ static int uint64_stable_cmp_asc_test(const void *A, const void *B, void *thunk)
     return (a > b) - (a < b);
 }
 
-bool test_sort_d_1(void *In, struct log *log)
+unsigned test_sort_d_1(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     struct test_sort_d *in = In;
     for (size_t i = 0; i < UINT64_BIT; i++)
     {

@@ -36,23 +36,25 @@ bool test_categorical_generator_a(void *p_res, size_t *p_ind, struct log *log)
     return 1;
 }
 
-bool test_categorical_a(void *In, struct log *log)
+unsigned test_categorical_a(void *In, void *Context, void *Tls)
 {
-    bool succ = 0;
+    (void) Context;
+    unsigned res = TEST_RETRY;
     struct test_categorical_a *in = In;
+    struct test_tls *tls = Tls;
     size_t *xmar = NULL, *ymar = NULL, *outer = NULL;
-    if (array_assert(log, CODE_METRIC, array_init(&outer, NULL, in->cnt, sizeof(*outer), 0, ARRAY_STRICT)) &&
-        array_assert(log, CODE_METRIC, array_init(&xmar, NULL, in->dimx, sizeof(*xmar), 0, ARRAY_STRICT | ARRAY_CLEAR)) &&
-        array_assert(log, CODE_METRIC, array_init(&ymar, NULL, in->dimy, sizeof(*ymar), 0, ARRAY_STRICT | ARRAY_CLEAR)))
+    if (array_assert(&tls->log, CODE_METRIC, array_init(&outer, NULL, in->cnt, sizeof(*outer), 0, ARRAY_STRICT)) &&
+        array_assert(&tls->log, CODE_METRIC, array_init(&xmar, NULL, in->dimx, sizeof(*xmar), 0, ARRAY_STRICT | ARRAY_CLEAR)) &&
+        array_assert(&tls->log, CODE_METRIC, array_init(&ymar, NULL, in->dimy, sizeof(*ymar), 0, ARRAY_STRICT | ARRAY_CLEAR)))
     {
         size_t mar = 0;
         mar_init(in->tbl, xmar, ymar, &mar, in->dimx, in->dimy);
         double pv = outer_combined_init(outer, xmar, ymar, mar, in->dimx, in->dimy) ? stat_chisq(in->tbl, outer, mar, in->dimx, in->dimy) : stat_exact(in->tbl, xmar, ymar);
-        if (fabs(pv - in->pv) >= pv * REL_ERROR) log_message_fmt(log, CODE_METRIC, MESSAGE_ERROR, "Relative error is too large!\n");
-        else succ = 1;
+        res = fabs(pv - in->pv) >= pv * REL_ERROR;
+        if (!res) log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Relative error is too large!\n");
     }    
     free(xmar);
     free(ymar);
     free(outer);
-    return succ;
+    return res;
 }

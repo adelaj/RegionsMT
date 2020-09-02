@@ -12,9 +12,9 @@ struct test_utf8 {
 };
 
 bool test_utf8_generator(void *, size_t *, struct log *);
-bool test_utf8_len(void *, struct log *);
-bool test_utf8_encode(void *, struct log *);
-bool test_utf8_decode(void *, struct log *);
-bool test_utf16_encode(void *, struct log *);
-bool test_utf16_decode(void *, struct log *);
+unsigned test_utf8_len(void *, void *, void *);
+unsigned test_utf8_encode(void *, void *, void *);
+unsigned test_utf8_decode(void *, void *, void *);
+unsigned test_utf16_encode(void *, void *, void *);
+unsigned test_utf16_decode(void *, void *, void *);
 #define test_utf8_dispose NULL

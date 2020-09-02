@@ -13,15 +13,23 @@ void test_dispose(void *ptr)
     free(ptr);
 }
 
-struct test_tls {
-    struct tls_base base;
-    struct log log;
-};
-
 struct test_context {
     const struct test_group *groupl;
     volatile size_t succ, fail, tot;
 };
+
+struct test_metric {
+    size_t group, instance;
+    struct strl test, generator;
+};
+
+static struct message_result fmt_test_metric(char *buff, size_t *p_cnt, void *p_arg, const struct env *env, enum fmt_execute_flags flags)
+{
+    (void) env;
+    struct test_metric *metric = ARG_FETCH_PTR(flags & FMT_EXE_FLAG_PTR, p_arg);
+    if (flags & FMT_EXE_FLAG_PHONY) return MESSAGE_SUCCESS;
+    return print_fmt(buff, p_cnt, NULL, "%~uz:%''~s*:%''~s*:%~uz", metric->group, STRL(metric->test), STRL(metric->generator), metric->instance);
+}
 
 static unsigned test_thread(void *Indl, void *Context, void *Tls)
 {
@@ -29,27 +37,52 @@ static unsigned test_thread(void *Indl, void *Context, void *Tls)
     size_t *indl = Indl, w = indl[0], x = indl[1], y = indl[2], z = indl[3];
     struct test_context *context = Context;
     struct test_tls *tls = Tls;
-    void *data;
+    struct test_metric metric = { .group = w + 1, .test = context->groupl[w].test[x].name, .generator = context->groupl[w].generator[y].name, .instance = z + 1 };
     uint64_t start = get_time();
-    bool succ = 0;
-    if (!context->groupl[w].generator[y].callback(&data, &z, &tls->log))
+    unsigned res = 0;
+    void *data = tls->base.storage;
+    if (!data && !context->groupl[w].generator[y].callback(&data, &z, &tls->log))
     {
-        if (tls->base.reentrance < TEST_GENERATOR_THRESHOLD)
+        if (tls->base.exec <= GENERATOR_THRESHOLD)
         {
-            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Generator for the test %~uz:%''~s*:%''~s*:%~uz reported failure and will be retriggered elsewhen. Available attempts: %~uz.\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1, TEST_GENERATOR_THRESHOLD - tls->base.reentrance);
+            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Generator for the test %& reported failure and will be retriggered elsewhen. Remaining attempts: %~uz.\n", fmt_test_metric, &metric, GENERATOR_THRESHOLD - tls->base.exec);
             return TASK_YIELD;
         }
-        else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts for the test %~uz:%''~s*:%''~s*:%~uz exhausted!\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1);
+        else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts per generator of the test %& exhausted!\n", fmt_test_metric, &metric);
     }
     else
     {
-        succ = context->groupl[w].test[x].callback(data, &tls->log);
-        if (!succ) log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_WARNING, "Test %~uz:%''~s*:%''~s*:%~uz failed!\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1);
-        else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %~uz:%''~s*:%''~s*:%~uz took %~T.\n", w + 1, STRL(context->groupl[w].test[x].name), STRL(context->groupl[w].generator[y].name), z + 1, start, get_time());
+        if (!tls->base.storage)
+        {
+            tls->base.exec = 1;
+            tls->base.storage = data;
+        }
+        res = context->groupl[w].test[x].callback(data, NULL, tls);
+        switch (res)
+        {
+        case TASK_FAIL:
+            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Test %& failed!\n", fmt_test_metric, &metric);
+            break;
+        case TASK_SUCCESS:
+            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %& took %~T.\n", fmt_test_metric, &metric, start, get_time());
+            break;
+        case TASK_YIELD:
+            return TASK_YIELD;
+        case TEST_RETRY:
+            if (tls->base.exec <= TEST_THRESHOLD)
+            {
+                log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Test %& reported failure and will be retriggered elsewhen. Remaining attempts: %~uz.\n", fmt_test_metric, &metric, TEST_THRESHOLD - tls->base.exec);
+                return TASK_YIELD;
+            }
+            else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts per the test %& exhausted!\n", fmt_test_metric, &metric);
+            // break;
+        default:
+            res = 0;
+        }
         if (context->groupl[w].dispose) context->groupl[w].dispose(data);
     }
-    size_interlocked_add_sat((volatile void *[]) { &context->fail, &context->succ }[succ], 1);
-    return succ;
+    size_interlocked_add_sat((volatile void *[]) { &context->fail, &context->succ }[res], 1);
+    return res;
 }
 
 static unsigned group_thread(void *Indl, void *Context, void *Tls)

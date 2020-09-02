@@ -30,9 +30,10 @@ static void *Memrchr_test(void const *Str, int ch, size_t cnt)
     return NULL;
 }
 
-bool test_np_a(void *In, struct log *log)
+unsigned test_np_a(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     struct test_np_a *in = In;
     for (char i = 0; i < CHAR_MAX; i++) for (size_t cnt = in->cnt; cnt;)
     {

@@ -1,13 +1,18 @@
 #pragma once
 
 #include "log.h"
+#include "threadpool.h"
 
 typedef bool (*test_generator_callback)(void *, size_t *, struct log *);
 typedef void (*test_dispose_callback)(void *);
-typedef bool (*test_callback)(void *, struct log *);
 
 #define FSTRL(F) { F, STRI(#F) } 
-#define TEST_GENERATOR_THRESHOLD 255
+#define GENERATOR_THRESHOLD 256
+#define TEST_THRESHOLD 256
+
+enum {
+    TEST_RETRY = TASK_CNT
+};
 
 struct test_group {
     test_dispose_callback dispose;
@@ -20,11 +25,16 @@ struct test_group {
     };
     struct {
         struct test {
-            test_callback callback;
+            task_callback callback;
             struct strl name;
         } *test;
         size_t test_cnt;
     };
+};
+
+struct test_tls {
+    struct tls_base base;
+    struct log log;
 };
 
 void test_dispose(void *);

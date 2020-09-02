@@ -9,7 +9,8 @@ enum {
     TASK_FAIL = 0,
     TASK_SUCCESS,
     TASK_DROP,
-    TASK_YIELD
+    TASK_YIELD,
+    TASK_CNT
 };
 
 enum {
@@ -38,7 +39,7 @@ void aggr_inc(volatile void *, const void *, unsigned);
 
 struct tls_base {
     struct thread_pool *pool;
-    size_t tid, pid, inc, reentrance;
+    size_t tid, pid, inc, exec;
     void *storage;
 };
 
@@ -65,7 +66,7 @@ struct dispatched_task {
     task_callback callback;
     struct task_aggr aggr;
     void *arg, *context, *storage;
-    size_t reentrance;
+    size_t exec;
     volatile bool not_garbage, not_orphan;
 };
 

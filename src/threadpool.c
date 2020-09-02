@@ -195,11 +195,11 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
         // Execute the task
         struct tls_base *tls = arg->tls;
         tls->storage = dispatched_task->storage;
-        tls->reentrance = dispatched_task->reentrance;
+        tls->exec = dispatched_task->exec = size_add_sat(dispatched_task->exec, 1);
         unsigned res = dispatched_task->callback ? dispatched_task->callback(dispatched_task->arg, dispatched_task->context, tls): TASK_SUCCESS;
         if (res == TASK_YIELD)
         {
-            dispatched_task->reentrance = size_add_sat(dispatched_task->reentrance, 1);
+            dispatched_task->exec = tls->exec;
             dispatched_task->storage = tls->storage;
             bool_store_release(&dispatched_task->not_orphan, 0);
         }
@@ -278,7 +278,8 @@ void thread_pool_schedule(struct thread_pool *pool)
             dispatched_task->arg = task->arg;
             dispatched_task->callback = task->callback;
             dispatched_task->context = task->context;
-            dispatched_task->reentrance = 0;
+            dispatched_task->exec = 0;
+            dispatched_task->storage = NULL;
             bool_store_release(&dispatched_task->not_garbage, 1);
             bool_store_release(&dispatched_task->not_orphan, 1);
             queue_dequeue(&pool->queue, off, sizeof(*task));

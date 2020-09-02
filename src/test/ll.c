@@ -58,25 +58,28 @@ static int flt64_stable_cmp_dsc_nan_test(double *p_a, double *p_b, void *context
     return isnan(a) ? (isnan(b) ? 0 : 1) : isnan(b) ? -1 : flt64_stable_cmp_dsc_test(&a, &b, context);
 }
 
-bool test_ll_a_1(void *In, struct log *log)
+unsigned test_ll_a_1(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     struct test_ll_a *in = In;
     int res = flt64_stable_cmp_dsc(&in->a, &in->b, NULL);
     return res == in->res_dsc && flt64_stable_cmp_dsc_test(&in->a, &in->b, NULL) == res;
 }
 
-bool test_ll_a_2(void *In, struct log *log)
+unsigned test_ll_a_2(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     struct test_ll_a *in = In;
     int res = flt64_stable_cmp_dsc_abs(&in->a, &in->b, NULL);
     return res == in->res_dsc_abs && flt64_stable_cmp_dsc_abs_test(&in->a, &in->b, NULL) == res;
 }
 
-bool test_ll_a_3(void *In, struct log *log)
+unsigned test_ll_a_3(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     struct test_ll_a *in = In;
     int res = flt64_stable_cmp_dsc_nan(&in->a, &in->b, NULL);
     return res == in->res_dsc_nan && flt64_stable_cmp_dsc_nan_test(&in->a, &in->b, NULL) == res;
@@ -112,9 +115,10 @@ bool test_ll_generator_b(void *p_res, size_t *p_ind, struct log *log)
     return 1;
 }
 
-bool test_ll_b(void *In, struct log *log)
+unsigned test_ll_b(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     const struct test_ll_b *in = In;
     uint32_t res_bsr = uint32_bit_scan_reverse(in->a), res_bsf = uint32_bit_scan_forward(in->a);
     if (res_bsr != in->res_bsr || res_bsf != in->res_bsf) return 0;

@@ -37,26 +37,29 @@ bool test_utf8_generator(void *p_res, size_t *p_ind, struct log *log)
     return 1;
 }
 
-bool test_utf8_len(void *In, struct log *log)
+unsigned test_utf8_len(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     const struct test_utf8 *restrict in = In;
     uint8_t len = utf8_len(in->val);
     return len == in->utf8_len;
 }
 
-bool test_utf8_encode(void *In, struct log *log)
+unsigned test_utf8_encode(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     const struct test_utf8 *restrict in = In;
     uint8_t byte[UTF8_COUNT], len;
     utf8_encode(in->val, byte, &len);
     return !memcmp(in->utf8, byte, len * sizeof(*byte)) && len == in->utf8_len;
 }
 
-bool test_utf8_decode(void *In, struct log *log)
+unsigned test_utf8_decode(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     const struct test_utf8 *restrict in = In;
     uint8_t byte[UTF8_COUNT], context = 0, len = 0, ind = 0;
     uint32_t val = 0;
@@ -65,9 +68,10 @@ bool test_utf8_decode(void *In, struct log *log)
     return ind == in->utf8_len && !memcmp(in->utf8, byte, len * sizeof(*byte)) && in->val == val && len == in->utf8_len;
 }
 
-bool test_utf16_encode(void *In, struct log *log)
+unsigned test_utf16_encode(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     const struct test_utf8 *restrict in = In;
     if (in->val >= UTF8_BOUND) return 1;
     uint16_t word[UTF16_COUNT];
@@ -80,9 +84,10 @@ bool test_utf16_encode(void *In, struct log *log)
     return ind == len;
 }
 
-bool test_utf16_decode(void *In, struct log *log)
+unsigned test_utf16_decode(void *In, void *Context, void *Tls)
 {
-    (void) log;
+    (void) Context;
+    (void) Tls;
     const struct test_utf8 *restrict in = In;
     if (in->val >= UTF8_BOUND) return 1;
     uint16_t word[UTF16_COUNT];
