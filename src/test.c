@@ -26,9 +26,12 @@ struct test_metric {
 static struct message_result fmt_test_metric(char *buff, size_t *p_cnt, void *p_arg, const struct env *env, enum fmt_execute_flags flags)
 {
     (void) env;
+    struct style *style = ARG_FETCH_PTR(flags & FMT_EXE_FLAG_PTR, p_arg);
     struct test_metric *metric = ARG_FETCH_PTR(flags & FMT_EXE_FLAG_PTR, p_arg);
     if (flags & FMT_EXE_FLAG_PHONY) return MESSAGE_SUCCESS;
-    return print_fmt(buff, p_cnt, NULL, "%~uz:%''~s*:%''~s*:%~uz", metric->group, STRL(metric->test), STRL(metric->generator), metric->instance);
+    return style ?
+        print_fmt(buff, p_cnt, NULL, "%~~uz:%''~~s*:%''~~s*:%~~uz", &style->type_str, metric->group, &style->type_str, STRL(metric->test), &style->type_str, STRL(metric->generator), &style->type_str, metric->instance) :
+        print_fmt(buff, p_cnt, NULL, "%uz:%''s*:%''s*:%uz", metric->group, STRL(metric->test), STRL(metric->generator), metric->instance);
 }
 
 static unsigned test_thread(void *Indl, void *Context, void *Tls)
@@ -45,10 +48,10 @@ static unsigned test_thread(void *Indl, void *Context, void *Tls)
     {
         if (tls->base.exec <= GENERATOR_THRESHOLD)
         {
-            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Generator for the test %& reported failure and will be retriggered elsewhen. Remaining attempts: %~uz.\n", fmt_test_metric, &metric, GENERATOR_THRESHOLD - tls->base.exec);
+            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Generator for the test %& reported failure and will be retriggered elsewhen. Remaining attempts: %~uz.\n", fmt_test_metric, tls->log.style, &metric, GENERATOR_THRESHOLD - tls->base.exec);
             return TASK_YIELD;
         }
-        else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts per generator of the test %& exhausted!\n", fmt_test_metric, &metric);
+        else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts per generator of the test %& exhausted!\n", fmt_test_metric, tls->log.style, &metric);
     }
     else
     {
@@ -61,20 +64,20 @@ static unsigned test_thread(void *Indl, void *Context, void *Tls)
         switch (res)
         {
         case TASK_FAIL:
-            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Test %& failed!\n", fmt_test_metric, &metric);
+            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Test %& failed!\n", fmt_test_metric, tls->log.style, &metric);
             break;
         case TASK_SUCCESS:
-            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %& took %~T.\n", fmt_test_metric, &metric, start, get_time());
+            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %& took %~T.\n", fmt_test_metric, tls->log.style, &metric, start, get_time());
             break;
         case TASK_YIELD:
             return TASK_YIELD;
         case TEST_RETRY:
             if (tls->base.exec <= TEST_THRESHOLD)
             {
-                log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Test %& reported failure and will be retriggered elsewhen. Remaining attempts: %~uz.\n", fmt_test_metric, &metric, TEST_THRESHOLD - tls->base.exec);
+                log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Test %& reported failure and will be retriggered elsewhen. Remaining attempts: %~uz.\n", fmt_test_metric, tls->log.style, &metric, TEST_THRESHOLD - tls->base.exec);
                 return TASK_YIELD;
             }
-            else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts per the test %& exhausted!\n", fmt_test_metric, &metric);
+            else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts per the test %& exhausted!\n", fmt_test_metric, tls->log.style, &metric);
             // break;
         default:
             res = 0;

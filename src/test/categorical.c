@@ -50,7 +50,7 @@ unsigned test_categorical_a(void *In, void *Context, void *Tls)
         size_t mar = 0;
         mar_init(in->tbl, xmar, ymar, &mar, in->dimx, in->dimy);
         double pv = outer_combined_init(outer, xmar, ymar, mar, in->dimx, in->dimy) ? stat_chisq(in->tbl, outer, mar, in->dimx, in->dimy) : stat_exact(in->tbl, xmar, ymar);
-        res = fabs(pv - in->pv) >= pv * REL_ERROR;
+        res = fabs(pv - in->pv) < pv * REL_ERROR;
         if (!res) log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Relative error is too large!\n");
     }    
     free(xmar);
