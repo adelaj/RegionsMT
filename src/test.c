@@ -34,6 +34,11 @@ static struct message_result fmt_test_metric(char *buff, size_t *p_cnt, void *p_
         print_fmt(buff, p_cnt, NULL, "%uz:%''s*:%''s*:%uz", metric->group, STRL(metric->test), STRL(metric->generator), metric->instance);
 }
 
+struct test_thread_storage {
+    uint64_t start;
+    void *data, *context;
+};
+
 static unsigned test_thread(void *Indl, void *Context, void *Tls)
 {
     // w -- group index; x -- test index; y -- generator index; z -- generator instance index
@@ -41,12 +46,13 @@ static unsigned test_thread(void *Indl, void *Context, void *Tls)
     struct test_context *context = Context;
     struct test_tls *tls = Tls;
     struct test_metric metric = { .group = w + 1, .test = context->groupl[w].test[x].name, .generator = context->groupl[w].generator[y].name, .instance = z + 1 };
-    uint64_t start = get_time();
     unsigned res = 0;
-    void *data = tls->base.storage;
-    if (!data && !context->groupl[w].generator[y].callback(&data, &z, &tls->log))
+    struct test_thread_storage *storage = tls->base.storage;
+    bool first_run = !storage;
+    if (first_run && !array_assert(&tls->log, CODE_METRIC, array_init(&storage, NULL, 1, sizeof(*storage), 0, ARRAY_STRICT))) return 0;
+    if (first_run && !context->groupl[w].generator[y].callback(&storage->data, &z, &tls->log))
     {
-        if (tls->base.exec <= GENERATOR_THRESHOLD)
+        if (tls->base.exec < GENERATOR_THRESHOLD)
         {
             log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Generator for the test %& reported failure and will be retriggered elsewhen. Remaining attempts: %~uz.\n", fmt_test_metric, tls->log.style, &metric, GENERATOR_THRESHOLD - tls->base.exec);
             return TASK_YIELD;
@@ -55,35 +61,39 @@ static unsigned test_thread(void *Indl, void *Context, void *Tls)
     }
     else
     {
-        if (!tls->base.storage)
+        if (first_run)
         {
+            storage->context = NULL;
+            storage->start = get_time();
             tls->base.exec = 1;
-            tls->base.storage = data;
+            tls->base.storage = storage;
         }
-        res = context->groupl[w].test[x].callback(data, NULL, tls);
+        res = context->groupl[w].test[x].callback(storage->data, &storage->context, tls);
         switch (res)
         {
-        case TASK_FAIL:
+        case TEST_FAIL:
             log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Test %& failed!\n", fmt_test_metric, tls->log.style, &metric);
             break;
-        case TASK_SUCCESS:
-            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %& took %~T.\n", fmt_test_metric, tls->log.style, &metric, start, get_time());
+        case TEST_SUCCESS:
+            log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_INFO, "Execution of the test %& took %~T.\n", fmt_test_metric, tls->log.style, &metric, storage->start, get_time());
             break;
-        case TASK_YIELD:
+        case TEST_YIELD:
             return TASK_YIELD;
         case TEST_RETRY:
-            if (tls->base.exec <= TEST_THRESHOLD)
+            if (tls->base.exec < TEST_THRESHOLD)
             {
                 log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_NOTE, "Test %& reported failure and will be retriggered elsewhen. Remaining attempts: %~uz.\n", fmt_test_metric, tls->log.style, &metric, TEST_THRESHOLD - tls->base.exec);
                 return TASK_YIELD;
             }
-            else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts per the test %& exhausted!\n", fmt_test_metric, tls->log.style, &metric);
+            else log_message_fmt(&tls->log, CODE_METRIC, MESSAGE_ERROR, "Number of attempts per test %& exhausted!\n", fmt_test_metric, tls->log.style, &metric);
             // break;
         default:
             res = 0;
         }
-        if (context->groupl[w].dispose) context->groupl[w].dispose(data);
+        if (context->groupl[w].dispose) context->groupl[w].dispose(storage->data);
+        free(storage->context);
     }
+    free(storage);
     size_interlocked_add_sat((volatile void *[]) { &context->fail, &context->succ }[res], 1);
     return res;
 }

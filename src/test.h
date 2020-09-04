@@ -11,6 +11,9 @@ typedef void (*test_dispose_callback)(void *);
 #define TEST_THRESHOLD 256
 
 enum {
+    TEST_FAIL = TASK_FAIL,
+    TEST_SUCCESS = TASK_SUCCESS,
+    TEST_YIELD = TASK_YIELD,
     TEST_RETRY = TASK_CNT
 };
 

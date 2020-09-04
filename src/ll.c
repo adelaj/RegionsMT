@@ -606,8 +606,7 @@ DECLARE_FLT64_STABLE_CMP_NAN(_asc, _CMP_NGE_UQ)
 int flt64_sign(double x)
 {
     int res = _mm_movemask_pd(_mm_castsi128_pd(_mm_cmpeq_epi64(
-        _mm_and_si128(_mm_castpd_si128(_mm_loaddup_pd(&x)), _mm_set_epi64x(0x8000000000000000, 0x7fffffffffffffff)), 
-        _mm_set_epi64x(0, 0))));
+        _mm_and_si128(_mm_castpd_si128(_mm_loaddup_pd(&x)), _mm_set_epi64x(0x8000000000000000, 0x7fffffffffffffff)), _mm_setzero_si128())));
     return res & 1 ? 0 : res - 1;
 }
 

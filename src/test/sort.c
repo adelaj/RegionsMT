@@ -200,15 +200,14 @@ unsigned test_sort_b_1(void *In, void *Context, void *Tls)
     return ucnt == in->ucnt && (!ucnt || ind == ucnt);
 }
 
-unsigned test_sort_b_2(void *In, void *Context, void *Tls)
+unsigned test_sort_b_2(void *In, void *p_Context, void *Tls)
 {
-    (void) Context;
     struct test_sort_b *in = In;
     struct test_tls *tls = Tls;
     size_t ucnt = in->cnt;
-    uintptr_t *ord;
-    if (!array_assert(&tls->log, CODE_METRIC, orders_stable_unique(&ord, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL))) return TEST_RETRY;
     unsigned res = TEST_RETRY;
+    if (!*(uintptr_t **) p_Context && !array_assert(&tls->log, CODE_METRIC, orders_stable_unique(p_Context, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL))) return res;
+    uintptr_t *ord = *(uintptr_t **) p_Context;
     double *arr;
     if (array_assert(&tls->log, CODE_METRIC, array_init(&arr, NULL, in->cnt, sizeof(*arr), 0, ARRAY_STRICT)))
     {
@@ -222,7 +221,6 @@ unsigned test_sort_b_2(void *In, void *Context, void *Tls)
         }
         free(arr);
     }
-    free(ord);
     return res;
 }
 
