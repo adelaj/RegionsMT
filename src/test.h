@@ -40,5 +40,11 @@ struct test_tls {
     struct log log;
 };
 
+struct test_context {
+    void *storage;
+    size_t exec;
+    bool no_retry;
+};
+
 void test_dispose(void *);
 bool test(const struct test_group *, size_t, size_t, struct log *);

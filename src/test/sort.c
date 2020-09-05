@@ -200,27 +200,37 @@ unsigned test_sort_b_1(void *In, void *Context, void *Tls)
     return ucnt == in->ucnt && (!ucnt || ind == ucnt);
 }
 
-unsigned test_sort_b_2(void *In, void *p_Context, void *Tls)
+unsigned test_sort_b_2(void *In, void *Context, void *Tls)
 {
     struct test_sort_b *in = In;
     struct test_tls *tls = Tls;
-    size_t ucnt = in->cnt;
+    struct test_context *context = Context;
     unsigned res = TEST_RETRY;
-    if (!*(uintptr_t **) p_Context && !array_assert(&tls->log, CODE_METRIC, orders_stable_unique(p_Context, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL))) return res;
-    uintptr_t *ord = *(uintptr_t **) p_Context;
-    double *arr;
-    if (array_assert(&tls->log, CODE_METRIC, array_init(&arr, NULL, in->cnt, sizeof(*arr), 0, ARRAY_STRICT)))
+    if (!context->storage)
     {
-        memcpy(arr, in->arr, in->cnt * sizeof(*arr));
-        double swp;
-        if (array_assert(&tls->log, CODE_METRIC, orders_apply(ord, ucnt, sizeof(*arr), arr, &swp, sizeof(*arr))))
-        {
-            size_t ind = 1;
-            for (; ind < ucnt; ind++) if (in->arr[ord[ind]] != arr[ind]) break;
-            res = !ucnt || ind == ucnt;
-        }
-        free(arr);
+        size_t ucnt = in->cnt;
+        if (!array_assert(&tls->log, CODE_METRIC, orders_stable_unique((uintptr_t **) &context->storage, in->arr, &ucnt, sizeof(*in->arr), flt64_stable_cmp_dsc, NULL))) return TEST_RETRY;
+        if (ucnt != in->ucnt) res = 0;
     }
+    if (res)
+    {
+        size_t ucnt = in->ucnt;
+        uintptr_t *ord = context->storage;
+        double *arr;
+        if (array_assert(&tls->log, CODE_METRIC, array_init(&arr, NULL, in->cnt, sizeof(*arr), 0, ARRAY_STRICT)))
+        {
+            memcpy(arr, in->arr, in->cnt * sizeof(*arr));
+            double swp;
+            if (array_assert(&tls->log, CODE_METRIC, orders_apply(ord, ucnt, sizeof(*arr), arr, &swp, sizeof(*arr))))
+            {
+                size_t ind = 1;
+                for (; ind < ucnt; ind++) if (in->arr[ord[ind]] != arr[ind]) break;
+                res = !ucnt || ind == ucnt;
+            }
+            free(arr);
+        }
+    }
+    if (context->no_retry || res != TEST_RETRY) free(context->storage);
     return res;
 }
 

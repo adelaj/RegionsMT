@@ -37,7 +37,7 @@
 static bool test_main(size_t thread_cnt, struct log *log)
 {
     const struct test_group groupl[] = {
-        {
+        /*{
             // Low level facilities A
             test_ll_dispose_a,
             CLII((struct test_generator []) {
@@ -80,11 +80,13 @@ static bool test_main(size_t thread_cnt, struct log *log)
             CLII((struct test []) {
                 FSTRL(test_sort_a),
             })
-        },
+        },*/
         {
             // Sorting routines B: order computation
             test_sort_dispose_b,
             CLII((struct test_generator []) {
+                FSTRL(test_sort_generator_b_1),
+                FSTRL(test_sort_generator_b_1),
                 FSTRL(test_sort_generator_b_1)
             }),
             CLII((struct test []) {
@@ -92,7 +94,7 @@ static bool test_main(size_t thread_cnt, struct log *log)
                 FSTRL(test_sort_b_2)
             })
         },
-        {
+        /*{
             // Sorting routines C: precise search
             test_sort_dispose_c,
             CLII((struct test_generator []) {
@@ -136,10 +138,9 @@ static bool test_main(size_t thread_cnt, struct log *log)
             CLII((struct test []) {
                 FSTRL(test_categorical_a),
             })
-        }
+        }*/
     };
-    log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Test mode triggered. Notation: %~s*:%~s*:%~s*:%~s*.\n",
-        STRC("<group no.>"), STRC("<test name>"), STRC("<generator name>"), STRC("<generator instance no.>"));
+    log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Test mode triggered.\n");
     return test(groupl, countof(groupl), thread_cnt, log);
 }
 

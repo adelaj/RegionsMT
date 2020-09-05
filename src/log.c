@@ -870,7 +870,7 @@ bool log_message_fseek(struct log *restrict log, struct code_metric code_metric,
 
 bool fopen_assert(struct log *restrict log, struct code_metric code_metric, const char *restrict path, bool res)
 {
-    if (!res) log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to open the file %\"~P! %C!\n", path, errno);
+    if (!res) log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to open the file %\"~P. %C!\n", path, errno);
     return res;
 }
 
@@ -879,10 +879,10 @@ bool array_assert(struct log *log, struct code_metric code_metric, struct array_
     switch (res.error)
     {
     case ARRAY_OUT_OF_MEMORY:
-        log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to allocate %~uz bytes of memory! %C!\n", res.tot, errno);
+        log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to allocate %~uz bytes of memory. %C!\n", res.tot, errno);
         break;
     case ARRAY_OVERFLOW:
-        log_message_fmt(log, code_metric, MESSAGE_ERROR, "Memory allocation failed! %C!\n", ERANGE);
+        log_message_fmt(log, code_metric, MESSAGE_ERROR, "Memory allocation failed. %C!\n", ERANGE);
         break;
     case ARRAY_NO_ERROR:
         break;
