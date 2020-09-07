@@ -71,6 +71,7 @@ struct dispatched_task {
 };
 
 // Opaque structure with OS-dependent implementation
+// Explicit definiton is not included here in order not to litter this file with system headers
 struct thread_pool;
 
 bool loop_mt(struct thread_pool *, task_callback, struct task_cond, struct task_aggr, void *, size_t *restrict, size_t, size_t *restrict, bool, struct log *);

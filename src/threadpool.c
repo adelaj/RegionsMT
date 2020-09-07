@@ -98,20 +98,19 @@ struct thread_pool {
     struct queue queue;
     volatile size_t cnt, task_hint;
     size_t task_cnt;
-    struct persistent_array dispatched_task;
-    struct persistent_array arg;
+    struct persistent_array dispatched_task, arg;
     bool query_wake;
 };
 
 static bool thread_pool_enqueue_impl(struct thread_pool *pool, size_t cnt, struct log *log)
 {
     size_t car, probe = size_add(&car, size_load_acquire(&pool->task_hint), cnt);
-    if (!crt_assert_impl(log, CODE_METRIC, car ? ERANGE : 0)) return 0;
-    if (!array_assert(log, CODE_METRIC, persistent_array_test(&pool->dispatched_task, probe, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK))) return 0;
+    if (!crt_assert_impl(log, CODE_METRIC, car ? ERANGE : 0) ||
+        !array_assert(log, CODE_METRIC, persistent_array_test(&pool->dispatched_task, probe, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK))) return 0;
     for (size_t i = pool->task_cnt; i < probe; i++)
         bool_store_release(&((struct dispatched_task *) persistent_array_fetch(&pool->dispatched_task, i, sizeof(struct dispatched_task)))->not_garbage, 0);
     if (pool->task_cnt < probe) pool->task_cnt = probe;
-    size_interlocked_add(&pool->task_hint, cnt);
+    size_interlocked_add(&pool->task_hint, cnt); // It is believed that this should not overflow
     return 1;
 }
 
@@ -203,16 +202,16 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
             dispatched_task->storage = tls->storage;
             bool_store_release(&dispatched_task->not_orphan, 0);
         }
-        else
-        {
-            if (dispatched_task->aggr.callback) dispatched_task->aggr.callback(dispatched_task->aggr.mem, dispatched_task->aggr.arg, res);
-            size_interlocked_dec(&pool->task_hint);
-        }
-
+        else if (dispatched_task->aggr.callback) dispatched_task->aggr.callback(dispatched_task->aggr.mem, dispatched_task->aggr.arg, res);
+        
         // Inform scheduller that global state has been changed
         mutex_acquire(&pool->mutex);
         pool->query_wake = 1;
-        if (res != TASK_YIELD) bool_store_release(&dispatched_task->not_garbage, 0);
+        if (res != TASK_YIELD)
+        {
+            bool_store_release(&dispatched_task->not_garbage, 0);
+            size_interlocked_dec(&pool->task_hint); // This should be done strictly after setting of the garbage flag, not earlier!
+        }
         condition_signal(&pool->condition);
         mutex_release(&pool->mutex);
     }
@@ -270,7 +269,7 @@ void thread_pool_schedule(struct thread_pool *pool)
             else if (!bool_load_acquire(&dispatched_task->not_garbage)) break;
         }
         
-        if (!dispatched_task) exit(EXIT_FAILURE); // Never happens
+        if (!dispatched_task) exit(EXIT_FAILURE); // It is believed that this never happens
         
         if (dispatch)
         {

@@ -853,11 +853,13 @@ bool log_message_fmt(struct log *restrict log, struct code_metric code_metric, e
     return res;
 }
 
+// To be removed
 bool log_message_crt(struct log *restrict log, struct code_metric code_metric, enum message_type type, Errno_t err)
 {
     return log_message_fmt(log, code_metric, type, "%C!\n", err);
 }
 
+// To be removed
 bool log_message_fopen(struct log *restrict log, struct code_metric code_metric, enum message_type type, const char *restrict path, Errno_t err)
 {
     return log_message_fmt(log, code_metric, type, "Unable to open the file %\"~P. %C!\n", path, err);
@@ -879,10 +881,10 @@ bool array_assert(struct log *log, struct code_metric code_metric, struct array_
     switch (res.error)
     {
     case ARRAY_OUT_OF_MEMORY:
-        log_message_fmt(log, code_metric, MESSAGE_ERROR, "Unable to allocate %~uz bytes of memory. %C!\n", res.tot, errno);
+        log_message_fmt(log, code_metric, MESSAGE_ERROR, "Request for %~uz bytes of memory denied. %C!\n", res.tot, errno);
         break;
     case ARRAY_OVERFLOW:
-        log_message_fmt(log, code_metric, MESSAGE_ERROR, "Memory allocation failed. %C!\n", ERANGE);
+        log_message_fmt(log, code_metric, MESSAGE_ERROR, "Memory allocation impossible. %C!\n", ERANGE);
         break;
     case ARRAY_NO_ERROR:
         break;

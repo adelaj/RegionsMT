@@ -103,7 +103,6 @@ static unsigned test_thread(void *Indl, void *Context, void *Tls)
             res = 0;
         }
     }
-    //res = 1;
     if (context->groupl[w].dispose) context->groupl[w].dispose(storage->data);
     free(storage);
     size_interlocked_add_sat((volatile void *[]) { &context->fail, &context->succ }[res], 1);
