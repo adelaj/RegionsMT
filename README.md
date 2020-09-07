@@ -114,13 +114,15 @@ A different way of installation for Windows 10 can be performed on top of the [W
 
 ### Installation via Cygwin or MinGW ---  TBD
 
-## Installation for Mac OS (preliminary)
+## Installation for Mac OS using `clang` toolchain
 
 ### Prerequisites
 The following programs should be installed:
 * A Mac OS package manager such as [Homebrew](https://brew.sh/) or [MacPorts](https://www.macports.org/);
 * [Xcode](https://developer.apple.com/xcode/) with [Command Line Tools](https://stackoverflow.com/questions/9329243/xcode-install-command-line-tools).
 
-The following packages are required for the installation: 
+It is assumed that [Homebrew](https://brew.sh/) package manager is used. The following packages are required for the installation:
 * `git`;
-* `cmake` (3.15 or newer).
+* `cmake` (3.15 or newer);
+* `make` (4.1 or newer);
+* `llvm` (`llvm-ar`, `llvm-ranlib`, and `lld` executables are required). Path to executables should be added to `PATH` manually as described below.
