@@ -1,7 +1,11 @@
+tcn = $(subst @, ,$1)
+tcv = $(addprefix -,$(word 2,$(subst -, ,$(firstword $(call tcn,$1)))))
+
 # <VAR>:<TOOLCHAIN>
 $(call var_reg,$$$$2,,CC LD,gcc gcc-% clang clang-%)
-$(call var_reg,gcc,,CC LD,gcc@mingw)
-$(call var_reg,g++,,CXX,gcc gcc@mingw)
+$(call var_reg,gcc,,CC LD,gcc@mingw gcc@macos gcc-%@macos)
+$(call var_reg,g++,,CXX,gcc gcc@mingw gcc@macos)
+$(call var_reg,$$$$(2:gcc-%=g++-%),,CXX:gcc-%)
 $(call var_reg,$$$$(2:gcc-%=g++-%),,CXX:gcc-%)
 $(call var_reg,$$$$2,,CXX,clang clang-%)
 $(call var_reg,clang,,CC LD CXX,clang@mingw)
