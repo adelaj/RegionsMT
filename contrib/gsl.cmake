@@ -502,6 +502,8 @@ if (NOT (HAVE_DECL_FEENABLEEXCEPT OR HAVE_DECL_FESETTRAPENABLE))
             set(HAVE_DARWIN_IEEE_INTERFACE 1)
         elseif (CMAKE_SYSTEM_PROCESSOR MATCHES 86)
             set(HAVE_DARWIN86_IEEE_INTERFACE 1)
+            # Handling of the "ieee-utils/fp-darwin86.c"
+            add_definitions(-Dasm=__asm__)
         endif ()
     elseif (CMAKE_SYSTEM_NAME MATCHES NetBSD)
         set(HAVE_NETBSD_IEEE_INTERFACE 1)
