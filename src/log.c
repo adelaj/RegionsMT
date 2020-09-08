@@ -447,8 +447,6 @@ static struct message_result fmt_execute_code_metric(char *buff, size_t *p_cnt, 
 {
     struct code_metric metric = ARG_FETCH(flags & FMT_EXE_FLAG_PTR, p_arg, struct code_metric, struct code_metric);
     if (flags & FMT_EXE_FLAG_PHONY) return MESSAGE_SUCCESS;
-    struct strl begin = { 0 }, end = { 0 };
-    if (env) begin = env->begin, end = env->end;
     return print_fmt(buff, p_cnt, NULL, "%''~~s* @ %\"~~s*:%~~uz", env, STRL(metric.func), env, STRL(metric.path), env, metric.line);
 }
 
@@ -741,7 +739,7 @@ bool log_init(struct log *restrict log, const char *restrict path, size_t lim, e
 
 bool log_dup(struct log *restrict dst, struct log *restrict src)
 {
-    FILE *f = Fdup(src->file, "a");
+    FILE *f = src->file == stderr || src->file == stdout ? src->file : Fdup(src->file, "a");
     if (!crt_assert(src, CODE_METRIC, f)) return 0;
     if (array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->lim, sizeof(*dst->buff), 0, 0)))
     {
