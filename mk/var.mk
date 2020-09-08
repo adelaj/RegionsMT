@@ -1,10 +1,10 @@
 tcv = $(addprefix -,$(call __tcv,$(subst -, ,$1)))
 __tcv = $(if $(filter-out 1,$(words $1)),$(lastword $1))
 tcn = $(firstword $(subst @, ,$1))$(call tcv,$1)
-ftrin = $(call striplast,$(call __ftrin,$1))
-__ftrin = $(if $2,$(if $(findstring $1),$(firstword $2),$(firstword $2)) $(call __ftrin,$1,$(call nofirstword,$2)))
-nftrin = $(call striplast,$(call __nftrin,$1))
-__nftrin = $(if $2,$(if $(findstring $1),$(firstword $2),,$(firstword $2)) $(call __nftrin,$1,$(call nofirstword,$2)))
+ftrin = $(call striplast,$(call __ftrin,$1,$2))
+__ftrin = $(if $2,$(if $(findstring $1,$(firstword $2)),$(firstword $2)) $(call __ftrin,$1,$(call nofirstword,$2)))
+nftrin = $(call striplast,$(call __nftrin,$1,$2))
+__nftrin = $(if $2,$(if $(findstring $1,$(firstword $2)),,$(firstword $2)) $(call __nftrin,$1,$(call nofirstword,$2)))
 
 # <VAR>:<TOOLCHAIN>
 $(call var_reg,$$$$(call tcn,$$$$2),,CC LD,$(CC_TOOLCHAIN))
@@ -30,9 +30,9 @@ $(call var_reg,-fuse-ld=lld,$$1,LDFLAGS:%,$(call nftrin,@macos,$(filter clang%,$
 
 # '__USE_MINGW_ANSI_STDIO' fixes bug with 'long double' under MinGW
 $(call var_reg,-D_UCRT -D__MSVCRT_VERSION__=0x1400 -D_UNICODE -D__USE_MINGW_ANSI_STDIO,$$1,CFLAGS:%,$(call ftrin,@mingw,$(CC_TOOLCHAIN)),%:%)
-$(call var_reg,-mcrtdll=ucrt,$$1,LDLIB:%,$(call ftrin,@mingw,$(CC_TOOLCHAIN)),%:%)
+$(call var_reg,-mcrtdll=ucrt,$$1,LDLIB:%,$(filter gcc@mingw%,$(CC_TOOLCHAIN)),%:%)
 # See https://sourceforge.net/p/mingw-w64/mailman/message/36621319/ for the details on how to use clang against ucrt
-$(call var_reg,-lucrt,$$1,LDLIB:%,$(call ftrin,@mingw,$(CC_TOOLCHAIN)),%:%)
+$(call var_reg,-lucrt,$$1,LDLIB:%,$(filter clang@mingw%,$(CC_TOOLCHAIN)),%:%)
 # https://sourceforge.net/p/mingw-w64/mailman/message/33154210/
 $(call var_reg,-Wl$$$$(COMMA)--large-address-aware,$$1,LDFLAGS:%,$(call ftrin,@mingw,$(CC_TOOLCHAIN)),i386 i686,%)
 
