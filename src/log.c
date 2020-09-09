@@ -739,7 +739,7 @@ bool log_init(struct log *restrict log, const char *restrict path, size_t lim, e
 
 bool log_dup(struct log *restrict dst, struct log *restrict src)
 {
-    FILE *f = src->file == stderr || src->file == stdout ? src->file : Fdup(src->file, "a");
+    FILE *f = file_is_tty(src->file) ? src->file : Fdup(src->file, "a");
     if (!crt_assert(src, CODE_METRIC, f)) return 0;
     if (array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->lim, sizeof(*dst->buff), 0, 0)))
     {
