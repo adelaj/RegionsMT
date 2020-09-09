@@ -21,6 +21,7 @@ $(call var_reg,-m32,$$1,CFLAGS LDFLAGS,%,$(CC_TOOLCHAIN),i386 i686,%)
 $(call var_reg,-m64 -mcx16,$$1,CFLAGS LDFLAGS,%,$(CC_TOOLCHAIN),x86_64:%)
 $(call var_reg,-O3 -flto,$$1,CFLAGS LDFLAGS,%,$(CC_TOOLCHAIN),%:Release)
 $(call var_reg,-D_DEBUG -g,$$1,CFLAGS:%,$(CC_TOOLCHAIN),%:Debug)
+# GCC do not have support of LTO under macos: https://gcc.gnu.org/bugzilla/show_bug.cgi?id=48180
 $(call var_reg,-fuse-linker-plugin,$$1,CFLAGS LDFLAGS,%,$(call nftrin,@macos,$(filter gcc%,$(CC_TOOLCHAIN))),%:Release)
 $(call var_reg,-Og,$$1,CFLAGS LDFLAGS,%,$(filter gcc%,$(CC_TOOLCHAIN)),%:Debug)
 $(call var_reg,-O0,$$1,CFLAGS LDFLAGS,%,$(filter clang%,$(CC_TOOLCHAIN)),%:Debug)

@@ -282,7 +282,7 @@ uint64_t get_time()
 
 int Fclose(FILE *f)
 {
-    return f && f != stderr && f != stdin && f != stdout ? fclose(f) : 0;
+    return f ? fclose(f) : 0;
 }
 
 size_t Strnlen(const char *str, size_t len)

@@ -716,22 +716,25 @@ struct message_result print_fmt(char *buff, size_t *p_cnt, const struct style *s
 // Last argument may be 'NULL'
 bool log_init(struct log *restrict log, const char *restrict path, size_t lim, enum log_flags flags, const struct ttl_style *restrict ttl_style, const struct style *restrict style, struct log *restrict fallback)
 {
-    FILE *f = path ? Fopen(path, flags & LOG_APPEND ? "a" : "w") : stderr;
+    FILE *f = path ? Fopen(path, flags & LOG_APPEND ? "a" : "w") : Fdup(stderr, "a");
     if (!fopen_assert(fallback, CODE_METRIC, path, f)) return 0;
-    bool tty = (flags & (LOG_FORCE_TTY)) || file_is_tty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
-    size_t cap = bom ? MAX(lim, lengthof(UTF8_BOM)) : lim;
-    if (array_assert(fallback, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)))
+    if (!setvbuf(f, NULL, _IONBF, 0))
     {
-        if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
-        else log->cnt = 0;
-        log->ttl_style = tty ? ttl_style : NULL;
-        log->style = tty ? style : NULL;
-        log->lim = lim;
-        log->file = f;
-        log->tot = 0;
-        log->fallback = fallback;
-        if (log->cnt < log->lim || log_flush(log)) return 1;
-        free(log->buff);
+        bool tty = (flags & (LOG_FORCE_TTY)) || file_is_tty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
+        size_t cap = bom ? MAX(lim, lengthof(UTF8_BOM)) : lim;
+        if (array_assert(fallback, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)))
+        {
+            if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
+            else log->cnt = 0;
+            log->ttl_style = tty ? ttl_style : NULL;
+            log->style = tty ? style : NULL;
+            log->lim = lim;
+            log->file = f;
+            log->tot = 0;
+            log->fallback = fallback;
+            if (log->cnt < log->lim || log_flush(log)) return 1;
+            free(log->buff);
+        }
     }
     Fclose(f);
     return 0;
@@ -739,9 +742,10 @@ bool log_init(struct log *restrict log, const char *restrict path, size_t lim, e
 
 bool log_dup(struct log *restrict dst, struct log *restrict src)
 {
-    FILE *f = file_is_tty(src->file) ? src->file : Fdup(src->file, "a");
+    FILE *f = Fdup(src->file, "a");
     if (!crt_assert(src, CODE_METRIC, f)) return 0;
-    if (array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->lim, sizeof(*dst->buff), 0, 0)))
+    if (!setvbuf(f, NULL, _IONBF, 0) &&
+        array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->lim, sizeof(*dst->buff), 0, 0)))
     {
         dst->cnt = 0;
         dst->ttl_style = src->ttl_style;
@@ -763,7 +767,7 @@ bool log_flush(struct log *restrict log)
     size_t wr = fwrite(log->buff, sizeof(*log->buff), cnt, log->file);
     log->tot += wr;
     log->cnt = 0;
-    return crt_assert(log->fallback, CODE_METRIC, !fflush(log->file) && wr == cnt);
+    return wr == cnt;
 }
 
 // May be used for 'log' filled with zeros manually

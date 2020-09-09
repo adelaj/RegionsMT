@@ -639,7 +639,7 @@ static int Wmain(int argc, wchar_t **wargv)
     if (ho != INVALID_HANDLE_VALUE)
     {
         DWORD mode = 0;
-        if (GetConsoleMode(ho, &mode)) SetConsoleMode(ho, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING);
+        if (GetConsoleMode(ho, &mode)) SetConsoleMode(ho, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_WRAP_AT_EOL_OUTPUT);
     }
 
     // Performing UTF-16LE to UTF-8 translation and executing the main routine
