@@ -84,25 +84,23 @@ uint8_t uint8_interlocked_or(volatile void *, uint8_t);
 uint16_t uint16_interlocked_or(volatile void *, uint16_t);
 uint8_t uint8_interlocked_and(volatile void *, uint8_t);
 uint16_t uint16_interlocked_and(volatile void *, uint16_t);
+void *ptr_interlocked_exchange(volatile void *, void *);
+
+size_t size_interlocked_add(volatile void *, size_t);
+size_t size_interlocked_sub(volatile void *, size_t);
+size_t size_interlocked_inc(volatile void *);
+size_t size_interlocked_dec(volatile void *);
+size_t size_interlocked_add_sat(volatile void *, size_t);
+size_t size_interlocked_sub_sat(volatile void *, size_t);
+
 bool size_interlocked_compare_exchange(volatile void *, size_t *, size_t);
 bool ptr_interlocked_compare_exchange(volatile void *, void **, void *);
 bool Dsize_interlocked_compare_exchange(volatile void *, Dsize_t *, Dsize_t);
-void *ptr_interlocked_exchange(volatile void *, void *);
-
-size_t size_interlocked_inc(volatile void *);
-size_t size_interlocked_dec(volatile void *);
-size_t size_interlocked_add(volatile void *, size_t);
-size_t size_interlocked_sub(volatile void *, size_t);
-size_t size_interlocked_add_sat(volatile void *, size_t);
-size_t size_interlocked_sub_sat(volatile void *, size_t);
 
 size_t size_shl(size_t *, size_t, uint8_t);
 size_t size_shr(size_t *, size_t, uint8_t);
 size_t size_add(size_t *, size_t, size_t);
 size_t size_sub(size_t *, size_t, size_t);
-size_t size_sum(size_t *, size_t *, size_t);
-size_t size_prod_test(size_t *, size_t *, size_t);
-size_t size_mul(size_t *, size_t, size_t);
 
 uint32_t uint32_bit_scan_reverse(uint32_t);
 uint32_t uint32_bit_scan_forward(uint32_t);
@@ -110,6 +108,10 @@ uint32_t uint32_pop_cnt(uint32_t);
 size_t size_bit_scan_reverse(size_t);
 size_t size_bit_scan_forward(size_t);
 size_t size_pop_cnt(size_t);
+
+size_t size_sum(size_t *, size_t *, size_t);
+size_t size_prod_test(size_t *, size_t *, size_t);
+size_t size_mul(size_t *, size_t, size_t);
 
 uint32_t uint32_log10(uint32_t, bool);
 uint64_t uint64_log10(uint64_t, bool);

@@ -50,7 +50,7 @@ bool read_phenotypes(void *Res, void *Context)
     FILE *f = fopen(context->path, "rb");
     // if (!f) ...
 
-    size_t sz = file_get_size(f);
+    size_t sz = Fsize(f);
     size_t row_cnt = row_count(f, 0, sz);
     ptrdiff_t *tbl = malloc(row_cnt * sizeof(size_t));
 

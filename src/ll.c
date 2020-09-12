@@ -43,6 +43,15 @@
 static DECLARE_LOAD_ACQUIRE(int, spinlock)
 static DECLARE_STORE_RELEASE(int, spinlock)
 static DECLARE_INTERLOCKED_COMPARE_EXCHANGE(int, spinlock, _acquire, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED)
+static DECLARE_INTERLOCKED_OP(uint8_t, uint8, and_release, __atomic_fetch_and, __ATOMIC_RELEASE)
+static DECLARE_INTERLOCKED_OP(uint8_t, uint8, or_release, __atomic_fetch_or, __ATOMIC_RELEASE)
+
+DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, __atomic_fetch_or, __ATOMIC_ACQ_REL)
+DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, __atomic_fetch_or, __ATOMIC_ACQ_REL)
+DECLARE_INTERLOCKED_OP(uint8_t, uint8, and, __atomic_fetch_and, __ATOMIC_ACQ_REL)
+DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, __atomic_fetch_and, __ATOMIC_ACQ_REL)
+DECLARE_INTERLOCKED_OP(void *, ptr, exchange, __atomic_exchange_n, __ATOMIC_ACQ_REL)
+DECLARE_INTERLOCKED_OP(size_t, size, add, __atomic_fetch_add, __ATOMIC_ACQ_REL)
 
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
@@ -57,15 +66,6 @@ DECLARE_INTERLOCKED_COMPARE_EXCHANGE_2(Dsize_t, Dsize, )
 // This has lower overhead than 'DECLARE_INTERLOCKED_COMPARE_EXCHANGE_2'
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize, , __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)
 #       endif
-
-DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, __atomic_fetch_or, __ATOMIC_ACQ_REL)
-DECLARE_INTERLOCKED_OP(uint8_t, uint8, or_release, __atomic_fetch_or, __ATOMIC_RELEASE)
-DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, __atomic_fetch_or, __ATOMIC_ACQ_REL)
-DECLARE_INTERLOCKED_OP(uint8_t, uint8, and, __atomic_fetch_and, __ATOMIC_ACQ_REL)
-DECLARE_INTERLOCKED_OP(uint8_t, uint8, and_release, __atomic_fetch_and, __ATOMIC_RELEASE)
-DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, __atomic_fetch_and, __ATOMIC_ACQ_REL)
-DECLARE_INTERLOCKED_OP(void *, ptr, exchange, __atomic_exchange_n, __ATOMIC_ACQ_REL)
-DECLARE_INTERLOCKED_OP(size_t, size, add, __atomic_fetch_add, __ATOMIC_ACQ_REL)
 
 uint32_t uint32_bit_scan_reverse(uint32_t x)
 {
@@ -136,16 +136,16 @@ size_t size_pop_cnt(size_t x)
 static DECLARE_LOAD_ACQUIRE(long, spinlock)
 static DECLARE_STORE_RELEASE(long, spinlock)
 static DECLARE_INTERLOCKED_COMPARE_EXCHANGE(long, spinlock, long, _InterlockedCompareExchange, _acquire)
-
-DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, void *, _InterlockedCompareExchangePointer,)
+static DECLARE_INTERLOCKED_OP(uint8_t, uint8, and_release, char, _InterlockedAnd8)
+static DECLARE_INTERLOCKED_OP(uint8_t, uint8, or_release, char, _InterlockedOr8)
 
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, char, _InterlockedOr8)
-DECLARE_INTERLOCKED_OP(uint8_t, uint8, or_release, char, _InterlockedOr8)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, short, _InterlockedOr16)
 DECLARE_INTERLOCKED_OP(uint8_t, uint8, and, char, _InterlockedAnd8)
-DECLARE_INTERLOCKED_OP(uint8_t, uint8, and_release, char, _InterlockedAnd8)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, short, _InterlockedAnd16)
 DECLARE_INTERLOCKED_OP(void *, ptr, exchange, void *, _InterlockedExchangePointer)
+
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, void *, _InterlockedCompareExchangePointer, )
 
 uint32_t uint32_bit_scan_reverse(uint32_t x)
 {
@@ -166,8 +166,9 @@ uint32_t uint32_pop_cnt(uint32_t x)
 
 #   ifdef _M_X64
 
-DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, long long, _InterlockedCompareExchange64,)
 DECLARE_INTERLOCKED_OP(size_t, size, add, long long, _InterlockedExchangeAdd64)
+
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, long long, _InterlockedCompareExchange64,)
 
 bool Dsize_interlocked_compare_exchange(volatile void *dst, Dsize_t *p_cmp, Dsize_t xchg)
 {
@@ -228,9 +229,10 @@ size_t size_pop_cnt(size_t x)
 
 #   elif defined _M_IX86
 
+DECLARE_INTERLOCKED_OP(size_t, size, add, long, _InterlockedExchangeAdd)
+
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(size_t, size, long, _InterlockedCompareExchange, )
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize, long long, _InterlockedCompareExchange64, )
-DECLARE_INTERLOCKED_OP(size_t, size, add, long, _InterlockedExchangeAdd)
 
 #   endif
 #endif 
@@ -429,18 +431,6 @@ size_t size_hash_inv(size_t x)
 
 #elif defined _M_IX86 || defined __i386__
 
-DECLARE_UINT_LOG10(size_t, size, SIZE_MAX, TEN10(u))
-
-size_t size_hash(size_t x)
-{
-    return (size_t) uint32_hash((uint32_t) x);
-}
-
-size_t size_hash_inv(size_t x)
-{
-    return (size_t) uint32_hash_inv((uint32_t) x);
-}
-
 size_t size_bit_scan_reverse(size_t x)
 {
     return (size_t) uint32_bit_scan_reverse((uint32_t) x);
@@ -454,6 +444,18 @@ size_t size_bit_scan_forward(size_t x)
 size_t size_pop_cnt(size_t x)
 {
     return (size_t) uint32_pop_cnt((uint32_t) x);
+}
+
+DECLARE_UINT_LOG10(size_t, size, SIZE_MAX, TEN10(u))
+
+size_t size_hash(size_t x)
+{
+    return (size_t) uint32_hash((uint32_t) x);
+}
+
+size_t size_hash_inv(size_t x)
+{
+    return (size_t) uint32_hash_inv((uint32_t) x);
 }
 
 #endif

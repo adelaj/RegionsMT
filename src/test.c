@@ -23,11 +23,14 @@ struct test_metric {
     struct strl test_name, generator_name;
 };
 
+static DECLARE_PTR_ARG_FETCH(metric_ptr, struct test_metric)
+
 static struct message_result fmt_test_metric(char *buff, size_t *p_cnt, void *p_arg, const struct env *env, enum fmt_execute_flags flags)
 {
     (void) env;
-    struct style *style = ARG_FETCH_PTR(flags & FMT_EXE_FLAG_PTR, p_arg);
-    struct test_metric *metric = ARG_FETCH_PTR(flags & FMT_EXE_FLAG_PTR, p_arg);
+    bool ptr = flags & FMT_EXE_FLAG_PTR;
+    struct style *style = style_ptr_arg_fetch(p_arg, ptr);
+    struct test_metric *metric = metric_ptr_arg_fetch(p_arg, ptr);
     if (flags & FMT_EXE_FLAG_PHONY) return MESSAGE_SUCCESS;
     return style ?
         print_fmt(buff, p_cnt, NULL, "%~~uz/%~~uz:%''~~s*/%~~uz:%''~~s*/%~~uz", 

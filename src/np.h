@@ -6,7 +6,7 @@
 //  Warning! This file should be included prior to any standard library header!
 //
 
-#if defined _MSC_BUILD || defined __MINGW32__
+#if defined _WIN32 && (defined _MSC_BUILD || defined __MINGW32__)
 #   ifndef _CRT_SECURE_NO_WARNINGS
 #       define _CRT_SECURE_NO_WARNINGS
 #   endif
@@ -20,8 +20,11 @@
 #   include <errno.h>
 typedef errno_t Errno_t;
 
-#elif defined __GNUC__ || defined __clang__
+#   define HAS_ALIGNED_REALLOC
+
+#elif (defined __GNUC__ || defined __clang__) && (defined __unix__ || defined __APPLE__)
 // Required for some POSIX only functions
+#   define _DEFAULT_SOURCE
 #   define _POSIX_C_SOURCE 200112L
 #   define _DARWIN_C_SOURCE
 
@@ -53,10 +56,6 @@ typedef struct { va_list va_list; } Va_list;
 
 #define Aligned_alloca(SZ, ALIGN) ((void *) ((((uintptr_t) Alloca((SZ) + (ALIGN) - 1) + (ALIGN) - 1) / (ALIGN)) * (ALIGN)))
 
-#if defined _MSC_BUILD || defined __MINGW32__
-#   define HAS_ALIGNED_REALLOC
-#endif
-
 // Aligned memory allocation/deallocation
 void *Aligned_malloc(size_t, size_t);
 void *Aligned_realloc(void *, size_t, size_t); // Warning! This function returns NULL on all platforms except Windows!
@@ -66,9 +65,13 @@ void Aligned_free(void *);
 // File operations
 FILE *Fopen(const char *, const char *);
 FILE *Fdup(FILE *, const char *);
-int Fclose(FILE *); // Tolerant to the 'NULL' and 'std###' streams
+size_t Fwrite_unlocked(const void *, size_t, size_t, FILE *);
+int Fflush_unlocked(FILE *);
 int Fseeki64(FILE *, int64_t, int);
 int64_t Ftelli64(FILE *);
+bool Fisatty(FILE *);
+int64_t Fsize(FILE *);
+int Fclose(FILE *); // Tolerant to the 'NULL'
 
 // Error and time
 Errno_t Strerror_s(char *, size_t, Errno_t);
@@ -81,9 +84,8 @@ size_t Strnlen(const char *, size_t);
 size_t Strchrnull(const char *, int);
 size_t Strlncpy(char *, char *, size_t);
 void *Memrchr(void const *, int, size_t);
+void *Memrchr2(const void *, int, int, size_t);
 
-bool file_is_tty(FILE *);
-int64_t file_get_size(FILE *);
 size_t get_processor_count(void);
 size_t get_page_size(void);
 size_t get_process_id(void);

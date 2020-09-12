@@ -5,21 +5,54 @@
 #include "strproc.h"
 #include "utf8.h"
 
-#define ARG_FETCH_PTR(FLAG, ARG) \
-    ((FLAG) ? *(*(void ***) (ARG))++ : Va_arg(*(Va_list *) (ARG), void *))
+#define DECLARE_PTR_ARG_FETCH(PREFIX, TYPE) \
+    TYPE *PREFIX ## _arg_fetch(void *p_arg, bool ptr) \
+    { \
+        return ptr ? (TYPE *) *(*(void ***) p_arg)++ : Va_arg(*(Va_list *) p_arg, TYPE *); \
+    }
 
-/*
-#define ARG_FETCH_STR(FLAG, ARG) \
-    ((FLAG) ? (const char *) *(*(void ***) (ARG))++ : Va_arg(*(Va_list *) (ARG), const char *))
-*/
+#define DECLARE_ARG_FETCH(PREFIX, TYPE, TYPE_DOM) \
+    TYPE PREFIX ## _arg_fetch(void *p_arg, bool ptr) \
+    { \
+        return ptr ? *(TYPE *) *(*(void ***) p_arg)++ : (TYPE) Va_arg(*(Va_list *) p_arg, TYPE_DOM); \
+    }
 
-#define ARG_FETCH(FLAG, ARG, TYPE, TYPE_DOM) \
-    ((FLAG) ? *(TYPE *) *(*(void ***) (ARG))++ : Va_arg(*(Va_list *) (ARG), TYPE_DOM))
+#define DECLARE_STRUCT_ARG_FETCH(PREFIX, TYPE) \
+    TYPE PREFIX ## _arg_fetch(void *p_arg, bool ptr) \
+    { \
+        return ptr ? *(TYPE *) *(*(void ***) p_arg)++ : Va_arg(*(Va_list *) p_arg, TYPE); \
+    }
+
+void *ptr_arg_fetch(void *p, bool);
+struct style *style_ptr_arg_fetch(void *p, bool);
+
+unsigned char ussint_arg_fetch(void *p, bool);
+unsigned short usint_arg_fetch(void *p, bool);
+unsigned uint_arg_fetch(void *p, bool);
+unsigned long ulint_arg_fetch(void *p, bool);
+unsigned long long ullint_arg_fetch(void *p, bool);
+uint8_t uint8_arg_fetch(void *p, bool);
+uint16_t uint16_arg_fetch(void *p, bool);
+uint32_t uint32_arg_fetch(void *p, bool);
+uint64_t uint64_arg_fetch(void *p, bool);
+size_t size_arg_fetch(void *p, bool);
+uintmax_t uintmax_arg_fetch(void *p, bool);
+
+signed char ssint_arg_fetch(void *p, bool);
+short sint_arg_fetch(void *p, bool);
+int int_arg_fetch(void *p, bool);
+long lint_arg_fetch(void *p, bool);
+long long llint_arg_fetch(void *p, bool);
+int8_t int8_arg_fetch(void *p, bool);
+int16_t int16_arg_fetch(void *p, bool);
+int32_t int32_arg_fetch(void *p, bool);
+int64_t int64_arg_fetch(void *p, bool);
+ptrdiff_t ptrdiff_arg_fetch(void *p, bool);
+intmax_t intmax_arg_fetch(void *p, bool);
 
 enum fmt_execute_flags {
     FMT_EXE_FLAG_PHONY = 1,
-    FMT_EXE_FLAG_BLANK = 2,
-    FMT_EXE_FLAG_PTR = 4
+    FMT_EXE_FLAG_PTR = 2
 };
 
 #define ANSI "\x1b"
@@ -102,6 +135,7 @@ struct log {
     struct log *fallback;
     size_t cnt, cap, lim;
     uint64_t tot; // File size is 64-bit always!
+    struct mutex *p_mutex;
 };
 
 typedef struct message_result (*message_callback)(char *, size_t *, void *, const struct style *);

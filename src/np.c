@@ -6,7 +6,10 @@
 #include <string.h>
 #include <immintrin.h>
 
-#if defined _MSC_BUILD || defined __MINGW32__
+#if defined _WIN32 && (defined _MSC_BUILD || defined __MINGW32__)
+
+#   include <windows.h>
+#   include <io.h>
 
 void *Aligned_malloc(size_t al, size_t sz)
 {
@@ -27,116 +30,6 @@ void Aligned_free(void *ptr)
 {
     _aligned_free(ptr);
 }
-
-int Fseeki64(FILE *file, int64_t offset, int origin)
-{
-    return _fseeki64(file, offset, origin);
-}
-
-int64_t Ftelli64(FILE *file)
-{
-    return _ftelli64(file);
-}
-
-Errno_t Strerror_s(char *buff, size_t cap, Errno_t code)
-{
-    return strerror_s(buff, cap, code);
-}
-
-Errno_t Localtime_s(struct tm *tm, const time_t *t)
-{
-    return localtime_s(tm, t);
-}
-
-int Stricmp(const char *a, const char *b)
-{
-    return _stricmp(a, b);
-}
-
-int Strnicmp(const char *a, const char *b, size_t len)
-{
-    return _strnicmp(a, b, len);
-}
-
-#elif defined __GNUC__ || defined __clang__
-#   include <stdlib.h>
-#   include <strings.h>
-
-void *Aligned_malloc(size_t al, size_t sz)
-{
-    void *res;
-    int code = posix_memalign(&res, al, sz);
-    if (code) errno = code;
-    return res;
-}
-
-void *Aligned_realloc(void *ptr, size_t al, size_t sz)
-{
-    (void) ptr;
-    (void) al;
-    (void) sz;
-    errno = ENOSYS; // Function not implemented
-    return NULL;
-}
-
-void *Aligned_calloc(size_t al, size_t cnt, size_t sz)
-{
-    size_t hi, tot = size_mul(&hi, cnt, sz);
-    if (hi)
-    {
-        errno = ENOMEM;
-        return NULL;
-    }
-    void *res = Aligned_malloc(al, tot);
-    if (!res) return NULL;
-    memset(res, 0, tot);
-    return res;
-}
-
-void Aligned_free(void *ptr)
-{
-    free(ptr);
-}
-
-#   include <sys/types.h>
-#   include <sys/stat.h>
-#   include <fcntl.h>
-
-int Fseeki64(FILE *file, int64_t offset, int origin)
-{
-    return fseeko(file, (off_t) offset, origin);
-}
-
-int64_t Ftelli64(FILE *file)
-{
-    return (int64_t) ftello(file);
-}
-
-Errno_t Strerror_s(char *buff, size_t cap, Errno_t code)
-{
-    return strerror_r(code, buff, cap);
-}
-
-Errno_t Localtime_s(struct tm *tm, const time_t *t)
-{
-    return localtime_r(t, tm) ? 0 : errno;
-}
-
-int Stricmp(const char *a, const char *b)
-{
-    return strcasecmp(a, b);
-}
-
-int Strnicmp(const char *a, const char *b, size_t len)
-{
-    return strncasecmp(a, b, len);
-}
-
-#endif
-
-#ifdef _WIN32
-#   include <windows.h>
-#   include <io.h>
 
 _Static_assert(sizeof(wchar_t) == sizeof(uint16_t), "Incorrect 'wchar_t'!");
 
@@ -188,16 +81,56 @@ FILE *Fdup(FILE *f, const char *mode)
     return _fdopen(fd, mode);
 }
 
-bool file_is_tty(FILE *f)
+size_t Fwrite_unlocked(const void *ptr, size_t sz, size_t cnt, FILE *file)
+{
+    return _fwrite_nolock(ptr, sz, cnt, file);
+}
+
+int Fflush_unlocked(FILE *file)
+{
+    return _fflush_nolock(file);
+}
+
+int Fseeki64(FILE *file, int64_t offset, int origin)
+{
+    return _fseeki64(file, offset, origin);
+}
+
+int64_t Ftelli64(FILE *file)
+{
+    return _ftelli64(file);
+}
+
+bool Fisatty(FILE *f)
 {
     return _isatty(_fileno(f));
 }
 
-int64_t file_get_size(FILE *f)
+int64_t Fsize(FILE *f)
 {
     LARGE_INTEGER sz;
     if (GetFileSizeEx((HANDLE) _get_osfhandle(_fileno(f)), &sz)) return (int64_t) sz.QuadPart;
     else return 0;
+}
+
+Errno_t Strerror_s(char *buff, size_t cap, Errno_t code)
+{
+    return strerror_s(buff, cap, code);
+}
+
+Errno_t Localtime_s(struct tm *tm, const time_t *t)
+{
+    return localtime_s(tm, t);
+}
+
+int Stricmp(const char *a, const char *b)
+{
+    return _stricmp(a, b);
+}
+
+int Strnicmp(const char *a, const char *b, size_t len)
+{
+    return _strnicmp(a, b, len);
 }
 
 size_t get_processor_count()
@@ -227,10 +160,56 @@ uint64_t get_time()
     return t / 10 + !!(t % 10);
 }
 
-#elif defined __unix__ || defined __APPLE__
+#elif (defined __GNUC__ || defined __clang__) && (defined __unix__ || defined __APPLE__)
 
-#   include <sys/time.h>
+#   include <stdlib.h>
+#   include <strings.h>
 #   include <unistd.h>
+#   include <fcntl.h>
+#   include <sys/types.h>
+#   include <sys/stat.h>
+#   include <sys/time.h>
+
+void *Aligned_malloc(size_t al, size_t sz)
+{
+    void *res;
+    int code = posix_memalign(&res, al, sz);
+    if (code) errno = code;
+    return res;
+}
+
+void *Aligned_realloc(void *ptr, size_t al, size_t sz)
+{
+    (void) ptr;
+    (void) al;
+    (void) sz;
+    errno = ENOSYS; // Function not implemented
+    return NULL;
+}
+
+void *Aligned_calloc(size_t al, size_t cnt, size_t sz)
+{
+    size_t hi, tot = size_mul(&hi, cnt, sz);
+    if (hi)
+    {
+        errno = ENOMEM;
+        return NULL;
+    }
+    void *res = Aligned_malloc(al, tot);
+    if (!res) return NULL;
+    memset(res, 0, tot);
+    return res;
+}
+
+void Aligned_free(void *ptr)
+{
+    free(ptr);
+}
+
+FILE *Fopen(const char *path, const char *mode)
+{
+    return fopen(path, mode);
+}
 
 FILE *Fdup(FILE *f, const char *mode)
 {
@@ -239,21 +218,72 @@ FILE *Fdup(FILE *f, const char *mode)
     return fdopen(fd, mode);
 }
 
-FILE *Fopen(const char *path, const char *mode)
+#   ifndef __APPLE__
+
+size_t Fwrite_unlocked(const void *ptr, size_t sz, size_t cnt, FILE *file)
 {
-    return fopen(path, mode);
+    return fwrite_unlocked(ptr, sz, cnt, file);
 }
 
-bool file_is_tty(FILE *f)
+int Fflush_unlocked(FILE *file)
+{
+    return fflush_unlocked(file);
+}
+
+#   else
+
+size_t Fwrite_unlocked(const void *ptr, size_t sz, size_t cnt, FILE *file)
+{
+    return fwrite(ptr, sz, cnt, file);
+}
+
+int Fflush_unlocked(FILE *file)
+{
+    return flush(file);
+}
+
+#   endif
+
+int Fseeki64(FILE *file, int64_t offset, int origin)
+{
+    return fseeko(file, (off_t) offset, origin);
+}
+
+int64_t Ftelli64(FILE *file)
+{
+    return (int64_t) ftello(file);
+}
+
+bool Fisatty(FILE *f)
 {
     return isatty(fileno(f));
 }
 
-int64_t file_get_size(FILE *f)
+int64_t Fsize(FILE *f)
 {
     struct stat st;
     if (!fstat(fileno(f), &st)) return (int64_t) st.st_size;
     else return 0;
+}
+
+Errno_t Strerror_s(char *buff, size_t cap, Errno_t code)
+{
+    return strerror_r(code, buff, cap);
+}
+
+Errno_t Localtime_s(struct tm *tm, const time_t *t)
+{
+    return localtime_r(t, tm) ? 0 : errno;
+}
+
+int Stricmp(const char *a, const char *b)
+{
+    return strcasecmp(a, b);
+}
+
+int Strnicmp(const char *a, const char *b, size_t len)
+{
+    return strncasecmp(a, b, len);
 }
 
 size_t get_processor_count() 

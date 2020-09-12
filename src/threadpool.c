@@ -1,8 +1,10 @@
+#define VERBOSE
 #include "np.h"
 #include "ll.h"
 #include "memory.h"
 #include "threadpool.h"
 #include "threadsupp.h"
+#undef VERBOSE
 
 #include <string.h>
 #include <stdlib.h>
@@ -93,8 +95,8 @@ bool loop_mt(struct thread_pool *pool, task_callback callback, struct task_cond 
 
 struct thread_pool {
     spinlock spinlock, add;
-    mutex_handle mutex;
-    condition_handle condition;
+    struct mutex mutex;
+    struct condition condition;
     struct queue queue;
     volatile size_t cnt, task_hint;
     size_t task_cnt;
@@ -149,9 +151,9 @@ enum {
 struct thread_arg {
     struct dispatched_task *volatile dispatched_task;
     void *tls;
-    thread_handle thread;
-    mutex_handle mutex;
-    condition_handle condition;
+    struct thread thread;
+    struct mutex mutex;
+    struct condition condition;
     uint8_t bits[UINT8_CNT(THREAD_BIT_CNT)];
 };
 
