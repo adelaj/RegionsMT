@@ -24,6 +24,7 @@
     }
 
 void *ptr_arg_fetch(void *p, bool);
+struct env *env_ptr_arg_fetch(void *p, bool);
 struct style *style_ptr_arg_fetch(void *p, bool);
 
 unsigned char ussint_arg_fetch(void *p, bool);
@@ -38,6 +39,8 @@ uint64_t uint64_arg_fetch(void *p, bool);
 size_t size_arg_fetch(void *p, bool);
 uintmax_t uintmax_arg_fetch(void *p, bool);
 
+bool bool_arg_fetch(void *p, bool);
+Errno_t Errno_arg_fetch(void *p, bool);
 signed char ssint_arg_fetch(void *p, bool);
 short sint_arg_fetch(void *p, bool);
 int int_arg_fetch(void *p, bool);
