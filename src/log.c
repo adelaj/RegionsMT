@@ -583,8 +583,8 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
             list_ptr = ptr;
         }
         //list_copy = res.flags & FMT_COPY_ARGS;
-        //if (res.flags & FMT_COPY_ARGS) ft |= FMT_EXE_FLAG_COPY_ARG;
-        if ((res.flags & FMT_CONDITIONAL) && (bool_arg_fetch(p_arg_copy, list_ptr) == !(res.flags & FMT_CONDITIONAL_NOT))) execute_flags |= FMT_EXE_FLAG_PHONY;
+        //if (res.flags & FMT_COPY_ARGS) execute_flags |= FMT_EXE_FLAG_COPY_ARG;
+        if ((res.flags & FMT_CONDITIONAL) && (!bool_arg_fetch(p_arg_copy, list_ptr) == !(res.flags & FMT_CONDITIONAL_NOT))) execute_flags |= FMT_EXE_FLAG_PHONY;
         if (res.flags & FMT_ENV_USER) env = env_ptr_arg_fetch(p_arg_copy, list_ptr);
         else if (style && (res.flags & FMT_ENV)) switch (res.type)
         {
@@ -765,61 +765,75 @@ bool log_init(struct log *restrict log, const char *restrict path, size_t lim, e
     if (!fopen_assert(fallback, CODE_METRIC, path, f)) return 0;
     if (!setvbuf(f, NULL, _IONBF, 0))
     {
-        bool tty = (flags & (LOG_FORCE_TTY)) || Fisatty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
-        size_t cap = bom ? MAX(lim, lengthof(UTF8_BOM)) : lim;
-        if (array_assert(fallback, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)))
+        log->p_mutex = NULL;
+        if (!(flags & LOG_LOCKED) || (
+            array_assert(fallback, CODE_METRIC, array_init(&log->p_mutex, NULL, 1, sizeof(*log->p_mutex), 0, ARRAY_FAILSAFE)) &&
+            thread_assert(fallback, CODE_METRIC, mutex_init(log->p_mutex))))
         {
-            if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
-            else log->cnt = 0;
-            log->ttl_style = tty ? ttl_style : NULL;
-            log->style = tty ? style : NULL;
-            log->lim = lim;
-            log->file = f;
-            log->tot = 0;
-            log->fallback = fallback;
-            if (log->cnt < log->lim || log_flush(log)) return 1;
-            free(log->buff);
+            bool tty = (flags & (LOG_FORCE_TTY)) || Fisatty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
+            size_t cap = bom ? MAX(lim, lengthof(UTF8_BOM)) : lim;
+            if (array_assert(fallback, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)))
+            {
+                if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
+                else log->cnt = 0;
+                log->ttl_style = tty ? ttl_style : NULL;
+                log->style = tty ? style : NULL;
+                log->lim = lim;
+                log->file = f;
+                log->tot = 0;
+                log->fallback = fallback;
+                if (log->cnt < log->lim || log_flush(log)) return 1;
+                free(log->buff);
+            }
+            mutex_close(log->p_mutex);
         }
+        free(log->p_mutex);
     }
     Fclose(f);
     return 0;
 }
 
-bool log_dup(struct log *restrict dst, struct log *restrict src)
+bool log_mirror_init(struct log *restrict dst, struct log *restrict src)
 {
-    FILE *f = Fdup(src->file, "a");
-    if (!crt_assert(src, CODE_METRIC, f)) return 0;
-    if (!setvbuf(f, NULL, _IONBF, 0) &&
-        array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->lim, sizeof(*dst->buff), 0, 0)))
-    {
-        dst->cnt = 0;
-        dst->ttl_style = src->ttl_style;
-        dst->style = src->style;
-        dst->lim = src->lim;
-        dst->file = f;
-        dst->tot = 0;
-        dst->fallback = NULL; // User should set this manually
-        return 1;
-    }
-    Fclose(f);
-    return 0;
+    if (!array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->lim, sizeof(*dst->buff), 0, 0))) return 0;
+    dst->cnt = 0;
+    dst->ttl_style = src->ttl_style;
+    dst->style = src->style;
+    dst->lim = src->lim;
+    dst->file = src->file;
+    dst->tot = 0;
+    dst->p_mutex = src->p_mutex;
+    dst->fallback = NULL; // User should set this manually
+    return 1;
 }
 
 bool log_flush(struct log *restrict log)
 {
     size_t cnt = log->cnt;
     if (!cnt) return 1;
-    size_t wr = fwrite(log->buff, sizeof(*log->buff), cnt, log->file);
+    if (log->p_mutex) mutex_acquire(log->p_mutex);
+    size_t wr = Fwrite_unlocked(log->buff, sizeof(*log->buff), cnt, log->file);
+    int res = Fflush_unlocked(log->file);
+    if (log->p_mutex) mutex_release(log->p_mutex);
     log->tot += wr;
     log->cnt = 0;
-    return wr == cnt;
+    return wr == cnt && crt_assert(log->fallback, CODE_METRIC, !res);
 }
 
-// May be used for 'log' filled with zeros manually
 void log_close(struct log *restrict log)
 {
+    if (!log) return;
     log_flush(log);
     Fclose(log->file);
+    mutex_close(log->p_mutex);
+    free(log->p_mutex);
+    free(log->buff);
+}
+
+void log_mirror_close(struct log *restrict log)
+{
+    if (!log) return;
+    log_flush(log);
     free(log->buff);
 }
 

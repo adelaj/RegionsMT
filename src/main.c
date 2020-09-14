@@ -423,7 +423,7 @@ static int Main(int argc, char **argv)
     };
 
     struct log log;
-    if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, NULL))
+    if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, LOG_LOCKED, &ttl_style, &style, NULL))
     {
         //struct log log1;
         //log_init(&log1, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, &log);
@@ -636,7 +636,7 @@ static int Wmain(int argc, wchar_t **wargv)
     
     // Trying to enable handling for VT sequences
     HANDLE ho = GetStdHandle(STD_ERROR_HANDLE);
-    if (ho != INVALID_HANDLE_VALUE)
+    if (ho != INVALID_HANDLE_VALUE && ho != NULL)
     {
         DWORD mode = 0;
         if (GetConsoleMode(ho, &mode)) SetConsoleMode(ho, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_WRAP_AT_EOL_OUTPUT);

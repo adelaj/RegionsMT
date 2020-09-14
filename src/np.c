@@ -9,6 +9,7 @@
 #if defined _WIN32 && (defined _MSC_BUILD || defined __MINGW32__)
 
 #   include <windows.h>
+#   include <wchar.h>
 #   include <io.h>
 
 void *Aligned_malloc(size_t al, size_t sz)
@@ -101,9 +102,36 @@ int64_t Ftelli64(FILE *file)
     return _ftelli64(file);
 }
 
+#define WSTR_CMP(WSTR, LEN, CMP) \
+    ((LEN) >= (countof(CMP) - 1) && \
+    !wcsncmp((WSTR), (CMP), (countof(CMP) - 1)) && \
+    (WSTR += (countof(CMP) - 1), LEN -= (countof(CMP) - 1), 1))
+
+// The method implemented below inspired by:
+// https://github.com/k-takata/ptycheck
+// https://github.com/msys2/MINGW-packages/blob/master/mingw-w64-gcc/0140-gcc-8.2.0-diagnostic-color.patch
 bool Fisatty(FILE *f)
 {
-    return _isatty(_fileno(f));
+    if (_isatty(_fileno(f))) return 1;
+    DWORD mode;
+    HANDLE ho = (HANDLE) _get_osfhandle(_fileno(f));
+    if (ho != INVALID_HANDLE_VALUE && ho != NULL && GetConsoleMode(ho, &mode)) return 1;
+    if (GetFileType(ho) != FILE_TYPE_PIPE) return 0;
+    FILE_NAME_INFO *ni = Alloca(sizeof(FILE_NAME_INFO) + sizeof(WCHAR) * (MAX_PATH - 1));
+    if (!GetFileInformationByHandleEx(ho, FileNameInfo, ni, sizeof(WCHAR) * MAX_PATH)) return 0;
+    //wchar_t *wstr = Alloca(sizeof(*wstr) * (MAX_PATH + 1));
+    //size_t len = 
+    wchar_t *wstr = ni->FileName;
+    size_t len = ni->FileNameLength / sizeof(*wstr), tmp;
+    //wchar_t *wstr = L"\\msys-dd50a72ab4668b33-pty1-to-master";
+    //size_t len = 37, tmp;
+    // Compare with sample string: L"\\msys-dd50a72ab4668b33-pty1-to-master"
+    if (!WSTR_CMP(wstr, len, L"\\cygwin-") && !WSTR_CMP(wstr, len, L"\\msys-")) return 0; // Skip prefix L"\\cygwin-" or L"\\msys-"
+    for (tmp = 0; len && iswxdigit(*wstr); tmp++, wstr++, len--); // Skip 16 hexadimical digits
+    if (tmp != 16 || !WSTR_CMP(wstr, len, L"-pty")) return 0; // Skip L"-pty"
+    for (tmp = 0; len && iswdigit(*wstr); tmp++, wstr++, len--); // Skip number
+    if (!tmp || (!WSTR_CMP(wstr, len, L"-from-master") && !WSTR_CMP(wstr, len, L"-to-master"))) return 0; // Skip L"-from-master" or L"-to-master"
+    return !len;
 }
 
 int64_t Fsize(FILE *f)

@@ -130,7 +130,7 @@ bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct
     if (!pool) return 0;
     size_t ind = 0;
     for (; ind < thread_cnt; ind++)
-        if (!log_dup(&((struct test_tls *) thread_pool_fetch_tls(pool, ind))->log, log)) break;
+        if (!log_mirror_init(&((struct test_tls *) thread_pool_fetch_tls(pool, ind))->log, log)) break;
     bool succ = 0;
     struct test_thread_context context;
     context.groupl = groupl;
@@ -149,7 +149,7 @@ bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct
         log_message_fmt(log, CODE_METRIC, fail ? MESSAGE_ERROR : MESSAGE_INFO, "Execution of %~uz test(s) in %~uz thread(s) took %~T. Succeeded: %~uz, failed: %~uz.\n", size_load_acquire(&context.tot), thread_cnt, start, get_time(), size_load_acquire(&context.succ), fail);
         succ = !fail;
     }
-    while (ind--) log_close(&((struct test_tls *) thread_pool_fetch_tls(pool, ind))->log);
+    while (ind--) log_mirror_close(&((struct test_tls *) thread_pool_fetch_tls(pool, ind))->log);
     thread_pool_dispose(pool);
     return succ;
 }

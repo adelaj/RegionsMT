@@ -152,12 +152,14 @@ union message_callback {
 enum log_flags {
     LOG_APPEND = 1,
     LOG_NO_BOM = 2,
-    LOG_FORCE_TTY = 4
+    LOG_FORCE_TTY = 4,
+    LOG_LOCKED = 8
 };
 
 bool log_init(struct log *restrict, const char *restrict, size_t, enum log_flags, const struct ttl_style *restrict, const struct style *restrict, struct log *restrict);
-bool log_dup(struct log *restrict, struct log *restrict);
+bool log_mirror_init(struct log *restrict, struct log *restrict);
 void log_close(struct log *restrict);
+void log_mirror_close(struct log *restrict);
 bool log_flush(struct log *restrict);
 
 bool log_message(struct log *restrict, struct code_metric, enum message_type, message_callback, void *);
