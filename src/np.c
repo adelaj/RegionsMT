@@ -107,38 +107,34 @@ int64_t Ftelli64(FILE *file)
     !wcsncmp((WSTR), (CMP), (countof(CMP) - 1)) && \
     (WSTR += (countof(CMP) - 1), LEN -= (countof(CMP) - 1), 1))
 
-// The method implemented below inspired by:
+// The implementation below is inspired by:
 // https://github.com/k-takata/ptycheck
 // https://github.com/msys2/MINGW-packages/blob/master/mingw-w64-gcc/0140-gcc-8.2.0-diagnostic-color.patch
 bool Fisatty(FILE *f)
 {
-    if (_isatty(_fileno(f))) return 1;
+    int fd = _fileno(f);
+    if (_isatty(fd)) return 1;
     DWORD mode;
-    HANDLE ho = (HANDLE) _get_osfhandle(_fileno(f));
-    if (ho != INVALID_HANDLE_VALUE && ho != NULL && GetConsoleMode(ho, &mode)) return 1;
+    HANDLE ho = (HANDLE) _get_osfhandle(fd);
+    if (!ho || ho == INVALID_HANDLE_VALUE) return 0;
+    if (GetConsoleMode(ho, &mode)) return 1;
     if (GetFileType(ho) != FILE_TYPE_PIPE) return 0;
-    FILE_NAME_INFO *ni = Alloca(sizeof(FILE_NAME_INFO) + sizeof(WCHAR) * (MAX_PATH - 1));
-    if (!GetFileInformationByHandleEx(ho, FileNameInfo, ni, sizeof(WCHAR) * MAX_PATH)) return 0;
-    //wchar_t *wstr = Alloca(sizeof(*wstr) * (MAX_PATH + 1));
-    //size_t len = 
-    wchar_t *wstr = ni->FileName;
-    size_t len = ni->FileNameLength / sizeof(*wstr), tmp;
-    //wchar_t *wstr = L"\\msys-dd50a72ab4668b33-pty1-to-master";
-    //size_t len = 37, tmp;
-    // Compare with sample string: L"\\msys-dd50a72ab4668b33-pty1-to-master"
-    if (!WSTR_CMP(wstr, len, L"\\cygwin-") && !WSTR_CMP(wstr, len, L"\\msys-")) return 0; // Skip prefix L"\\cygwin-" or L"\\msys-"
-    for (tmp = 0; len && iswxdigit(*wstr); tmp++, wstr++, len--); // Skip 16 hexadimical digits
+    wchar_t wbuff[MAX_PATH], *wstr = wbuff; // 'MAX_PATH' already provides space for the null-terminator
+    DWORD len = GetFinalPathNameByHandleW(ho, (LPWSTR) wstr, countof(wbuff), VOLUME_NAME_NONE | FILE_NAME_OPENED), tmp;
+    // Compare to a sample string, e. g. L"\\msys-dd50a72ab4668b33-pty1-to-master"
+    if (!len || len > countof(wbuff) || (!WSTR_CMP(wstr, len, L"\\msys-") && !WSTR_CMP(wstr, len, L"\\cygwin-"))) return 0; // Skip prefix: L"\\cygwin-" or L"\\msys-"
+    for (tmp = 0; len && iswxdigit(*wstr); tmp++, wstr++, len--); // Skip 16 hexadecimal digits
     if (tmp != 16 || !WSTR_CMP(wstr, len, L"-pty")) return 0; // Skip L"-pty"
-    for (tmp = 0; len && iswdigit(*wstr); tmp++, wstr++, len--); // Skip number
-    if (!tmp || (!WSTR_CMP(wstr, len, L"-from-master") && !WSTR_CMP(wstr, len, L"-to-master"))) return 0; // Skip L"-from-master" or L"-to-master"
+    for (tmp = 0; len && iswdigit(*wstr); tmp++, wstr++, len--); // Skip at least one digit
+    if (!tmp || (!WSTR_CMP(wstr, len, L"-from-master") && !WSTR_CMP(wstr, len, L"-to-master"))) return 0; // Skip suffix: L"-from-master" or L"-to-master"
     return !len;
 }
 
 int64_t Fsize(FILE *f)
 {
     LARGE_INTEGER sz;
-    if (GetFileSizeEx((HANDLE) _get_osfhandle(_fileno(f)), &sz)) return (int64_t) sz.QuadPart;
-    else return 0;
+    HANDLE ho = (HANDLE) _get_osfhandle(_fileno(f));
+    return ho && ho != INVALID_HANDLE_VALUE && GetFileSizeEx(ho, &sz) ? (int64_t) sz.QuadPart : 0;
 }
 
 Errno_t Strerror_s(char *buff, size_t cap, Errno_t code)
@@ -267,7 +263,7 @@ size_t Fwrite_unlocked(const void *ptr, size_t sz, size_t cnt, FILE *file)
 
 int Fflush_unlocked(FILE *file)
 {
-    return flush(file);
+    return fflush(file);
 }
 
 #   endif

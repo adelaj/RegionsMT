@@ -163,7 +163,6 @@ struct main_args main_args_default()
 struct main_args main_args_override(struct main_args args_hi, struct main_args args_lo)
 {
     struct main_args res = { .log_path = args_hi.log_path ? args_hi.log_path : args_lo.log_path };
-    if (res.log_path && !strcmp(res.log_path, "stderr")) res.log_path = NULL;
     memcpy(res.bits, args_hi.bits, UINT8_CNT(MAIN_ARGS_BIT_CNT));
     if (uint8_bit_test(args_hi.bits, MAIN_ARGS_BIT_POS_THREAD_CNT)) res.thread_cnt = args_hi.thread_cnt;
     else
@@ -205,7 +204,7 @@ static int Main(int argc, char **argv)
         CLII((struct par_sch[])
         {
             [0] = { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_HELP }, empty_handler, PAR_OPTION },
-            [1] = { offsetof(struct main_args, log_path), NULL, p_str_handler, PAR_VALUED },
+            [1] = { offsetof(struct main_args, log_path), NULL, p_str_handler, PAR_VALUED_OPTION },
             [2] = { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_TEST }, empty_handler, PAR_OPTION },
             [3] = { offsetof(struct main_args, thread_cnt), &(struct handler_context) { offsetof(struct main_args, bits) - offsetof(struct main_args, thread_cnt), MAIN_ARGS_BIT_POS_THREAD_CNT }, size_handler, PAR_VALUED },
             [4] = { 0, &(struct handler_context) { offsetof(struct main_args, bits), MAIN_ARGS_BIT_POS_CAT }, empty_handler, PAR_OPTION },
@@ -419,7 +418,8 @@ static int Main(int argc, char **argv)
         .type_flt = ENV_INIT_COL(FG_BR_CYAN),
         .type_time_diff = ENV_INIT_COL(FG_BR_YELLOW),
         .type_code_metric = ENV_INIT_COL(FG_BR_YELLOW),
-        .type_utf = ENV_INIT_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO)      
+        .type_utf = ENV_INIT_COL(FG_BR_MAGENTA)
+        // ENV_INIT_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO)
     };
 
     struct log log;
@@ -427,14 +427,13 @@ static int Main(int argc, char **argv)
     {
         //struct log log1;
         //log_init(&log1, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, &log);
-        //log_message_fmt(&log1, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "012345678901%~~-sAA%!-s1;%1;C%$F", &(struct env) ENV_INIT_COL(FG_BR_CYAN), "X", "BB", "%$E", "D" }, "G%%%~~#*%~#*%#x394%~#921", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, 12041241241ull);
-        //log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~#*%~#*.\n", 0x393, 920);
+        //log_message_fmt(&log1, CODE_METRIC, MESSAGE_NOTE, "%@@$%$%~T.\n", (const void *[]) { "012345678901%~~-sAA%!-s1;%1;C%$F", &(struct env) ENV_INIT_COL(FG_BR_CYAN), "X", "BB", "%$E", "D" }, "G%%%~~#*%~#*%''#x394%~#921", &(struct env) ENV_INIT_COL(FG_BR_CYAN), 0x393, 920, 0ull, UINT64_C(12041241241));
+        //log_message_fmt(&log1, CODE_METRIC, MESSAGE_NOTE, "%@@$%$", (const void *[]) { "AA%!-s1;%1;C%$F", "B", "%$E", "D" }, "G%%%~#*%~#*%~c.\n", 0x393, 920, 'a');
+        //log_message_fmt(&log1, CODE_METRIC, MESSAGE_NOTE, "|%$%$", "%c4%!-sX%3|", 'W', "YYY", "\n");
+        //exit(0);
         //SetLastError(99999);
         //wapi_assert(&log1, CODE_METRIC, 0);
         //wapi_assert(&log1, CODE_METRIC, 0);
-        //FILE *f = Fopen(argv[1], "w");
-        //fwrite("2", 1, 1, f);
-        //Fclose(f);
 
         //struct persistent_array a;
         //persistent_array_init(&a, 1, 100, 0);
@@ -636,7 +635,7 @@ static int Wmain(int argc, wchar_t **wargv)
     
     // Trying to enable handling for VT sequences
     HANDLE ho = GetStdHandle(STD_ERROR_HANDLE);
-    if (ho != INVALID_HANDLE_VALUE && ho != NULL)
+    if (ho && ho != INVALID_HANDLE_VALUE)
     {
         DWORD mode = 0;
         if (GetConsoleMode(ho, &mode)) SetConsoleMode(ho, mode | ENABLE_VIRTUAL_TERMINAL_PROCESSING | ENABLE_WRAP_AT_EOL_OUTPUT);

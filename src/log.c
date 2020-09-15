@@ -142,18 +142,18 @@ enum fmt_flt_flags {
 };
 
 enum fmt_flags {
-    FMT_CONDITIONAL = 1,
-    FMT_CONDITIONAL_NOT = 2,
-    FMT_OVERPRINT =  4,
-    FMT_QUOTE_SELECT = 8,
-    FMT_QUOTE_SINGLE = 16,
-    FMT_QUOTE_DOUBLE = 32,
-    FMT_LEFT_JUSTIFY = 64,
+    FMT_COPY_ARGS = 1,
+    FMT_CONDITIONAL = 2,
+    FMT_CONDITIONAL_NOT = 4,
+    FMT_OVERPRINT =  8,
+    FMT_QUOTE_SELECT = 16,
+    FMT_QUOTE_SINGLE = 32,
+    FMT_QUOTE_DOUBLE = 64,
     FMT_ENV = 128,
     FMT_ENV_USER = 256,
     FMT_ARG_PTR = 512,
     FMT_LIST_PTR = 1024,
-    FMT_COPY_ARGS = 2048
+    FMT_LEFT_JUSTIFY = 2048,
 };
 
 enum fmt_arg_mode {
@@ -165,7 +165,10 @@ enum fmt_arg_mode {
 struct fmt_result {
     enum fmt_flags flags;
     enum fmt_type type;
-    size_t wd;
+    struct {
+        enum fmt_arg_mode mode;
+        size_t len;
+    } box_arg;
     union {
         struct {
             enum fmt_int_spec spec;
@@ -291,39 +294,43 @@ static struct message_result fmt_decode_utf(uint32_t *p_val, enum fmt_arg_mode *
     return MESSAGE_SUCCESS;
 }
 
+#define TRY_FLAG(CMP, SET, DEFAULT) ((CMP) & (SET) ? (DEFAULT) : (SET))
+#define TRY_FLAG2(CMP, SET1, SET2, DEFAULT) TRY_FLAG((CMP), (SET1), TRY_FLAG((CMP), (SET2), (DEFAULT)))
+
 static struct message_result fmt_decode(struct fmt_result *res, const char *fmt, size_t *p_pos)
 {
     size_t pos = *p_pos;
-    memset(res, 0, sizeof(*res));
+    *res = (struct fmt_result) { 0 };
     struct message_result message_res = MESSAGE_SUCCESS;
     for (;; pos++)
     {
         enum fmt_flags tmp = 0;
         switch (fmt[pos])
         {
+        // Warning! Cases should be sorted according to the flag values.
         case '^':
-            tmp = FMT_COPY_ARGS;
+            tmp = TRY_FLAG(res->flags, FMT_COPY_ARGS, 0);
             break;
         case '?':
-            tmp = res->flags & FMT_CONDITIONAL ? res->flags & FMT_CONDITIONAL_NOT ? 0 : FMT_CONDITIONAL_NOT : FMT_CONDITIONAL;
+            tmp = TRY_FLAG2(res->flags, FMT_CONDITIONAL, FMT_CONDITIONAL_NOT, 0);
             break;
         case '!':
-            tmp = FMT_OVERPRINT;
+            tmp = TRY_FLAG(res->flags, FMT_OVERPRINT, 0);
             break;        
         case '\'':
-            tmp = res->flags & FMT_QUOTE_SELECT ? res->flags & FMT_QUOTE_SINGLE ? 0 : FMT_QUOTE_SINGLE : FMT_QUOTE_SELECT;
+            tmp = TRY_FLAG2(res->flags, FMT_QUOTE_SELECT, FMT_QUOTE_SINGLE, 0);
             break;
-        case '\"':
-            tmp = FMT_QUOTE_DOUBLE;
+        case '\"': // Warning! "\'\'" and "\"" sequences are incompatible 
+            tmp = res->flags & FMT_QUOTE_SINGLE ? 0 : FMT_QUOTE_DOUBLE;
             break;
         case '~':
-            tmp = res->flags & FMT_ENV ? res->flags & FMT_ENV_USER ? 0 : FMT_ENV_USER : FMT_ENV;
-            break;
-        case '-':
-            tmp = FMT_LEFT_JUSTIFY;
+            tmp = TRY_FLAG2(res->flags, FMT_ENV, FMT_ENV_USER, 0);
             break;
         case '@':
-            tmp = res->flags & FMT_ARG_PTR ? res->flags & FMT_LIST_PTR ? 0 : FMT_LIST_PTR : FMT_ARG_PTR;
+            tmp = TRY_FLAG2(res->flags, FMT_ARG_PTR, FMT_LIST_PTR, 0);
+            break;
+        case '-':
+            tmp = TRY_FLAG(res->flags, FMT_LEFT_JUSTIFY, 0);
             break;
         }
         if (!tmp) break;
@@ -730,7 +737,7 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
                 j = SIZE_MAX;
             } 
         }
-        if (res.flags & FMT_ARG_PTR) Va_end(arg_sub);
+        if ((res.flags & FMT_ARG_PTR) && !(res.flags & FMT_LIST_PTR)) Va_end(arg_sub);
         if (!message_res.status) return message_res;
         if (!tmp) i = SIZE_MAX;
         break;
