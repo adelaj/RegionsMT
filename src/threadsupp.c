@@ -27,26 +27,26 @@ Errno_t thread_close(struct thread *p_thread)
     return p_thread && !CloseHandle((HANDLE) p_thread->thread);
 }
 
-Errno_t mutex_init(struct mutex *p_mutex)
+Errno_t mutex_init(struct mutex *mutex)
 {
-    return !InitializeCriticalSectionAndSpinCount(&p_mutex->mutex, 0x400);
+    return !InitializeCriticalSectionAndSpinCount(&mutex->mutex, 0x400);
 }
 
-Errno_t mutex_acquire(struct mutex *p_mutex)
+Errno_t mutex_acquire(struct mutex *mutex)
 {
-    EnterCriticalSection(&p_mutex->mutex);
+    EnterCriticalSection(&mutex->mutex);
     return 0;
 }
 
-Errno_t mutex_release(struct mutex *p_mutex)
+Errno_t mutex_release(struct mutex *mutex)
 {
-    LeaveCriticalSection(&p_mutex->mutex);
+    LeaveCriticalSection(&mutex->mutex);
     return 0;
 }
 
-Errno_t mutex_close(struct mutex *p_mutex)
+Errno_t mutex_close(struct mutex *mutex)
 {
-    if (p_mutex) DeleteCriticalSection(&p_mutex->mutex);
+    if (mutex) DeleteCriticalSection(&mutex->mutex);
     return 0;
 }
 
@@ -68,9 +68,9 @@ Errno_t condition_broadcast(struct condition *p_condition)
     return 0;
 }
 
-Errno_t condition_sleep(struct condition *p_condition, struct mutex *p_mutex)
+Errno_t condition_sleep(struct condition *p_condition, struct mutex *mutex)
 {
-    return !SleepConditionVariableCS(&p_condition->condition, &p_mutex->mutex, INFINITE);
+    return !SleepConditionVariableCS(&p_condition->condition, &mutex->mutex, INFINITE);
 }
 
 Errno_t condition_close(struct condition *p_condition)
@@ -125,24 +125,24 @@ Errno_t thread_close(struct thread *p_thread)
     return 0;
 }
 
-Errno_t mutex_init(struct mutex *p_mutex)
+Errno_t mutex_init(struct mutex *mutex)
 {
-    return pthread_mutex_init(&p_mutex->mutex, NULL);
+    return pthread_mutex_init(&mutex->mutex, NULL);
 }
 
-Errno_t mutex_acquire(struct mutex *p_mutex)
+Errno_t mutex_acquire(struct mutex *mutex)
 {
-    return pthread_mutex_lock(&p_mutex->mutex);
+    return pthread_mutex_lock(&mutex->mutex);
 }
 
-Errno_t mutex_release(struct mutex *p_mutex)
+Errno_t mutex_release(struct mutex *mutex)
 {
-    return pthread_mutex_unlock(&p_mutex->mutex);
+    return pthread_mutex_unlock(&mutex->mutex);
 }
 
-Errno_t mutex_close(struct mutex *p_mutex)
+Errno_t mutex_close(struct mutex *mutex)
 {
-    return p_mutex ? pthread_mutex_destroy(&p_mutex->mutex) : 0;
+    return mutex ? pthread_mutex_destroy(&mutex->mutex) : 0;
 }
 
 Errno_t condition_init(struct condition *p_condition)
@@ -160,9 +160,9 @@ Errno_t condition_broadcast(struct condition *p_condition)
     return pthread_cond_broadcast(&p_condition->condition);
 }
 
-Errno_t condition_sleep(struct condition *p_condition, struct mutex *p_mutex)
+Errno_t condition_sleep(struct condition *p_condition, struct mutex *mutex)
 {
-    return pthread_cond_wait(&p_condition->condition, &p_mutex->mutex);
+    return pthread_cond_wait(&p_condition->condition, &mutex->mutex);
 }
 
 Errno_t condition_close(struct condition *p_condition)

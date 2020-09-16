@@ -58,7 +58,7 @@ enum fmt_execute_flags {
     FMT_EXE_FLAG_PTR = 2
 };
 
-#define ANSI "\x1b"
+#define ESC "\x1b"
 #define CSI "["
 #define SGR(C) C "m"
 
@@ -81,9 +81,9 @@ enum fmt_execute_flags {
 #define FG_BR_CYAN 96
 #define FG_BR_WHITE 97
 
-#define ENV_INIT(BEGIN, END) { .begin = STRI(BEGIN), .end = STRI(END) }
-#define ENV_INIT_COL_EXT(BEGIN, COL, END) ENV_INIT(ANSI CSI SGR(TOSTRING(COL)) BEGIN, END ANSI CSI SGR(TOSTRING(FG_RESET)))
-#define ENV_INIT_COL(COL) ENV_INIT_COL_EXT("", COL, "")
+#define ENVI(BEGIN, END) { .begin = STRI(BEGIN), .end = STRI(END) }
+#define ENVI_FG_EXT(BEGIN, COL, END) ENVI(ESC CSI SGR(TOSTRING(COL)) BEGIN, END ESC CSI SGR(TOSTRING(FG_RESET)))
+#define ENVI_FG(COL) ENVI_FG_EXT("", COL, "")
 
 struct env {
     struct strl begin, end;
@@ -135,10 +135,10 @@ struct log {
     char *buff;
     const struct ttl_style *ttl_style;
     const struct style *style;
-    struct log *fallback;
-    size_t cnt, cap, lim;
+    struct log *fallback; // When fallback is null lock applies to the log buffer also!
+    size_t cnt, cap, hint;
     uint64_t tot; // File size is 64-bit always!
-    struct mutex *p_mutex;
+    struct mutex *mutex;
 };
 
 typedef struct message_result (*message_callback)(char *, size_t *, void *, const struct style *);
@@ -153,14 +153,14 @@ enum log_flags {
     LOG_APPEND = 1,
     LOG_NO_BOM = 2,
     LOG_FORCE_TTY = 4,
-    LOG_LOCKED = 8
+    LOG_WRITE_LOCK = 8
 };
 
 bool log_init(struct log *restrict, const char *restrict, size_t, enum log_flags, const struct ttl_style *restrict, const struct style *restrict, struct log *restrict);
 bool log_mirror_init(struct log *restrict, struct log *restrict);
 void log_close(struct log *restrict);
 void log_mirror_close(struct log *restrict);
-bool log_flush(struct log *restrict);
+bool log_flush(struct log *restrict, bool);
 
 bool log_message(struct log *restrict, struct code_metric, enum message_type, message_callback, void *);
 bool log_message_var(struct log *restrict, struct code_metric, enum message_type, message_callback_var, void *, ...);

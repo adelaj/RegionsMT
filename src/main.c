@@ -144,9 +144,9 @@ static bool test_main(size_t thread_cnt, struct log *log)
 
 #else
 
-static bool test_main(struct log *log)
+static bool test_main(struct fallback *fallback)
 {
-    log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Test mode deactivated!\n");
+    log_message_fmt(fallback, CODE_METRIC, MESSAGE_NOTE, "Test mode deactivated!\n");
     return 1;
 }
 
@@ -405,25 +405,25 @@ static int Main(int argc, char **argv)
 
     bool succ = 1;
     struct ttl_style ttl_style = {
-        .time_stamp = ENV_INIT_COL(FG_BR_BLACK),
-        .header = { ENV_INIT_COL(FG_GREEN), ENV_INIT_COL(FG_RED), ENV_INIT_COL(FG_YELLOW), ENV_INIT_COL(FG_MAGENTA), ENV_INIT_COL(FG_CYAN), ENV_INIT_COL(FG_BR_BLACK) },
-        .code_metric = ENV_INIT_COL(FG_BR_BLACK)
+        .time_stamp = ENVI_FG(FG_BR_BLACK),
+        .header = { ENVI_FG(FG_GREEN), ENVI_FG(FG_RED), ENVI_FG(FG_YELLOW), ENVI_FG(FG_MAGENTA), ENVI_FG(FG_CYAN), ENVI_FG(FG_BR_BLACK) },
+        .code_metric = ENVI_FG(FG_BR_BLACK)
     };
 
     struct style style = {
-        .type_int = ENV_INIT_COL(FG_BR_CYAN),
-        .type_char = ENV_INIT_COL(FG_BR_MAGENTA),
-        .type_path = ENV_INIT_COL(FG_BR_CYAN),
-        .type_str = ENV_INIT_COL(FG_BR_MAGENTA),
-        .type_flt = ENV_INIT_COL(FG_BR_CYAN),
-        .type_time_diff = ENV_INIT_COL(FG_BR_YELLOW),
-        .type_code_metric = ENV_INIT_COL(FG_BR_YELLOW),
-        .type_utf = ENV_INIT_COL(FG_BR_MAGENTA)
+        .type_int = ENVI_FG(FG_BR_CYAN),
+        .type_char = ENVI_FG(FG_BR_MAGENTA),
+        .type_path = ENVI_FG(FG_BR_CYAN),
+        .type_str = ENVI_FG(FG_BR_MAGENTA),
+        .type_flt = ENVI_FG(FG_BR_CYAN),
+        .type_time_diff = ENVI_FG(FG_BR_YELLOW),
+        .type_code_metric = ENVI_FG(FG_BR_YELLOW),
+        .type_utf = ENVI_FG(FG_BR_MAGENTA)
         // ENV_INIT_COL_EXT(UTF8_LSQUO, FG_BR_MAGENTA, UTF8_RSQUO)
     };
 
-    struct log log;
-    if (log_init(&log, NULL, 1 + 0 * BLOCK_WRITE, LOG_LOCKED, &ttl_style, &style, NULL))
+    struct log fallback; // Slow fallback log for all operations. Destination device: stderr; 
+    if (log_init(&fallback, NULL, 0, LOG_WRITE_LOCK, &ttl_style, &style, NULL))
     {
         //struct log log1;
         //log_init(&log1, NULL, 1 + 0 * BLOCK_WRITE, 0, &ttl_style, &style, &log);
@@ -447,73 +447,79 @@ static int Main(int argc, char **argv)
         size_t pos_cnt;
         char **pos_arr;
         struct main_args main_args = { 0 };
-        if (argv_parse(argv_par_selector, &argv_par_sch, &main_args, argv, argc, &pos_arr, &pos_cnt, &log))
+        if (argv_parse(argv_par_selector, &argv_par_sch, &main_args, argv, argc, &pos_arr, &pos_cnt, &fallback))
         {
             main_args = main_args_override(main_args, main_args_default());
-            /*
-            if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY))
+            struct log log;
+            if (log_init(&log, main_args.log_path, BLOCK_WRITE, LOG_WRITE_LOCK, &ttl_style, &style, &fallback))
             {
-                if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY_USER))
-                    log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: ON.\n");
+                wapi_assert(&log, CODE_METRIC, 0);
+                /*
+                if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY))
+                {
+                    if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY_USER))
+                        log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: ON.\n");
+                    else
+                        log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: set to DEFAULT.\n");
+                }
                 else
-                    log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: set to DEFAULT.\n");
-            }
-            else
-            {
-                if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY_USER))
-                    log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: OFF.\n");
-                else
-                    log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: DEFAULT.\n");
-            }
-            */
+                {
+                    if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY_USER))
+                        log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: OFF.\n");
+                    else
+                        log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: DEFAULT.\n");
+                }
+                */
 
-            if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_HELP))
-            {
-                // Help mode
-                log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Help mode triggered!\n");
-            }
-            else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_TEST))
-            {
-                succ = test_main(main_args.thread_cnt, &log);
-            }
-            else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CAT))
-            {
-                if (pos_cnt >= 7)
+                if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_HELP))
                 {
-                    size_t rpl = (size_t) strtoull(pos_arr[5], NULL, 10);
-                    uint64_t seed = (uint64_t) strtoull(pos_arr[6], NULL, 10);
-                    succ = categorical_run_adj(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], pos_arr[4], rpl, seed, &log);
+                    // Help mode
+                    log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Help mode triggered!\n");
                 }
-            }
-            else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LDE))
-            {
-                if (pos_cnt >= 2) lde_run(pos_arr[0], pos_arr[1], &log);
-            }
-            else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CHISQ))
-            {
-                if (pos_cnt >= 4)
+                else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_TEST))
                 {
-                    succ = categorical_run_chisq(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], &log);
+                    succ = test_main(main_args.thread_cnt, &log);
                 }
-            }
-            else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LM))
-            {
-                if (pos_cnt >= 5)
+                else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CAT))
                 {
-                    succ = lm_expr_test(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], pos_arr[4], &log);
+                    if (pos_cnt >= 7)
+                    {
+                        size_t rpl = (size_t) strtoull(pos_arr[5], NULL, 10);
+                        uint64_t seed = (uint64_t) strtoull(pos_arr[6], NULL, 10);
+                        succ = categorical_run_adj(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], pos_arr[4], rpl, seed, &log);
+                    }
                 }
-            }
-            else
-            {
-                if (!pos_cnt) log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "No input data specified.\n");
+                else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LDE))
+                {
+                    if (pos_cnt >= 2) lde_run(pos_arr[0], pos_arr[1], &fallback);
+                }
+                else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CHISQ))
+                {
+                    if (pos_cnt >= 4)
+                    {
+                        succ = categorical_run_chisq(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], &log);
+                    }
+                }
+                else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LM))
+                {
+                    if (pos_cnt >= 5)
+                    {
+                        succ = lm_expr_test(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], pos_arr[4], &log);
+                    }
+                }
                 else
                 {
-                    
+                    if (!pos_cnt) log_message_fmt(&log, CODE_METRIC, MESSAGE_NOTE, "No input data specified.\n");
+                    else
+                    {
+
+                    }
                 }
+                log_close(&log);
             }
             free(pos_arr);
         }
-        log_close(&log);
+        log_close(&fallback);
     }
     
     /*   
