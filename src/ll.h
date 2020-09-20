@@ -23,24 +23,20 @@ typedef unsigned __int128 Dsize_t;
 #   elif defined _M_IX86 || defined __i386__
 typedef unsigned long long Dsize_t;
 #   endif
-#   ifdef _MSC_BUILD
-#       define DSIZE_ALIGN 8
-#   else
-// Warning! On 'i386' targets 'alignof(Dsize_t)' may be equal to 4. Do not use 'alignof' instead of 'sizeof'!
-// https://patchwork.kernel.org/patch/9251121/
-#       define DSIZE_ALIGN sizeof(Dsize_t)
-#   endif
 #elif defined _MSC_BUILD
-#   define DSIZE_ALIGN 16
 typedef struct { size_t s[2]; } Dsize_t;
 #endif
 
 #if defined _MSC_BUILD && defined _M_X64
-#   define DSIZEC(LO, HI) ((Dsize_t) { (LO), (HI) })
+#   define DSIZELC(LO) ((Dsize_t) { .s[0] = (LO) })
+#   define DSIZEHC(HI) ((Dsize_t) { .s[1] = (HI) })
+#   define DSIZEC(LO, HI) ((Dsize_t) { .s[0] = (LO), .s[1] = (HI) })
 #   define DSIZE_LO(D) ((D).s[0])
 #   define DSIZE_HI(D) ((D).s[1])
 #else
-#   define DSIZEC(LO, HI) ((Dsize_t) (LO) | (((Dsize_t) (HI)) << SIZE_BIT))
+#   define DSIZELC(LO) ((Dsize_t) (LO))
+#   define DSIZEHC(HI) ((((Dsize_t) (HI)) << SIZE_BIT))
+#   define DSIZEC(LO, HI) (DSIZELC(LO) | DSIZEHC(HI))
 #   define DSIZE_LO(D) ((size_t) (D))
 #   define DSIZE_HI(D) ((size_t) ((D) >> SIZE_BIT))
 #endif

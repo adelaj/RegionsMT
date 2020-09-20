@@ -9,7 +9,9 @@
 #if defined _WIN32 && (defined _MSC_BUILD || defined __MINGW32__)
 
 #   include <windows.h>
+#   include <wchar.h>
 #   include <io.h>
+#   include <sys/stat.h>
 
 void *Aligned_malloc(size_t al, size_t sz)
 {
@@ -18,20 +20,20 @@ void *Aligned_malloc(size_t al, size_t sz)
 
 void *Aligned_realloc(void *ptr, size_t al, size_t sz)
 {
-    return _aligned_realloc(ptr, sz, al);
+    if (sz) return _aligned_realloc(ptr, sz, al);
+    Aligned_free(ptr);
+    return NULL;
 }
 
 void *Aligned_calloc(size_t al, size_t cnt, size_t sz)
 {
-    return _aligned_recalloc(NULL, cnt, sz, al);
+    return sz ? _aligned_recalloc(NULL, cnt, sz, al) : NULL;
 }
 
 void Aligned_free(void *ptr)
 {
     _aligned_free(ptr);
 }
-
-_Static_assert(sizeof(wchar_t) == sizeof(uint16_t), "Incorrect 'wchar_t'!");
 
 static bool utf8_str_to_wstr(const char *restrict str, wchar_t **p_wstr, size_t *p_wlen)
 {
@@ -101,15 +103,38 @@ int64_t Ftelli64(FILE *file)
     return _ftelli64(file);
 }
 
+#define WSTR_CMP(WSTR, LEN, CMP) \
+    ((LEN) >= (countof(CMP) - 1) && \
+    !wcsncmp((WSTR), (CMP), (countof(CMP) - 1)) && \
+    (WSTR += (countof(CMP) - 1), LEN -= (countof(CMP) - 1), 1))
+
+// The implementation below is inspired by:
+// https://github.com/k-takata/ptycheck
+// https://github.com/msys2/MINGW-packages/blob/master/mingw-w64-gcc/0140-gcc-8.2.0-diagnostic-color.patch
 bool Fisatty(FILE *f)
 {
-    return _isatty(_fileno(f));
+    int fd = _fileno(f);
+    if (_isatty(fd)) return 1;
+    DWORD mode;
+    HANDLE ho = (HANDLE) _get_osfhandle(fd);
+    if (!ho || ho == INVALID_HANDLE_VALUE) return 0;
+    if (GetConsoleMode(ho, &mode)) return 1;
+    if (GetFileType(ho) != FILE_TYPE_PIPE) return 0;
+    wchar_t wbuff[MAX_PATH], *wstr = wbuff; // 'MAX_PATH' already provides space for the null-terminator
+    DWORD len = GetFinalPathNameByHandleW(ho, (LPWSTR) wstr, countof(wbuff), VOLUME_NAME_NONE | FILE_NAME_OPENED), tmp;
+    // Compare to a sample string, e. g. L"\\msys-dd50a72ab4668b33-pty1-to-master"
+    if (!len || len > countof(wbuff) || (!WSTR_CMP(wstr, len, L"\\msys-") && !WSTR_CMP(wstr, len, L"\\cygwin-"))) return 0; // Skip prefix: L"\\cygwin-" or L"\\msys-"
+    for (tmp = 0; len && iswxdigit(*wstr); tmp++, wstr++, len--); // Skip 16 hexadecimal digits
+    if (tmp != 16 || !WSTR_CMP(wstr, len, L"-pty")) return 0; // Skip L"-pty"
+    for (tmp = 0; len && iswdigit(*wstr); tmp++, wstr++, len--); // Skip at least one digit
+    if (!tmp || (!WSTR_CMP(wstr, len, L"-from-master") && !WSTR_CMP(wstr, len, L"-to-master"))) return 0; // Skip suffix: L"-from-master" or L"-to-master"
+    return !len;
 }
 
 int64_t Fsize(FILE *f)
 {
-    LARGE_INTEGER sz;
-    if (GetFileSizeEx((HANDLE) _get_osfhandle(_fileno(f)), &sz)) return (int64_t) sz.QuadPart;
+    struct _stat64 st;
+    if (!_fstat64(_fileno(f), &st)) return (int64_t) st.st_size;
     else return 0;
 }
 
@@ -182,8 +207,8 @@ void *Aligned_realloc(void *ptr, size_t al, size_t sz)
 {
     (void) ptr;
     (void) al;
-    (void) sz;
-    errno = ENOSYS; // Function not implemented
+    if (sz) errno = ENOSYS; // Function not implemented
+    else Aligned_free(ptr);
     return NULL;
 }
 
@@ -239,7 +264,7 @@ size_t Fwrite_unlocked(const void *ptr, size_t sz, size_t cnt, FILE *file)
 
 int Fflush_unlocked(FILE *file)
 {
-    return flush(file);
+    return fflush(file);
 }
 
 #   endif
@@ -309,6 +334,13 @@ uint64_t get_time()
 }
 
 #endif
+
+void *Realloc(void *ptr, size_t sz)
+{
+    if (sz) return realloc(ptr, sz);
+    free(ptr);
+    return NULL;
+}
 
 int Fclose(FILE *f)
 {

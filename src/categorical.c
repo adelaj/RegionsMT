@@ -298,11 +298,11 @@ bool outer_combined_init(size_t *outer, size_t *xmar, size_t *ymar, size_t mar, 
         outer_init(outer, xmar, ymar, dimx, dimy);
         return 1;
     }
-    size_t lim = 5 * mar;
+    size_t hint = 5 * mar;
     for (size_t i = 0; i < dimy; i++) for (size_t j = 0; j < dimx; j++)
     {
         size_t tmp = xmar[j] * ymar[i];
-        if (tmp >= lim) outer[j + dimx * i] = tmp;
+        if (tmp >= hint) outer[j + dimx * i] = tmp;
         else return 0;
     }
     return 1;

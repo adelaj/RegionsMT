@@ -524,7 +524,7 @@ struct array_result hash_table_init(struct hash_table *tbl, size_t cnt, size_t s
             res = array_init(&tbl->flags, NULL, NIBBLE_CNT(cnt), sizeof(*tbl->flags), 0, ARRAY_CLEAR | ARRAY_STRICT);
             if (res.status)
             {
-                tbl->cnt = tbl->tot = tbl->lim = 0;
+                tbl->cnt = tbl->tot = tbl->hint = 0;
                 tbl->lcap = lcnt;
                 return (struct array_result) { .status = ARRAY_SUCCESS, .tot = size_add_sat(tot, res.tot) };
             }
@@ -611,7 +611,7 @@ static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt
     tbl->flags = flags;
     tbl->lcap = lcnt;
     tbl->tot = tbl->cnt;
-    tbl->lim = (size_t) ((double) cnt * .77 + .5); // Magic constants from the 'khash.h'
+    tbl->hint = (size_t) ((double) cnt * .77 + .5); // Magic constants from the 'khash.h'
     return res;
 }
 
@@ -619,7 +619,7 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
 {
     struct array_result res = { .status = 1 };
     size_t cap = (size_t) 1 << tbl->lcap;
-    if (tbl->tot >= tbl->lim)
+    if (tbl->tot >= tbl->hint)
     {
         size_t lcnt;
         if ((cap >> 1) <= tbl->cnt)

@@ -57,8 +57,9 @@ typedef struct { va_list va_list; } Va_list;
 #define Aligned_alloca(SZ, ALIGN) ((void *) ((((uintptr_t) Alloca((SZ) + (ALIGN) - 1) + (ALIGN) - 1) / (ALIGN)) * (ALIGN)))
 
 // Aligned memory allocation/deallocation
+void *Realloc(void *, size_t); // Releases the memory when size is zero
 void *Aligned_malloc(size_t, size_t);
-void *Aligned_realloc(void *, size_t, size_t); // Warning! This function returns NULL on all platforms except Windows!
+void *Aligned_realloc(void *, size_t, size_t); // Warning! This function returns NULL on all platforms except Windows! However, releases the memory when size is zero
 void *Aligned_calloc(size_t, size_t, size_t);
 void Aligned_free(void *);
 

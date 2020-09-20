@@ -16,7 +16,7 @@ $(call var_reg,gcc-ranlib$$$$(call tcv,$$$$2),,RANLIB,$(filter gcc%,$(CC_TOOLCHA
 $(call var_reg,llvm-ranlib$$$$(call tcv,$$$$2),,RANLIB,$(filter clang%,$(CC_TOOLCHAIN)))
 
 # <VAR>:<TARGET>:<TOOLCHAIN>:<ARCH>:<CONFIG>
-$(call var_reg,-std=c11 -Wall -mavx,$$1,CFLAGS:%,$(CC_TOOLCHAIN),%:%)
+$(call var_reg,-std=c17 -Wall -mavx,$$1,CFLAGS:%,$(CC_TOOLCHAIN),%:%)
 $(call var_reg,-m32,$$1,CFLAGS LDFLAGS,%,$(CC_TOOLCHAIN),i386 i686,%)
 $(call var_reg,-m64 -mcx16,$$1,CFLAGS LDFLAGS,%,$(CC_TOOLCHAIN),x86_64:%)
 $(call var_reg,-O3 -flto,$$1,CFLAGS LDFLAGS,%,$(CC_TOOLCHAIN),%:Release)
@@ -38,7 +38,7 @@ $(call var_reg,-lucrt,$$1,LDLIB:%,$(filter clang@mingw%,$(CC_TOOLCHAIN)),%:%)
 $(call var_reg,-Wl$$$$(COMMA)--large-address-aware,$$1,LDFLAGS:%,$(call ftrin,@mingw,$(CC_TOOLCHAIN)),i386 i686,%)
 
 # Warning! Add "/D_DLL" if using "/MD" instead of "/MT"
-$(call var_reg,/MP /arch:AVX /volatile:ms /D_UNICODE /D_CRT_SECURE_NO_WARNINGS,$$1,CFLAGS:%:msvc:%:%)
+$(call var_reg,/Zc:preprocessor /std:c17 /MP /arch:AVX /volatile:ms /D_UNICODE /D_CRT_SECURE_NO_WARNINGS,$$1,CFLAGS:%:msvc:%:%)
 $(call var_reg,/MTd /Od /RTC1 /Zi /FS /D_DEBUG,$$1,CFLAGS:%:msvc:%:Debug)
 $(call var_reg,/D_DLL /MD /GL /O2,$$1,CFLAGS:%:msvc:%:Release)
 $(call var_reg,/LTCG,$$1,LDFLAGS ARFLAGS,%:msvc:%:Release)

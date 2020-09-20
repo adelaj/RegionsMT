@@ -31,7 +31,7 @@ static void *Aligned_realloc_impl(void *ptr, size_t *restrict p_cap, size_t al, 
     (void) p_cap;
     return Aligned_realloc(ptr, al, tot);
 #else
-    if (!p_cap) return Aligned_realloc(ptr, al, tot); // This will return 'NULL' and set 'errno'
+    if (!p_cap || !tot) return Aligned_realloc(ptr, al, tot); // This will return 'NULL' and set 'errno' if 'tot' is non-zero and release memory otherwise
     void *res = Aligned_malloc(al, tot);
     if (!res) return NULL;
     memcpy(res, ptr, *p_cap);
@@ -55,7 +55,7 @@ struct array_result array_init_impl(void *p_Src, size_t *restrict p_cap, size_t 
         {
             if (!(flags & ARRAY_REDUCE)) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
             size_t tot = cnt * sz + diff; // No checks for overflows
-            void *res = flags & ARRAY_ALIGN ? Aligned_realloc_impl(src, p_cap, al, tot) : realloc(src, tot); // Array shrinking
+            void *res = flags & ARRAY_ALIGN ? Aligned_realloc_impl(src, p_cap, al, tot) : Realloc(src, tot); // Array shrinking; when 'tot' is zero memory is released
             if (tot && !res) return (struct array_result) { .error = ARRAY_OUT_OF_MEMORY, .tot = tot };
             *p_cap = cnt;
             *p_src = res;
@@ -74,7 +74,7 @@ struct array_result array_init_impl(void *p_Src, size_t *restrict p_cap, size_t 
     void *res;
     if (src && (flags & ARRAY_REALLOC))
     {
-        res = flags & ARRAY_ALIGN ? Aligned_realloc_impl(src, p_cap, al, tot) : realloc(src, tot);
+        res = flags & ARRAY_ALIGN ? Aligned_realloc_impl(src, p_cap, al, tot) : Realloc(src, tot); // When 'tot' is zero memory is released
         if (res && p_cap && (flags & ARRAY_CLEAR))
         {
             size_t off = *p_cap * sz + diff;

@@ -80,7 +80,7 @@ void sort_mt_dispose(struct sort_mt *arg)
 struct sort_mt {
     void *arr;
     size_t cnt;
-    alignas(DSIZE_ALIGN) volatile Dsize_t ran[];
+    alignas(sizeof(Dsize_t)) volatile Dsize_t ran[];
 };
 
 static unsigned sort_thread(void *Ind, void *Data, void *tls)

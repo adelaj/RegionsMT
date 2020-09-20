@@ -57,15 +57,14 @@ bool empty_handler(const char *str, size_t len, void *Ptr, void *Context)
     return 1;
 }
 
-bool p_str_handler(const char *str, size_t len, void *Ptr, void *context)
+bool p_str_handler(const char *str, size_t len, void *Ptr, void *Context)
 {
-    (void) context;
     (void) len;
-    const char **ptr = Ptr;
-    *ptr = str;
-    return 1;
+    *(const char **) Ptr = str;
+    return empty_handler(str, len, Ptr, Context);
 }
 
+// Deprecated!
 bool str_handler(const char *str, size_t len, void *Ptr, void *context)
 {
     (void) context;

@@ -87,6 +87,7 @@ $(EP213).log: $$(PREFIX)/$$1/CMakeLists.txt $$(call fetch_var2,CREQ $(ER123),. $
     $$(strip $(CMAKE) \
     -G "Visual Studio 16 2019" \
     -A "$$(@F:.log=)" \
+    -D CMAKE_GENERATOR_INSTANCE="C:\Program Files (x86)\Microsoft Visual Studio\2019\Preview" \
     -D CMAKE_C_FLAGS_RELEASE="$(strip $(call fetch_var,CFLAGS $(R123) Release) $(MSVC_CREQ))" \
     -D CMAKE_C_FLAGS_DEBUG="$(strip $(call fetch_var,CFLAGS $(R123) Debug) $(MSVC_CREQ))" \
     -D CMAKE_EXE_LINKER_FLAGS_RELEASE="$(strip $(call fetch_var,LDFLAGS $(R123) Release) $(MSVC_LDREQ_RELEASE))" \

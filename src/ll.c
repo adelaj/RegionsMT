@@ -241,35 +241,35 @@ DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize, long long, _InterlockedComp
 
 size_t size_shl(size_t *p_hi, size_t x, uint8_t y)
 {
-    Dsize_t val = (Dsize_t) x << (y % SIZE_BIT);
+    Dsize_t val = DSIZELC(x) << (y % SIZE_BIT);
     *p_hi = DSIZE_HI(val);
     return DSIZE_LO(val);
 }
 
 size_t size_shr(size_t *p_lo, size_t x, uint8_t y)
 {
-    Dsize_t val = ((Dsize_t) x << SIZE_BIT) >> (y % SIZE_BIT);
+    Dsize_t val = DSIZEHC(x) >> (y % SIZE_BIT);
     *p_lo = DSIZE_LO(val);
     return DSIZE_HI(val);
 }
 
 size_t size_mul(size_t *p_hi, size_t x, size_t y)
 {
-    Dsize_t val = (Dsize_t) x * (Dsize_t) y;
+    Dsize_t val = DSIZELC(x) * DSIZELC(y);
     *p_hi = DSIZE_HI(val);
     return DSIZE_LO(val);
 }
 
 size_t size_add(size_t *p_car, size_t x, size_t y)
 {
-    Dsize_t val = (Dsize_t) x + (Dsize_t) y;
+    Dsize_t val = DSIZELC(x) + DSIZELC(y);
     *p_car = DSIZE_HI(val);
     return DSIZE_LO(val);
 }
 
 size_t size_sub(size_t *p_bor, size_t x, size_t y)
 {
-    Dsize_t val = (Dsize_t) x - (Dsize_t) y;
+    Dsize_t val = DSIZELC(x) - DSIZELC(y);
     *p_bor = 0 - DSIZE_HI(val);
     return DSIZE_LO(val);
 }

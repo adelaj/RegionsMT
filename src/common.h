@@ -7,32 +7,21 @@
 #ifdef _MSC_BUILD
 #   if !(defined __GNUC__ || defined __clang__) // In the case of the clang usage
 //      Suppressing some MSVS warnings
-#       pragma warning(disable : 4116) // "Unnamed type definition in parentheses"
+//#       pragma warning(disable : 4116) // "Unnamed type definition in parentheses"
 #       pragma warning(disable : 4200) // "Zero-sized array in structure/union"
 #       pragma warning(disable : 4201) // "Nameless structure/union"
-#       pragma warning(disable : 4204) // "Non-constant aggregate initializer"
+//#       pragma warning(disable : 4204) // "Non-constant aggregate initializer"
 #       pragma warning(disable : 4221) // "Initialization by using the address of automatic variable"
 //#       pragma warning(disable : 4090) // "'=': different 'const' qualifiers" -- gives some false-positives
 //#       pragma warning(disable : 4706) // "Assignment within conditional expression"
-#       define restrict __restrict
-#       define inline __inline
-#       define alignof __alignof
-#       define alignas(N) __declspec(align(N)) // Warning! This do not handle expressions, only numeric literals
-#       define _Static_assert static_assert
-#       define _Thread_local __declspec(thread)
 #   endif
 #endif
 
-#if defined __GNUC__ || defined __clang__
-#   include <stdalign.h>
-#endif
-
+#include <stdalign.h>
 #include <limits.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <stddef.h>
-
-//_Static_assert((uintptr_t) NULL == 0, "Null pointer does not have zero representation!");
 
 #define MAX(a, b) \
     ((a) >= (b) ? (a) : (b))
@@ -61,8 +50,8 @@
 #define ARG(T, ...) ((T []) { __VA_ARGS__ }), countof(((T []) { __VA_ARGS__ }))
 
 // Convert value (which is often represented by a macro) to the string literal
-#define TOSTRING_EXPAND(Z) #Z
-#define TOSTRING(Z) TOSTRING_EXPAND(Z)
+#define TOSTR_IMPL(Z) #Z
+#define TOSTR(Z) TOSTR_IMPL(Z)
 
 #define STRC(STR) ((char *) (STR)), lengthof(STR)
 #define STRI(STR) { STRC(STR) }
@@ -79,15 +68,21 @@
 #define BLOCK_WRITE 4096
 
 // Common value for the size of temporary buffer used for file reading
-// Warning! Some routines make special assumption about this value!
 #define BLOCK_READ 4096
 
-// Constants for linear congruential generator
-#if defined _M_X64 || defined __x86_64__
-// These constants are suggested by D. E. Knuth
-#   define LCG_MUL 6364136223846793005llu
-#   define LCG_INC 1442695040888963407llu
-#elif defined _M_IX86 || defined __i386__
-#   define LCG_MUL 22695477u
-#   define LCG_INC 1u
-#endif
+// Argument default promotion
+#define TYPE_TO_EXPR(T) (1 ? *((T *) NULL) : *((T *) NULL))
+#define ADP(T) _Generic(TYPE_TO_EXPR(T), \
+    float: double, \
+    double: double, \
+    bool: bool, \
+    char: char, \
+    signed char: signed char, \
+    int: int, \
+    long: long, \
+    long long: long long, \
+    unsigned char: unsigned char, \
+    unsigned: unsigned, \
+    unsigned long: unsigned long, \
+    unsigned long long: unsigned long long, \
+    default: T)   

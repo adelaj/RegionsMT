@@ -141,19 +141,37 @@ enum fmt_flt_flags {
     FLT_FLAG_UPPERCASE = 2
 };
 
+/*
+enum fmt_flags2 {
+    FMT_ARG_PTR = 1, // '@' -- fetch args from 'Va_list *' passed through the next argument 
+    FMT_LIST_PTR = 2, // '@@' -- fetch args from 'void *[]' passed through the next argument
+    FMT_RETAIN_ARG = 4, // ^ 
+    FMT_CONDITIONAL = 8, // ?
+    FMT_CONDITIONAL_NOT = 4, // ??
+    FMT_OVERPRINT = 8,
+    FMT_QUOTE_SELECT = 16,
+    FMT_QUOTE_SINGLE = 32,
+    FMT_QUOTE_DOUBLE = 64,
+    FMT_ENV = 128,
+    FMT_ENV_USER = 256,
+    FMT_ARG_PTR = 512,
+    FMT_LEFT_JUSTIFY = 2048,
+};
+*/
+
 enum fmt_flags {
-    FMT_CONDITIONAL = 1,
-    FMT_CONDITIONAL_NOT = 2,
-    FMT_OVERPRINT =  4,
-    FMT_QUOTE_SELECT = 8,
-    FMT_QUOTE_SINGLE = 16,
-    FMT_QUOTE_DOUBLE = 32,
-    FMT_LEFT_JUSTIFY = 64,
+    FMT_COPY_ARGS = 1,
+    FMT_CONDITIONAL = 2,
+    FMT_CONDITIONAL_NOT = 4,
+    FMT_OVERPRINT =  8,
+    FMT_QUOTE_SELECT = 16,
+    FMT_QUOTE_SINGLE = 32,
+    FMT_QUOTE_DOUBLE = 64,
     FMT_ENV = 128,
     FMT_ENV_USER = 256,
     FMT_ARG_PTR = 512,
     FMT_LIST_PTR = 1024,
-    FMT_COPY_ARGS = 2048
+    FMT_LEFT_JUSTIFY = 2048,
 };
 
 enum fmt_arg_mode {
@@ -165,7 +183,10 @@ enum fmt_arg_mode {
 struct fmt_result {
     enum fmt_flags flags;
     enum fmt_type type;
-    size_t wd;
+    struct {
+        enum fmt_arg_mode mode;
+        size_t len;
+    } box_arg;
     union {
         struct {
             enum fmt_int_spec spec;
@@ -291,39 +312,43 @@ static struct message_result fmt_decode_utf(uint32_t *p_val, enum fmt_arg_mode *
     return MESSAGE_SUCCESS;
 }
 
+#define TRY_FLAG(CMP, SET, DEFAULT) ((CMP) & (SET) ? (DEFAULT) : (SET))
+#define TRY_FLAG2(CMP, SET1, SET2, DEFAULT) TRY_FLAG((CMP), (SET1), TRY_FLAG((CMP), (SET2), (DEFAULT)))
+
 static struct message_result fmt_decode(struct fmt_result *res, const char *fmt, size_t *p_pos)
 {
     size_t pos = *p_pos;
-    memset(res, 0, sizeof(*res));
+    *res = (struct fmt_result) { 0 };
     struct message_result message_res = MESSAGE_SUCCESS;
     for (;; pos++)
     {
         enum fmt_flags tmp = 0;
         switch (fmt[pos])
         {
+        // Warning! Cases should be sorted according to the flag values.
         case '^':
-            tmp = FMT_COPY_ARGS;
+            tmp = TRY_FLAG(res->flags, FMT_COPY_ARGS, 0);
             break;
         case '?':
-            tmp = res->flags & FMT_CONDITIONAL ? res->flags & FMT_CONDITIONAL_NOT ? 0 : FMT_CONDITIONAL_NOT : FMT_CONDITIONAL;
+            tmp = TRY_FLAG2(res->flags, FMT_CONDITIONAL, FMT_CONDITIONAL_NOT, 0);
             break;
         case '!':
-            tmp = FMT_OVERPRINT;
+            tmp = TRY_FLAG(res->flags, FMT_OVERPRINT, 0);
             break;        
         case '\'':
-            tmp = res->flags & FMT_QUOTE_SELECT ? res->flags & FMT_QUOTE_SINGLE ? 0 : FMT_QUOTE_SINGLE : FMT_QUOTE_SELECT;
+            tmp = TRY_FLAG2(res->flags, FMT_QUOTE_SELECT, FMT_QUOTE_SINGLE, 0);
             break;
-        case '\"':
-            tmp = FMT_QUOTE_DOUBLE;
+        case '\"': // Warning! "\'\'" and "\"" sequences are incompatible 
+            tmp = res->flags & FMT_QUOTE_SINGLE ? 0 : FMT_QUOTE_DOUBLE;
             break;
         case '~':
-            tmp = res->flags & FMT_ENV ? res->flags & FMT_ENV_USER ? 0 : FMT_ENV_USER : FMT_ENV;
-            break;
-        case '-':
-            tmp = FMT_LEFT_JUSTIFY;
+            tmp = TRY_FLAG2(res->flags, FMT_ENV, FMT_ENV_USER, 0);
             break;
         case '@':
-            tmp = res->flags & FMT_ARG_PTR ? res->flags & FMT_LIST_PTR ? 0 : FMT_LIST_PTR : FMT_ARG_PTR;
+            tmp = TRY_FLAG2(res->flags, FMT_ARG_PTR, FMT_LIST_PTR, 0);
+            break;
+        case '-':
+            tmp = TRY_FLAG(res->flags, FMT_LEFT_JUSTIFY, 0);
             break;
         }
         if (!tmp) break;
@@ -583,8 +608,8 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
             list_ptr = ptr;
         }
         //list_copy = res.flags & FMT_COPY_ARGS;
-        //if (res.flags & FMT_COPY_ARGS) ft |= FMT_EXE_FLAG_COPY_ARG;
-        if ((res.flags & FMT_CONDITIONAL) && (bool_arg_fetch(p_arg_copy, list_ptr) == !(res.flags & FMT_CONDITIONAL_NOT))) execute_flags |= FMT_EXE_FLAG_PHONY;
+        //if (res.flags & FMT_COPY_ARGS) execute_flags |= FMT_EXE_FLAG_COPY_ARG;
+        if ((res.flags & FMT_CONDITIONAL) && (!bool_arg_fetch(p_arg_copy, list_ptr) == !(res.flags & FMT_CONDITIONAL_NOT))) execute_flags |= FMT_EXE_FLAG_PHONY;
         if (res.flags & FMT_ENV_USER) env = env_ptr_arg_fetch(p_arg_copy, list_ptr);
         else if (style && (res.flags & FMT_ENV)) switch (res.type)
         {
@@ -730,7 +755,7 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
                 j = SIZE_MAX;
             } 
         }
-        if (res.flags & FMT_ARG_PTR) Va_end(arg_sub);
+        if ((res.flags & FMT_ARG_PTR) && !(res.flags & FMT_LIST_PTR)) Va_end(arg_sub);
         if (!message_res.status) return message_res;
         if (!tmp) i = SIZE_MAX;
         break;
@@ -759,67 +784,82 @@ struct message_result print_fmt(char *buff, size_t *p_cnt, const struct style *s
 }
 
 // Last argument may be 'NULL'
-bool log_init(struct log *restrict log, const char *restrict path, size_t lim, enum log_flags flags, const struct ttl_style *restrict ttl_style, const struct style *restrict style, struct log *restrict fallback)
+bool log_init(struct log *restrict log, const char *restrict path, size_t hint, enum log_flags flags, const struct ttl_style *restrict ttl_style, const struct style *restrict style, struct log *restrict fallback)
 {
     FILE *f = path ? Fopen(path, flags & LOG_APPEND ? "a" : "w") : Fdup(stderr, "a");
     if (!fopen_assert(fallback, CODE_METRIC, path, f)) return 0;
     if (!setvbuf(f, NULL, _IONBF, 0))
     {
-        bool tty = (flags & (LOG_FORCE_TTY)) || Fisatty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
-        size_t cap = bom ? MAX(lim, lengthof(UTF8_BOM)) : lim;
-        if (array_assert(fallback, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)))
+        log->mutex = NULL;
+        if (!(flags & LOG_WRITE_LOCK) || (
+            array_assert(fallback, CODE_METRIC, array_init(&log->mutex, NULL, 1, sizeof(*log->mutex), 0, ARRAY_FAILSAFE)) &&
+            thread_assert(fallback, CODE_METRIC, mutex_init(log->mutex))))
         {
-            if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
-            else log->cnt = 0;
-            log->ttl_style = tty ? ttl_style : NULL;
-            log->style = tty ? style : NULL;
-            log->lim = lim;
-            log->file = f;
-            log->tot = 0;
-            log->fallback = fallback;
-            if (log->cnt < log->lim || log_flush(log)) return 1;
-            free(log->buff);
+            bool tty = (flags & (LOG_FORCE_TTY)) || Fisatty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
+            size_t cap = bom ? MAX(hint, lengthof(UTF8_BOM)) : hint;
+            if (array_assert(fallback, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)))
+            {
+                if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
+                else log->cnt = 0;
+                log->ttl_style = tty ? ttl_style : NULL;
+                log->style = tty ? style : NULL;
+                log->hint = hint;
+                log->file = f;
+                log->tot = 0;
+                log->fallback = fallback;
+                if (log->cnt <= log->hint || log_flush(log, 0)) return 1;
+                free(log->buff);
+            }
+            mutex_close(log->mutex);
         }
+        free(log->mutex);
     }
     Fclose(f);
     return 0;
 }
 
-bool log_dup(struct log *restrict dst, struct log *restrict src)
+bool log_mirror_init(struct log *restrict dst, struct log *restrict src)
 {
-    FILE *f = Fdup(src->file, "a");
-    if (!crt_assert(src, CODE_METRIC, f)) return 0;
-    if (!setvbuf(f, NULL, _IONBF, 0) &&
-        array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->lim, sizeof(*dst->buff), 0, 0)))
-    {
-        dst->cnt = 0;
-        dst->ttl_style = src->ttl_style;
-        dst->style = src->style;
-        dst->lim = src->lim;
-        dst->file = f;
-        dst->tot = 0;
-        dst->fallback = NULL; // User should set this manually
-        return 1;
-    }
-    Fclose(f);
-    return 0;
+    if (!log_flush(src, 0) ||
+        !array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->hint, sizeof(*dst->buff), 0, 0))) return 0;
+    dst->cnt = 0;
+    dst->ttl_style = src->ttl_style;
+    dst->style = src->style;
+    dst->hint = src->hint;
+    dst->file = src->file;
+    dst->tot = 0;
+    dst->mutex = src->mutex;
+    dst->fallback = src->fallback;
+    return 1;
 }
 
-bool log_flush(struct log *restrict log)
+bool log_flush(struct log *restrict log, bool lock)
 {
     size_t cnt = log->cnt;
     if (!cnt) return 1;
-    size_t wr = fwrite(log->buff, sizeof(*log->buff), cnt, log->file);
+    if (lock && log->mutex) mutex_acquire(log->mutex);
+    size_t wr = Fwrite_unlocked(log->buff, sizeof(*log->buff), cnt, log->file);
+    int res = Fflush_unlocked(log->file);
+    if (lock && log->mutex) mutex_release(log->mutex);
     log->tot += wr;
     log->cnt = 0;
-    return wr == cnt;
+    return wr == cnt && crt_assert(log->fallback, CODE_METRIC, !res);
 }
 
-// May be used for 'log' filled with zeros manually
 void log_close(struct log *restrict log)
 {
-    log_flush(log);
+    if (!log) return;
+    log_flush(log, 0);
     Fclose(log->file);
+    mutex_close(log->mutex);
+    free(log->mutex);
+    free(log->buff);
+}
+
+void log_mirror_close(struct log *restrict log)
+{
+    if (!log) return;
+    log_flush(log, 0);
     free(log->buff);
 }
 
@@ -845,6 +885,7 @@ static bool log_fallback(struct log *log, struct code_metric metric_src, struct 
 static bool log_message_impl(struct log *restrict log, struct code_metric metric, enum message_type type, union message_callback handler, void *context, Va_list *p_arg)
 {
     if (!log) return 1;
+    if (!log->fallback && log->mutex) mutex_acquire(log->mutex);
     size_t cnt = log->cnt;
     for (unsigned i = 0; i < 2; i++) for (;;)
     {
@@ -877,7 +918,9 @@ static bool log_message_impl(struct log *restrict log, struct code_metric metric
         break;
     }
     log->cnt = cnt;
-    return cnt >= log->lim ? log_flush(log) : 1;
+    bool res =  cnt > log->hint ? log_flush(log, log->fallback) : 1;
+    if (!log->fallback && log->mutex) mutex_release(log->mutex);
+    return res;
 }
 
 bool log_message(struct log *restrict log, struct code_metric code_metric, enum message_type type, message_callback handler, void *context)

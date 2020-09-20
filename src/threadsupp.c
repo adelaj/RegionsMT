@@ -2,192 +2,192 @@
 #include "threadsupp.h"
 #undef VERBOSE
 
-#if (defined _WIN32 || defined _WIN64) && !defined FORCE_POSIX_THREADS
+#if defined _WIN32 && !defined FORCE_POSIX_THREADS
 
 bool thread_assert(struct log *log, struct code_metric code_metric, Errno_t res)
 {
     return wapi_assert(log, code_metric, !res);
 }
 
-Errno_t thread_init(struct thread *p_thread, thread_callback callback, void *args)
+Errno_t thread_init(struct thread *thread, thread_callback callback, void *args)
 {
     struct thread res = (struct thread) { _beginthreadex(NULL, 0, callback, args, 0, NULL) };
     if (!res.thread || res.thread == (uintptr_t) INVALID_HANDLE_VALUE) return errno;
-    *p_thread = res;
+    *thread = res;
     return 0;
 }
 
-Errno_t thread_wait(struct thread *p_thread, thread_return *p_out)
+Errno_t thread_wait(struct thread *thread, thread_return *p_out)
 {
-    return !(WaitForSingleObject((HANDLE) p_thread->thread, INFINITE) && GetExitCodeThread((HANDLE) p_thread->thread, (LPDWORD) p_out));
+    return !(WaitForSingleObject((HANDLE) thread->thread, INFINITE) && GetExitCodeThread((HANDLE) thread->thread, (LPDWORD) p_out));
 }
 
-Errno_t thread_close(struct thread *p_thread)
+Errno_t thread_close(struct thread *thread)
 {
-    return p_thread && !CloseHandle((HANDLE) p_thread->thread);
+    return thread && !CloseHandle((HANDLE) thread->thread);
 }
 
-Errno_t mutex_init(struct mutex *p_mutex)
+Errno_t mutex_init(struct mutex *mutex)
 {
-    return !InitializeCriticalSectionAndSpinCount(&p_mutex->mutex, 0x400);
+    return !InitializeCriticalSectionAndSpinCount(&mutex->mutex, 0x400);
 }
 
-Errno_t mutex_acquire(struct mutex *p_mutex)
+Errno_t mutex_acquire(struct mutex *mutex)
 {
-    EnterCriticalSection(&p_mutex->mutex);
+    EnterCriticalSection(&mutex->mutex);
     return 0;
 }
 
-Errno_t mutex_release(struct mutex *p_mutex)
+Errno_t mutex_release(struct mutex *mutex)
 {
-    LeaveCriticalSection(&p_mutex->mutex);
+    LeaveCriticalSection(&mutex->mutex);
     return 0;
 }
 
-Errno_t mutex_close(struct mutex *p_mutex)
+Errno_t mutex_close(struct mutex *mutex)
 {
-    if (p_mutex) DeleteCriticalSection(&p_mutex->mutex);
+    if (mutex) DeleteCriticalSection(&mutex->mutex);
     return 0;
 }
 
-Errno_t condition_init(struct condition *p_condition)
+Errno_t condition_init(struct condition *condition)
 {
-    InitializeConditionVariable(&p_condition->condition);
+    InitializeConditionVariable(&condition->condition);
     return 0;
 }
 
-Errno_t condition_signal(struct condition *p_condition)
+Errno_t condition_signal(struct condition *condition)
 {
-    WakeConditionVariable(&p_condition->condition);
+    WakeConditionVariable(&condition->condition);
     return 0;
 }
 
-Errno_t condition_broadcast(struct condition *p_condition)
+Errno_t condition_broadcast(struct condition *condition)
 {
-    WakeAllConditionVariable(&p_condition->condition);
+    WakeAllConditionVariable(&condition->condition);
     return 0;
 }
 
-Errno_t condition_sleep(struct condition *p_condition, struct mutex *p_mutex)
+Errno_t condition_sleep(struct condition *condition, struct mutex *mutex)
 {
-    return !SleepConditionVariableCS(&p_condition->condition, &p_mutex->mutex, INFINITE);
+    return !SleepConditionVariableCS(&condition->condition, &mutex->mutex, INFINITE);
 }
 
-Errno_t condition_close(struct condition *p_condition)
+Errno_t condition_close(struct condition *condition)
 {
-    (void) p_condition;
+    (void) condition;
     return 0;
 }
 
-Errno_t tls_init(struct tls *p_tls)
+Errno_t tls_init(struct tls *tls)
 {
     struct tls res = (struct tls) { TlsAlloc() };
     if (res.tls == TLS_OUT_OF_INDEXES) return 1;
-    *p_tls = res;
+    *tls = res;
     return 0;
 }
 
-Errno_t tls_assign(struct tls *p_tls, void *ptr)
+Errno_t tls_assign(struct tls *tls, void *ptr)
 {
-    return !TlsSetValue(p_tls->tls, ptr);
+    return !TlsSetValue(tls->tls, ptr);
 }
 
-void *tls_fetch(struct tls *p_tls)
+void *tls_fetch(struct tls *tls)
 {
-    return TlsGetValue(p_tls->tls);
+    return TlsGetValue(tls->tls);
 }
 
-Errno_t tls_close(struct tls *p_tls)
+Errno_t tls_close(struct tls *tls)
 {
-    return !TlsFree(p_tls->tls);
+    return !TlsFree(tls->tls);
 }
 
-#elif defined __unix__ || defined __APPLE__ || ((defined _WIN32 || defined _WIN64) && defined FORCE_POSIX_THREADS)
+#elif defined __unix__ || defined __APPLE__ || (defined _WIN32 && defined FORCE_POSIX_THREADS)
 
 bool thread_assert(struct log *log, struct code_metric code_metric, Errno_t res)
 {
     return crt_assert_impl(log, code_metric, res);
 }
 
-Errno_t thread_init(struct thread *p_thread, thread_callback callback, void *args)
+Errno_t thread_init(struct thread *thread, thread_callback callback, void *args)
 {
-    return pthread_create(&p_thread->thread, NULL, callback, args);
+    return pthread_create(&thread->thread, NULL, callback, args);
 }
 
-Errno_t thread_wait(struct thread *p_thread, thread_return *p_out)
+Errno_t thread_wait(struct thread *thread, thread_return *p_out)
 {
-    return pthread_join(p_thread->thread, p_out);
+    return pthread_join(thread->thread, p_out);
 }
 
-Errno_t thread_close(struct thread *p_thread)
+Errno_t thread_close(struct thread *thread)
 {
-    (void) p_thread;
+    (void) thread;
     return 0;
 }
 
-Errno_t mutex_init(struct mutex *p_mutex)
+Errno_t mutex_init(struct mutex *mutex)
 {
-    return pthread_mutex_init(&p_mutex->mutex, NULL);
+    return pthread_mutex_init(&mutex->mutex, NULL);
 }
 
-Errno_t mutex_acquire(struct mutex *p_mutex)
+Errno_t mutex_acquire(struct mutex *mutex)
 {
-    return pthread_mutex_lock(&p_mutex->mutex);
+    return pthread_mutex_lock(&mutex->mutex);
 }
 
-Errno_t mutex_release(struct mutex *p_mutex)
+Errno_t mutex_release(struct mutex *mutex)
 {
-    return pthread_mutex_unlock(&p_mutex->mutex);
+    return pthread_mutex_unlock(&mutex->mutex);
 }
 
-Errno_t mutex_close(struct mutex *p_mutex)
+Errno_t mutex_close(struct mutex *mutex)
 {
-    return p_mutex ? pthread_mutex_destroy(&p_mutex->mutex) : 0;
+    return mutex ? pthread_mutex_destroy(&mutex->mutex) : 0;
 }
 
-Errno_t condition_init(struct condition *p_condition)
+Errno_t condition_init(struct condition *condition)
 {
-    return pthread_cond_init(&p_condition->condition, NULL);
+    return pthread_cond_init(&condition->condition, NULL);
 }
 
-Errno_t condition_signal(struct condition *p_condition)
+Errno_t condition_signal(struct condition *condition)
 {
-    return pthread_cond_signal(&p_condition->condition);
+    return pthread_cond_signal(&condition->condition);
 }
 
-Errno_t condition_broadcast(struct condition *p_condition)
+Errno_t condition_broadcast(struct condition *condition)
 {
-    return pthread_cond_broadcast(&p_condition->condition);
+    return pthread_cond_broadcast(&condition->condition);
 }
 
-Errno_t condition_sleep(struct condition *p_condition, struct mutex *p_mutex)
+Errno_t condition_sleep(struct condition *condition, struct mutex *mutex)
 {
-    return pthread_cond_wait(&p_condition->condition, &p_mutex->mutex);
+    return pthread_cond_wait(&condition->condition, &mutex->mutex);
 }
 
-Errno_t condition_close(struct condition *p_condition)
+Errno_t condition_close(struct condition *condition)
 {
-    return p_condition ? pthread_cond_destroy(&p_condition->condition) : 0;
+    return condition ? pthread_cond_destroy(&condition->condition) : 0;
 }
 
-Errno_t tls_init(struct tls *p_tls)
+Errno_t tls_init(struct tls *tls)
 {
-    return pthread_key_create(&p_tls->tls, NULL);
+    return pthread_key_create(&tls->tls, NULL);
 }
 
-Errno_t tls_assign(struct tls *p_tls, void *ptr)
+Errno_t tls_assign(struct tls *tls, void *ptr)
 {
-    return pthread_setspecific(p_tls->tls, ptr);
+    return pthread_setspecific(tls->tls, ptr);
 }
 
-void *tls_fetch(struct tls *p_tls)
+void *tls_fetch(struct tls *tls)
 {
-    return pthread_getspecific(p_tls->tls);
+    return pthread_getspecific(tls->tls);
 }
 
-Errno_t tls_close(struct tls *p_tls)
+Errno_t tls_close(struct tls *tls)
 {
-    return pthread_key_delete(p_tls->tls);
+    return pthread_key_delete(tls->tls);
 }
 
 #endif
