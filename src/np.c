@@ -133,9 +133,15 @@ bool Fisatty(FILE *f)
 
 int64_t Fsize(FILE *f)
 {
+<<<<<<< HEAD
     struct _stat64 st;
     if (!_fstat64(_fileno(f), &st)) return (int64_t) st.st_size;
     else return 0;
+=======
+    LARGE_INTEGER sz;
+    HANDLE ho = (HANDLE) _get_osfhandle(_fileno(f));
+    return ho && ho != INVALID_HANDLE_VALUE && GetFileSizeEx(ho, &sz) ? (int64_t) sz.QuadPart : 0;
+>>>>>>> 2fa3c4951c93e154eb4ce77eb424ca0c0561eb8c
 }
 
 Errno_t Strerror_s(char *buff, size_t cap, Errno_t code)

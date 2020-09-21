@@ -104,7 +104,11 @@ enum fmt_execute_flags {
 #define FG_BR_WHITE 97
 
 #define ENVI(BEGIN, END) { .begin = STRI(BEGIN), .end = STRI(END) }
+<<<<<<< HEAD
 #define ENVI_FG_EXT(BEGIN, COL, END) ENVI(ESC CSI SGR(TOSTR(COL)) BEGIN, END ESC CSI SGR(TOSTR(FG_RESET)))
+=======
+#define ENVI_FG_EXT(BEGIN, COL, END) ENVI(ESC CSI SGR(TOSTRING(COL)) BEGIN, END ESC CSI SGR(TOSTRING(FG_RESET)))
+>>>>>>> 2fa3c4951c93e154eb4ce77eb424ca0c0561eb8c
 #define ENVI_FG(COL) ENVI_FG_EXT("", COL, "")
 
 struct env {
