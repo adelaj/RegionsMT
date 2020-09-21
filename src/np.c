@@ -108,16 +108,11 @@ int64_t Ftelli64(FILE *file)
     !wcsncmp((WSTR), (CMP), (countof(CMP) - 1)) && \
     (WSTR += (countof(CMP) - 1), LEN -= (countof(CMP) - 1), 1))
 
-<<<<<<< HEAD
 // The implementation below is inspired by:
-=======
-// The method implemented below inspired by:
->>>>>>> 0d8271c... ...
 // https://github.com/k-takata/ptycheck
 // https://github.com/msys2/MINGW-packages/blob/master/mingw-w64-gcc/0140-gcc-8.2.0-diagnostic-color.patch
 bool Fisatty(FILE *f)
 {
-<<<<<<< HEAD
     int fd = _fileno(f);
     if (_isatty(fd)) return 1;
     DWORD mode;
@@ -133,41 +128,14 @@ bool Fisatty(FILE *f)
     if (tmp != 16 || !WSTR_CMP(wstr, len, L"-pty")) return 0; // Skip L"-pty"
     for (tmp = 0; len && iswdigit(*wstr); tmp++, wstr++, len--); // Skip at least one digit
     if (!tmp || (!WSTR_CMP(wstr, len, L"-from-master") && !WSTR_CMP(wstr, len, L"-to-master"))) return 0; // Skip suffix: L"-from-master" or L"-to-master"
-=======
-    if (_isatty(_fileno(f))) return 1;
-    DWORD mode;
-    HANDLE ho = (HANDLE) _get_osfhandle(_fileno(f));
-    if (ho != INVALID_HANDLE_VALUE && ho != NULL && GetConsoleMode(ho, &mode)) return 1;
-    if (GetFileType(ho) != FILE_TYPE_PIPE) return 0;
-    FILE_NAME_INFO *ni = Alloca(sizeof(FILE_NAME_INFO) + sizeof(WCHAR) * (MAX_PATH - 1));
-    if (!GetFileInformationByHandleEx(ho, FileNameInfo, ni, sizeof(WCHAR) * MAX_PATH)) return 0;
-    //wchar_t *wstr = Alloca(sizeof(*wstr) * (MAX_PATH + 1));
-    //size_t len = 
-    wchar_t *wstr = ni->FileName;
-    size_t len = ni->FileNameLength / sizeof(*wstr), tmp;
-    //wchar_t *wstr = L"\\msys-dd50a72ab4668b33-pty1-to-master";
-    //size_t len = 37, tmp;
-    // Compare with sample string: L"\\msys-dd50a72ab4668b33-pty1-to-master"
-    if (!WSTR_CMP(wstr, len, L"\\cygwin-") && !WSTR_CMP(wstr, len, L"\\msys-")) return 0; // Skip prefix L"\\cygwin-" or L"\\msys-"
-    for (tmp = 0; len && iswxdigit(*wstr); tmp++, wstr++, len--); // Skip 16 hexadimical digits
-    if (tmp != 16 || !WSTR_CMP(wstr, len, L"-pty")) return 0; // Skip L"-pty"
-    for (tmp = 0; len && iswdigit(*wstr); tmp++, wstr++, len--); // Skip number
-    if (!tmp || (!WSTR_CMP(wstr, len, L"-from-master") && !WSTR_CMP(wstr, len, L"-to-master"))) return 0; // Skip L"-from-master" or L"-to-master"
->>>>>>> 0d8271c... ...
     return !len;
 }
 
 int64_t Fsize(FILE *f)
 {
-<<<<<<< HEAD
     struct _stat64 st;
     if (!_fstat64(_fileno(f), &st)) return (int64_t) st.st_size;
     else return 0;
-=======
-    LARGE_INTEGER sz;
-    HANDLE ho = (HANDLE) _get_osfhandle(_fileno(f));
-    return ho && ho != INVALID_HANDLE_VALUE && GetFileSizeEx(ho, &sz) ? (int64_t) sz.QuadPart : 0;
->>>>>>> 2fa3c4951c93e154eb4ce77eb424ca0c0561eb8c
 }
 
 Errno_t Strerror_s(char *buff, size_t cap, Errno_t code)

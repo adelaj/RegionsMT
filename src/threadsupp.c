@@ -166,15 +166,9 @@ Errno_t condition_broadcast(struct condition *condition)
     return pthread_cond_broadcast(&condition->condition);
 }
 
-<<<<<<< HEAD
 Errno_t condition_sleep(struct condition *condition, struct mutex *mutex)
 {
     return pthread_cond_wait(&condition->condition, &mutex->mutex);
-=======
-Errno_t condition_sleep(struct condition *p_condition, struct mutex *mutex)
-{
-    return pthread_cond_wait(&p_condition->condition, &mutex->mutex);
->>>>>>> 2fa3c4951c93e154eb4ce77eb424ca0c0561eb8c
 }
 
 Errno_t condition_close(struct condition *condition)

@@ -790,7 +790,6 @@ bool log_init(struct log *restrict log, const char *restrict path, size_t hint, 
     if (!fopen_assert(fallback, CODE_METRIC, path, f)) return 0;
     if (!setvbuf(f, NULL, _IONBF, 0))
     {
-<<<<<<< HEAD
         log->mutex = NULL;
         if (!(flags & LOG_WRITE_LOCK) || (
             array_assert(fallback, CODE_METRIC, array_init(&log->mutex, NULL, 1, sizeof(*log->mutex), 0, ARRAY_FAILSAFE)) &&
@@ -798,22 +797,12 @@ bool log_init(struct log *restrict log, const char *restrict path, size_t hint, 
         {
             bool tty = (flags & (LOG_FORCE_TTY)) || Fisatty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
             size_t cap = bom ? MAX(hint, lengthof(UTF8_BOM)) : hint;
-=======
-        log->p_mutex = NULL;
-        if (!(flags & LOG_LOCKED) || (
-            array_assert(fallback, CODE_METRIC, array_init(&log->p_mutex, NULL, 1, sizeof(*log->p_mutex), 0, ARRAY_FAILSAFE)) &&
-            thread_assert(fallback, CODE_METRIC, mutex_init(log->p_mutex))))
-        {
-            bool tty = (flags & (LOG_FORCE_TTY)) || Fisatty(f), bom = !(tty || (flags & (LOG_NO_BOM | LOG_APPEND)));
-            size_t cap = bom ? MAX(lim, lengthof(UTF8_BOM)) : lim;
->>>>>>> 0d8271c... ...
             if (array_assert(fallback, CODE_METRIC, array_init(&log->buff, &log->cap, cap, sizeof(*log->buff), 0, 0)))
             {
                 if (bom) memcpy(log->buff, UTF8_BOM, (log->cnt = lengthof(UTF8_BOM)) * sizeof(*log->buff));
                 else log->cnt = 0;
                 log->ttl_style = tty ? ttl_style : NULL;
                 log->style = tty ? style : NULL;
-<<<<<<< HEAD
                 log->hint = hint;
                 log->file = f;
                 log->tot = 0;
@@ -824,18 +813,6 @@ bool log_init(struct log *restrict log, const char *restrict path, size_t hint, 
             mutex_close(log->mutex);
         }
         free(log->mutex);
-=======
-                log->lim = lim;
-                log->file = f;
-                log->tot = 0;
-                log->fallback = fallback;
-                if (log->cnt < log->lim || log_flush(log)) return 1;
-                free(log->buff);
-            }
-            mutex_close(log->p_mutex);
-        }
-        free(log->p_mutex);
->>>>>>> 0d8271c... ...
     }
     Fclose(f);
     return 0;
@@ -843,7 +820,6 @@ bool log_init(struct log *restrict log, const char *restrict path, size_t hint, 
 
 bool log_mirror_init(struct log *restrict dst, struct log *restrict src)
 {
-<<<<<<< HEAD
     if (!log_flush(src, 0) ||
         !array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->hint, sizeof(*dst->buff), 0, 0))) return 0;
     dst->cnt = 0;
@@ -854,17 +830,6 @@ bool log_mirror_init(struct log *restrict dst, struct log *restrict src)
     dst->tot = 0;
     dst->mutex = src->mutex;
     dst->fallback = src->fallback;
-=======
-    if (!array_assert(src, CODE_METRIC, array_init(&dst->buff, &dst->cap, src->lim, sizeof(*dst->buff), 0, 0))) return 0;
-    dst->cnt = 0;
-    dst->ttl_style = src->ttl_style;
-    dst->style = src->style;
-    dst->lim = src->lim;
-    dst->file = src->file;
-    dst->tot = 0;
-    dst->p_mutex = src->p_mutex;
-    dst->fallback = NULL; // User should set this manually
->>>>>>> 0d8271c... ...
     return 1;
 }
 
@@ -872,17 +837,10 @@ bool log_flush(struct log *restrict log, bool lock)
 {
     size_t cnt = log->cnt;
     if (!cnt) return 1;
-<<<<<<< HEAD
     if (lock && log->mutex) mutex_acquire(log->mutex);
     size_t wr = Fwrite_unlocked(log->buff, sizeof(*log->buff), cnt, log->file);
     int res = Fflush_unlocked(log->file);
     if (lock && log->mutex) mutex_release(log->mutex);
-=======
-    if (log->p_mutex) mutex_acquire(log->p_mutex);
-    size_t wr = Fwrite_unlocked(log->buff, sizeof(*log->buff), cnt, log->file);
-    int res = Fflush_unlocked(log->file);
-    if (log->p_mutex) mutex_release(log->p_mutex);
->>>>>>> 0d8271c... ...
     log->tot += wr;
     log->cnt = 0;
     return wr == cnt && crt_assert(log->fallback, CODE_METRIC, !res);
@@ -891,28 +849,17 @@ bool log_flush(struct log *restrict log, bool lock)
 void log_close(struct log *restrict log)
 {
     if (!log) return;
-<<<<<<< HEAD
     log_flush(log, 0);
     Fclose(log->file);
     mutex_close(log->mutex);
     free(log->mutex);
-=======
-    log_flush(log);
-    Fclose(log->file);
-    mutex_close(log->p_mutex);
-    free(log->p_mutex);
->>>>>>> 0d8271c... ...
     free(log->buff);
 }
 
 void log_mirror_close(struct log *restrict log)
 {
     if (!log) return;
-<<<<<<< HEAD
     log_flush(log, 0);
-=======
-    log_flush(log);
->>>>>>> 0d8271c... ...
     free(log->buff);
 }
 
