@@ -16,7 +16,7 @@ $(call var_reg,gcc-ranlib$$$$(call tcv,$$$$2),,RANLIB,$(filter gcc%,$(CC_TOOLCHA
 $(call var_reg,llvm-ranlib$$$$(call tcv,$$$$2),,RANLIB,$(filter clang%,$(CC_TOOLCHAIN)))
 
 # <VAR>:<TARGET>:<TOOLCHAIN>:<ARCH>:<CONFIG>
-$(call var_reg,-std=c17 -pedantic -Wall -Wextra -mavx,$$1,CFLAGS:%,$(CC_TOOLCHAIN),%:%)
+$(call var_reg,-std=c17 -Wall -mavx,$$1,CFLAGS:%,$(CC_TOOLCHAIN),%:%)
 $(call var_reg,-m32,$$1,CFLAGS LDFLAGS,%,$(CC_TOOLCHAIN),i386 i686,%)
 $(call var_reg,-m64 -mcx16,$$1,CFLAGS LDFLAGS,%,$(CC_TOOLCHAIN),x86_64:%)
 $(call var_reg,-O3 -flto,$$1,CFLAGS LDFLAGS,%,$(CC_TOOLCHAIN),%:Release)
