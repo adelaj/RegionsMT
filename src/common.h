@@ -1,22 +1,5 @@
 #pragma once
 
-//#ifndef _DEBUG
-//#   define NDEBUG
-//#endif
-
-#ifdef _MSC_BUILD
-#   if !(defined __GNUC__ || defined __clang__) // In the case of the clang usage
-//      Suppressing some MSVS warnings
-//#       pragma warning(disable : 4116) // "Unnamed type definition in parentheses"
-#       pragma warning(disable : 4200) // "Zero-sized array in structure/union"
-#       pragma warning(disable : 4201) // "Nameless structure/union"
-//#       pragma warning(disable : 4204) // "Non-constant aggregate initializer"
-#       pragma warning(disable : 4221) // "Initialization by using the address of automatic variable"
-//#       pragma warning(disable : 4090) // "'=': different 'const' qualifiers" -- gives some false-positives
-//#       pragma warning(disable : 4706) // "Assignment within conditional expression"
-#   endif
-#endif
-
 #include <stdalign.h>
 #include <limits.h>
 #include <stdbool.h>
@@ -86,3 +69,27 @@
     unsigned long: unsigned long, \
     unsigned long long: unsigned long long, \
     default: T)   
+
+#if defined __GNUC__ || defined __clang__
+#   define GPUSH _Pragma("GCC diagnostic push")
+#   define GWRN(WRN) _Pragma(TOSTR(GCC diagnostic ignored TOSTR(-W ## WRN)))
+#   define GPOP _Pragma("GCC diagnostic pop")
+#   define MPUSH
+#   define MWRN(WRN)
+#   define MPOP
+#elif defined _MSC_BUILD
+#   define GPUSH
+#   define GWRN(WRN)
+#   define GPOP
+#   define MPUSH _Pragma("warning (push)")
+#   define MWRN(WRN) _Pragma(TOSTR(warning (disable: WRN)))
+#   define MPOP _Pragma("warning (pop)")
+#endif
+
+//MWRN(4116) // "Unnamed type definition in parentheses"
+MWRN(4200) // "Zero-sized array in structure/union"
+MWRN(4201) // "Nameless structure/union"
+//MWRN(4204) // "Non-constant aggregate initializer"
+MWRN(4221) // "Initialization by using the address of automatic variable"
+//MWRN(4090) // "'=': different 'const' qualifiers" -- gives some false-positives
+//MWRN(4706) // "Assignment within conditional expression"
