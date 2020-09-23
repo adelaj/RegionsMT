@@ -13,13 +13,14 @@ void aggr_inc(volatile void *Mem, const void *arg, unsigned status)
 {
     (void) arg;
     volatile struct inc_mem *mem = Mem;
-    size_interlocked_inc((volatile void *[]) { &mem->fail, &mem->success, &mem->drop }[MIN(status, AGGR_DROP)]);
+    volatile size_t *ptr = (volatile size_t *[]) { &mem->fail, &mem->success, &mem->drop }[MIN(status, AGGR_DROP)];
+    atomic_inc(ptr);
 }
 
 unsigned cond_inc(volatile void *Mem, const void *Tot)
 {
     volatile struct inc_mem *mem = Mem;
-    return size_load_acquire(&mem->success) + size_load_acquire(&mem->fail) + size_load_acquire(&mem->drop) == *(size_t *) Tot;
+    return load_acquire(&mem->success) + load_acquire(&mem->fail) + load_acquire(&mem->drop) == *(size_t *) Tot;
 }
 
 struct loop_mt {
@@ -42,7 +43,7 @@ static unsigned loop_tread_close(void *Data, void *context, void *tls)
     (void) context;
     (void) tls;
     volatile struct loop_mt *data = Data;
-    bool fail = size_load_acquire(&data->mem.fail), drop = size_load_acquire(&data->mem.drop);
+    bool fail = load_acquire(&data->mem.fail), drop = load_acquire(&data->mem.drop);
     free(Data);
     return drop ? TASK_DROP : !fail;
 }
@@ -72,9 +73,9 @@ bool loop_mt(struct thread_pool *pool, task_callback callback, struct task_cond 
     if (!crt_assert_impl(log, CODE_METRIC, !SIZE_PROD_TEST(&prod, cntl, cnt) || prod == SIZE_MAX || !SIZE_PROD_TEST_VA(&tot, prod, cnt) ? ERANGE : 0)) return 0;
     struct loop_mt *data;
     if (!array_assert(log, CODE_METRIC, array_init(&data, NULL, fam_countof(struct loop_mt, ind, tot), fam_sizeof(struct loop_mt, ind), fam_diffof(struct loop_mt, ind, tot), ARRAY_STRICT))) return 0;
-    size_store_release(&data->mem.fail, 0);
-    size_store_release(&data->mem.success, 0);
-    size_store_release(&data->mem.drop, 0);
+    store_release(&data->mem.fail, 0);
+    store_release(&data->mem.success, 0);
+    store_release(&data->mem.drop, 0);
     data->prod = prod;
     if (prod) // Building index set
     {
@@ -106,13 +107,13 @@ struct thread_pool {
 
 static bool thread_pool_enqueue_impl(struct thread_pool *pool, size_t cnt, struct log *log)
 {
-    size_t car, probe = size_add(&car, size_load_acquire(&pool->task_hint), cnt);
+    size_t car, probe = size_add(&car, load_acquire(&pool->task_hint), cnt);
     if (!crt_assert_impl(log, CODE_METRIC, car ? ERANGE : 0) ||
         !array_assert(log, CODE_METRIC, persistent_array_test(&pool->dispatched_task, probe, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK))) return 0;
     for (size_t i = pool->task_cnt; i < probe; i++)
-        bool_store_release(&((struct dispatched_task *) persistent_array_fetch(&pool->dispatched_task, i, sizeof(struct dispatched_task)))->not_garbage, 0);
+        store_release(&((struct dispatched_task *) persistent_array_fetch(&pool->dispatched_task, i, sizeof(struct dispatched_task)))->not_garbage, 0);
     if (pool->task_cnt < probe) pool->task_cnt = probe;
-    size_interlocked_add(&pool->task_hint, cnt); // It is believed that this should not overflow
+    atomic_add(&pool->task_hint, cnt); // It is believed that this should not overflow
     return 1;
 }
 
@@ -138,7 +139,7 @@ bool thread_pool_enqueue_yield(struct thread_pool *pool, generator_callback gene
 
 size_t thread_pool_get_count(struct thread_pool *pool)
 {
-    return size_load_acquire(&pool->cnt);
+    return load_acquire(&pool->cnt);
 }
 
 enum {
@@ -149,7 +150,7 @@ enum {
 };
 
 struct thread_arg {
-    struct dispatched_task *volatile dispatched_task;
+    void *volatile dispatched_task;
     void *tls;
     struct thread thread;
     struct mutex mutex;
@@ -163,14 +164,14 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
     struct thread_pool *pool = ((struct tls_base *) arg->tls)->pool;
     for (;;)
     {
-        struct dispatched_task *dispatched_task = ptr_interlocked_exchange(&arg->dispatched_task, NULL);
+        struct dispatched_task *dispatched_task = atomic_exchange(&arg->dispatched_task, NULL);
         if (!dispatched_task) // No task for the current thread
         {
             // At first, try to steal task from a different thread
             size_t cnt = thread_pool_get_count(pool);
             for (size_t i = 0; i < cnt; i++)
             {
-                dispatched_task = ptr_interlocked_exchange(&((struct thread_arg *) persistent_array_fetch(&pool->arg, i, sizeof(struct thread_arg)))->dispatched_task, NULL);
+                dispatched_task = atomic_exchange(&((struct thread_arg *) persistent_array_fetch(&pool->arg, i, sizeof(struct thread_arg)))->dispatched_task, NULL);
                 if (dispatched_task) break;
             }
             // If still no task found, then go the sleep state
@@ -202,7 +203,7 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
         {
             dispatched_task->exec = tls->exec;
             dispatched_task->storage = tls->storage;
-            bool_store_release(&dispatched_task->not_orphan, 0);
+            store_release(&dispatched_task->not_orphan, 0);
         }
         else if (dispatched_task->aggr.callback) dispatched_task->aggr.callback(dispatched_task->aggr.mem, dispatched_task->aggr.arg, res);
         
@@ -211,8 +212,8 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
         pool->query_wake = 1;
         if (res != TASK_YIELD)
         {
-            bool_store_release(&dispatched_task->not_garbage, 0);
-            size_interlocked_dec(&pool->task_hint); // This should be done strictly after setting of the garbage flag, not earlier!
+            store_release(&dispatched_task->not_garbage, 0);
+            atomic_dec(&pool->task_hint); // This should be done strictly after setting of the garbage flag, not earlier!
         }
         condition_signal(&pool->condition);
         mutex_release(&pool->mutex);
@@ -242,7 +243,7 @@ void thread_pool_schedule(struct thread_pool *pool)
             case COND_DROP:
                 if (task->aggr.callback) task->aggr.callback(task->aggr.mem, task->aggr.arg, AGGR_DROP);
                 queue_dequeue(&pool->queue, off, sizeof(*task));
-                size_interlocked_dec(&pool->task_hint);
+                atomic_dec(&pool->task_hint);
                 continue;
             case COND_EXECUTE:
                 dispatch = 1;
@@ -258,9 +259,9 @@ void thread_pool_schedule(struct thread_pool *pool)
             dispatched_task = persistent_array_fetch(&pool->dispatched_task, i, sizeof(*dispatched_task));
             if (!dispatch)
             {
-                if (bool_load_acquire(&dispatched_task->not_garbage))
+                if (load_acquire(&dispatched_task->not_garbage))
                 {
-                    if (!bool_load_acquire(&dispatched_task->not_orphan))
+                    if (!load_acquire(&dispatched_task->not_orphan))
                     {
                         orphan = 1;
                         break;
@@ -268,7 +269,7 @@ void thread_pool_schedule(struct thread_pool *pool)
                     garbage = 0;
                 }
             }
-            else if (!bool_load_acquire(&dispatched_task->not_garbage)) break;
+            else if (!load_acquire(&dispatched_task->not_garbage)) break;
         }
         
         if (!dispatched_task) exit(EXIT_FAILURE); // It is believed that this never happens
@@ -281,11 +282,11 @@ void thread_pool_schedule(struct thread_pool *pool)
             dispatched_task->context = task->context;
             dispatched_task->exec = 0;
             dispatched_task->storage = NULL;
-            bool_store_release(&dispatched_task->not_garbage, 1);
-            bool_store_release(&dispatched_task->not_orphan, 1);
+            store_release(&dispatched_task->not_garbage, 1);
+            store_release(&dispatched_task->not_orphan, 1);
             queue_dequeue(&pool->queue, off, sizeof(*task));
         }
-        else if (orphan) bool_store_release(&dispatched_task->not_orphan, 1);
+        else if (orphan) store_release(&dispatched_task->not_orphan, 1);
         
         // Unlocking the queue and the dispatch array
         spinlock_release(&pool->spinlock);
@@ -297,7 +298,7 @@ void thread_pool_schedule(struct thread_pool *pool)
             for (; ind < cnt; ind++)
             {
                 struct thread_arg *arg = persistent_array_fetch(&pool->arg, ind, sizeof(struct thread_arg));
-                if (!ptr_interlocked_compare_exchange(&arg->dispatched_task, &(void *) { NULL }, dispatched_task)) continue;
+                if (!atomic_compare_exchange(&arg->dispatched_task, &(void *) { NULL }, dispatched_task)) continue;
                 mutex_acquire(&arg->mutex);
                 uint8_bit_set(arg->bits, THREAD_BIT_QUERY_WAKE);
                 condition_signal(&arg->condition);
@@ -305,7 +306,7 @@ void thread_pool_schedule(struct thread_pool *pool)
                 break;
             }
             if (ind < cnt) continue; // Continue the outer loop
-            bool_store_release(&dispatched_task->not_orphan, 0);
+            store_release(&dispatched_task->not_orphan, 0);
         }
 
         // Go to the sleep state
@@ -336,7 +337,7 @@ static bool thread_arg_init(struct thread_arg *arg, size_t tls_sz, struct log *l
                 memset(arg->bits, 0, sizeof(arg->bits));
                 uint8_bit_set(arg->bits, THREAD_BIT_ACTIVE);
                 mutex_release(&arg->mutex);
-                ptr_store_release(&arg->dispatched_task, NULL);
+                store_release(&arg->dispatched_task, NULL);
                 return 1;
             }
             mutex_close(&arg->mutex);
@@ -368,8 +369,8 @@ static bool thread_pool_init(struct thread_pool *pool, size_t cnt, size_t task_h
                     {
                         spinlock_release(&pool->spinlock); // Initializing the queue spinlock
                         spinlock_release(&pool->add); // Initializing the thread array spinlock
-                        size_store_release(&pool->task_hint, 0); // The number of slots sufficient to store the queue intermediate data 
-                        size_store_release(&pool->cnt, 0); // Number of initialized threads
+                        store_release(&pool->task_hint, 0); // The number of slots sufficient to store the queue intermediate data 
+                        store_release(&pool->cnt, 0); // Number of initialized threads
                         pool->task_cnt = 0; // Guaranteed number of avilable task slots
                         mutex_acquire(&pool->mutex);
                         pool->query_wake = 0;
@@ -446,7 +447,7 @@ struct thread_pool *thread_pool_create(size_t cnt, size_t tls_sz, size_t task_hi
         size_t tmp = thread_pool_start_range(pool, tls_sz, 0, cnt, log);
         if (tmp == cnt)
         {
-            size_store_release(&pool->cnt, cnt);
+            store_release(&pool->cnt, cnt);
             spinlock_release(&pool->add);
             return pool;
         }
@@ -465,7 +466,7 @@ bool thread_pool_add(struct thread_pool *pool, size_t diff, size_t tls_sz, struc
         array_assert(log, CODE_METRIC, persistent_array_test(&pool->arg, r, sizeof(struct thread_arg), 0)))
     {
         tmp = thread_pool_start_range(pool, tls_sz, l, r, log);
-        if (tmp == r) size_store_release(&pool->cnt, r);
+        if (tmp == r) store_release(&pool->cnt, r);
         else thread_pool_finish_range(pool, 0, tmp);
     }
     spinlock_release(&pool->add);
