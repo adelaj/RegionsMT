@@ -65,174 +65,183 @@ _Static_assert((BIT_TEST2_MASK01 | BIT_TEST2_MASK10) == UINT8_MAX, "Wrong consta
 #define SIZE_PROD_TEST(PROD, ARG, CNT) (size_prod_test((PROD), (ARG), (CNT)) == (CNT))
 #define SIZE_PROD_TEST_VA(PROD, ...) (size_prod_test((PROD), ARG(size_t, __VA_ARGS__)) == countof(((size_t []) { __VA_ARGS__ })))
 
-#include <tgmath.h>
+unsigned char uchar_bit_scan_reverse(unsigned char);
+unsigned short ushrt_bit_scan_reverse(unsigned short);
+unsigned uint_bit_scan_reverse(unsigned);
+unsigned long ulong_bit_scan_reverse(unsigned long);
+
+unsigned char uchar_bit_scan_forward(unsigned char);
+unsigned short ushrt_bit_scan_forward(unsigned short);
+unsigned uint_bit_scan_forward(unsigned);
+unsigned long ulong_bit_scan_forward(unsigned long);
+
+unsigned char uchar_pop_cnt(unsigned char);
+unsigned short ushort_pop_cnt(unsigned short);
+unsigned uint_pop_cnt(unsigned);
+unsigned long ulong_pop_cnt(unsigned long);
+
+#if defined __x86_64__ || defined _M_X64
+unsigned long long ullong_bit_scan_reverse(unsigned long long);
+#   define CASE_ULLONG_BIT_SCAN_REVERSE , unsigned long long: ullong_bit_scan_reverse
+unsigned long long ullong_bit_scan_forward(unsigned long long);
+#   define CASE_ULLONG_BIT_SCAN_FORWARD , unsigned long long: ullong_bit_scan_forward
+unsigned long long ullong_pop_cnt(unsigned long long);
+#   define CASE_ULLONG_POP_CNT , unsigned long long: ullong_pop_cnt
+#else
+#   define CASE_ULLONG_BIT_SCAN_REVERSE
+#   define CASE_ULLONG_BIT_SCAN_FORWARD
+#   define CASE_ULLONG_POP_CNT
+#endif
+
+#define bit_scan_reverse(x) (_Generic((x), \
+    unsigned char: uchar_bit_scan_reverse, \
+    unsigned short: ushrt_bit_scan_reverse, \
+    unsigned: uint_bit_scan_reverse, \
+    unsigned long: ulong_bit_scan_reverse \
+    CASE_ULLONG_BIT_SCAN_REVERSE)(x))
+#define bit_scan_forward(x) (_Generic((x), \
+    unsigned char: uchar_bit_scan_forward, \
+    unsigned short: ushrt_bit_scan_forward, \
+    unsigned: uint_bit_scan_forward, \
+    unsigned long: ulong_bit_scan_forward \
+    CASE_ULLONG_BIT_SCAN_FORWARD)(x))
+#define pop_cnt(x) (_Generic((x), \
+    unsigned char: uchar_pop_cnt, \
+    unsigned short: ushort_pop_cnt, \
+    unsigned: uint_pop_cnt, \
+    unsigned long: ulong_pop_cnt \
+    CASE_ULLONG_POP_CNT)(x))
 
 #if defined __GNUC__ || defined __clang__
 
-#	if (defined __GNUC__ && defined __x86_64__) || (defined __clang__ && defined __i386__)
-//		For some reason gcc does not emit 'cmpxchg16b' (even when '-mcx16' is passed to it) via '__atomic_compare_exchange_n' intrinsic.
-//		See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84522 for more details.
-//		The same applies for the 'cmpxchg8b' under i386 clang.
-//		Thus the different method is used
+#    if (defined __GNUC__ && defined __x86_64__) || (defined __clang__ && defined __i386__)
+//        For some reason gcc does not emit 'cmpxchg16b' (even when '-mcx16' is passed to it) via '__atomic_compare_exchange_n' intrinsic.
+//        See https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84522 for more details.
+//        The same applies for the 'cmpxchg8b' under i386 clang.
+//        Thus the different method is used
 bool Dsize_interlocked_compare_exchange(volatile Dsize_t *, Dsize_t *, Dsize_t);
-#		define CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE \
-			volatile Dsize_t *: Dsize_interlocked_compare_exchange((DST), (P_CMP), (XCHG)),
-#	else
-#		define CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE
-#	endif
+#        define CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE \
+            volatile Dsize_t *: Dsize_interlocked_compare_exchange((DST), (P_CMP), (XCHG)),
+#    else
+#        define CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE
+#    endif
 
-#	define load_acquire(SRC) \
-		(__atomic_load_n((SRC), __ATOMIC_ACQUIRE))
-#	define store_release(DST, VAL) \
-		(__atomic_store_n((DST), (VAL), __ATOMIC_RELEASE))
-#	define interlocked_compare_exchange(DST, P_CMP, XCHG) (_Generic(DST, \
-		CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE \
-		default: __atomic_compare_exchange_n((DST), (P_CMP), (XCHG), 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)))
-#	define interlocked_compare_exchange_acquire(DST, P_CMP, XCHG) \
-		(__atomic_compare_exchange_n((DST), (P_CMP), (XCHG), 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
-#	define interlocked_and(DST, ARG) \
-		(__atomic_fetch_and((DST), (ARG), __ATOMIC_ACQ_REL))
-#	define interlocked_and_release(DST, ARG) \
-		(__atomic_fetch_and((DST), (ARG), __ATOMIC_RELEASE))
-#	define interlocked_or(DST, ARG) \
-		(__atomic_fetch_or((DST), (ARG), __ATOMIC_ACQ_REL))
-#	define interlocked_or_release(DST, ARG) \
-		(__atomic_fetch_or((DST), (ARG), __ATOMIC_RELEASE))
-#	define interlocked_add(DST, ARG) \
-		(__atomic_fetch_add((DST), (ARG), __ATOMIC_ACQ_REL))
-#	define interlocked_sub(DST, ARG) \
-		(__atomic_fetch_sub((DST), (ARG), __ATOMIC_ACQ_REL))
-#	define interlocked_inc(DST, ARG) \
-		(interlocked_add((DST), 1))
-#	define interlocked_dec(DST, ARG) \
-		(interlocked_sub((DST), 1))
-#	define interlocked_exchange(DST, ARG) \
-		(__atomic_exchange_n((DST), (ARG), __ATOMIC_ACQ_REL))
-
-#	define bit_scan_reverse(x) (_Generic((x), \
-        unsigned char: ussint_bit_scan_reverse(x), \ 
-		unsigned: x ? sizeof(x) * CHAR_BIT - (unsigned) __builtin_clz((unsigned) x) - 1 : UINT_MAX, \
-        unsigned long: x ? sizeof(x) * CHAR_BIT - (unsigned long) __builtin_clzl((unsigned long) x) - 1 : ULONG_MAX, \
-        unsigned long long: x ? sizeof(x) * CHAR_BIT - (unsigned long long) __builtin_clzll((unsigned long long) x) - 1 : ULLONG_MAX))
-#	define bit_scan_forward(x) (_Generic((x), \
-		unsigned char: ussint_bit_scan_forward(x), \
-        unsigned: x ? (unsigned) __builtin_ctz((unsigned) x) : UINT_MAX, \
-        unsigned long: x ? (unsigned long) __builtin_ctzl((unsigned long) x) : ULONG_MAX, \
-        unsigned long long: x ? (unsigned long long) __builtin_ctzll((unsigned long long) x) : ULLONG_MAX))
-#	define pop_cnt(x) (_Generic((x), \
-        unsigned: (unsigned) __builtin_popcount((unsigned) x), \
-        unsigned long: (unsigned long) __builtin_popcountl((unsigned long) x), \
-        unsigned long long: (unsigned long long) __builtin_popcountll((unsigned long long) x)))
+#    define load_acquire(SRC) \
+        (__atomic_load_n((SRC), __ATOMIC_ACQUIRE))
+#    define store_release(DST, VAL) \
+        (__atomic_store_n((DST), (VAL), __ATOMIC_RELEASE))
+#    define interlocked_compare_exchange(DST, P_CMP, XCHG) (_Generic(DST, \
+        CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE \
+        default: __atomic_compare_exchange_n((DST), (P_CMP), (XCHG), 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE)))
+#    define interlocked_compare_exchange_acquire(DST, P_CMP, XCHG) \
+        (__atomic_compare_exchange_n((DST), (P_CMP), (XCHG), 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))
+#    define interlocked_and(DST, ARG) \
+        (__atomic_fetch_and((DST), (ARG), __ATOMIC_ACQ_REL))
+#    define interlocked_and_release(DST, ARG) \
+        (__atomic_fetch_and((DST), (ARG), __ATOMIC_RELEASE))
+#    define interlocked_or(DST, ARG) \
+        (__atomic_fetch_or((DST), (ARG), __ATOMIC_ACQ_REL))
+#    define interlocked_or_release(DST, ARG) \
+        (__atomic_fetch_or((DST), (ARG), __ATOMIC_RELEASE))
+#    define interlocked_add(DST, ARG) \
+        (__atomic_fetch_add((DST), (ARG), __ATOMIC_ACQ_REL))
+#    define interlocked_sub(DST, ARG) \
+        (__atomic_fetch_sub((DST), (ARG), __ATOMIC_ACQ_REL))
+#    define interlocked_inc(DST, ARG) \
+        (interlocked_add((DST), 1))
+#    define interlocked_dec(DST, ARG) \
+        (interlocked_sub((DST), 1))
+#    define interlocked_exchange(DST, ARG) \
+        (__atomic_exchange_n((DST), (ARG), __ATOMIC_ACQ_REL))
 
 #elif defined _MSC_BUILD
 #   include <intrin.h>
 
-bool ulint_interlocked_compare_exchange(volatile unsigned long *, unsigned long *, unsigned long);
-bool ullint_interlocked_compare_exchange(volatile unsigned long long *, unsigned long long *, unsigned long long);
+bool uint_interlocked_compare_exchange(volatile unsigned *, unsigned *, unsigned);
+bool ulong_interlocked_compare_exchange(volatile unsigned long *, unsigned long *, unsigned long);
+bool ullong_interlocked_compare_exchange(volatile unsigned long long *, unsigned long long *, unsigned long long);
 bool ptr_interlocked_compare_exchange(void *volatile *, void **, void *);
 
-unsigned long ulint_bit_scan_reverse(unsigned long);
-unsigned long ulint_bit_scan_forward(unsigned long);
-
 #   ifdef _M_X64
-#		define CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE \
-			volatile Dsize_t *: (_InterlockedCompareExchange128((DST), DSIZE_HI(XCHG), DSIZE_LO(XCHG), (long long *) (P_CMP)->s)),
+#        define CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE \
+            volatile Dsize_t *: ((bool) _InterlockedCompareExchange128((DST), DSIZE_HI(XCHG), DSIZE_LO(XCHG), (long long *) (P_CMP)->s)),
 unsigned long long ullint_bit_scan_reverse(unsigned long long);
-#		define CASE_ULLINT_BIT_SCAN_REVERSE \
-			unsigned long long: ullint_bit_scan_reverse(x),
-unsigned long long ullint_bit_scan_forward(unsigned long long);
-#		define CASE_ULLINT_BIT_SCAN_FORWARD \
-			unsigned long long: ullint_bit_scan_forward(x),
-#		define CASE_ULLINT_POP_CNT \
-			unsigned long long: __popcnt64(x),
-#	else
-#		define CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE
-#		define CASE_ULLINT_BIT_SCAN_REVERSE
-#		define CASE_ULLINT_BIT_SCAN_FORWARD
-#		define CASE_ULLINT_POP_CNT 
-#	endif
 
-#	define VOLATILE_FIXED(PTR, ...) (_Generic((PTR), \
-		volatile bool *: (__VA_ARGS__), \
-		volatile char *: (__VA_ARGS__), \
-		volatile short *: (__VA_ARGS__), \
-		volatile int *: (__VA_ARGS__), \
-		volatile long *: (__VA_ARGS__), \
-		volatile long long *: (__VA_ARGS__), \
-		volatile unsigned char *: (__VA_ARGS__), \
-		volatile unsigned short *: (__VA_ARGS__), \
-		volatile unsigned *: (__VA_ARGS__), \
-		volatile unsigned long *: (__VA_ARGS__), \
-		volatile unsigned long long *: (__VA_ARGS__), \
-		void *volatile *: (__VA_ARGS__)))
+unsigned long long ullint_bit_scan_forward(unsigned long long);
+#        define CASE_ULLINT_BIT_SCAN_FORWARD \
+            unsigned long long: ullint_bit_scan_forward(x),
+#        define CASE_ULLINT_POP_CNT \
+            unsigned long long: __popcnt64(x),
+#    else
+#        define CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE
+#        define CASE_ULLINT_BIT_SCAN_REVERSE
+#        define CASE_ULLINT_BIT_SCAN_FORWARD
+#        define CASE_ULLINT_POP_CNT 
+#    endif
+
+#    define VOLATILE_FIXED(PTR, ...) (_Generic((PTR), \
+        volatile bool *: (__VA_ARGS__), \
+        volatile char *: (__VA_ARGS__), \
+        volatile short *: (__VA_ARGS__), \
+        volatile int *: (__VA_ARGS__), \
+        volatile long *: (__VA_ARGS__), \
+        volatile long long *: (__VA_ARGS__), \
+        volatile unsigned char *: (__VA_ARGS__), \
+        volatile unsigned short *: (__VA_ARGS__), \
+        volatile unsigned *: (__VA_ARGS__), \
+        volatile unsigned long *: (__VA_ARGS__), \
+        volatile unsigned long long *: (__VA_ARGS__), \
+        void *volatile *: (__VA_ARGS__)))
 
 // Acquire/release semantics imposed by volatility
 // Should be used only with '/volatile:ms' compiler option
-#	define load_acquire(SRC) \
-		VOLATILE_FIXED((SRC), *(SRC))
-#	define store_release(DST, VAL) \
-		VOLATILE_FIXED((DST), *(DST) = (VAL))
-#	define interlocked_compare_exchange(DST, P_CMP, XCHG) (_Generic((DST), \
-		CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE \
-		volatile unsigned *: ulint_interlocked_compare_exchange((volatile unsigned long *) (DST), (unsigned long *) (P_CMP), (unsigned long) (XCHG)), \
-		volatile unsigned long *: ulint_interlocked_compare_exchange((DST), (P_CMP), (XCHG)), \
-		volatile unsigned long long *: ullint_interlocked_compare_exchange((DST), (P_CMP), (XCHG)),\
-		void *volatile *: ptr_interlocked_compare_exchange((DST), (P_CMP), (XCHG))))
-#	define interlocked_compare_exchange_acquire(DST, P_CMP, XCHG) \
-		(interlocked_compare_exchange((DST), (P_CMP), (XCHG)))
-#	define interlocked_and_release(DST, ARG) (_Generic((DST), \
-		(interlocked_and(DST, ARG))
-#	define interlocked_or_release(DST, ARG) \
-		(__atomic_fetch_and((DST), (ARG), __ATOMIC_RELEASE))
-#	define interlocked_and(DST, ARG) \
-		(__atomic_fetch_and((DST), (ARG), __ATOMIC_ACQ_REL))
-#	define interlocked_or(DST, ARG) \
-		(__atomic_fetch_and((DST), (ARG), __ATOMIC_ACQ_REL))
-#	define interlocked_add(DST, ARG) \
-		(__atomic_fetch_add((DST), (ARG), __ATOMIC_ACQ_REL))
-#	define interlocked_sub(DST, ARG) \
-		(__atomic_fetch_add((DST), (ARG), __ATOMIC_ACQ_REL))
-#	define interlocked_inc(DST, ARG) \
-		(interlocked_add((DST), 1))
-#	define interlocked_dec(DST, ARG) \
-		(interlocked_sub((DST), 1))
-#	define interlocked_exchange(DST, ARG) \
-		(__atomic_exchange_n((DST), (ARG), __ATOMIC_ACQ_REL))
+#    define load_acquire(SRC) \
+        VOLATILE_FIXED((SRC), *(SRC))
+#    define store_release(DST, VAL) \
+        VOLATILE_FIXED((DST), *(DST) = (VAL))
+#    define interlocked_compare_exchange(DST, P_CMP, XCHG) (_Generic((DST), \
+        CASE_DSIZE_INTERLOCKED_COMPARE_EXCHANGE \
+        volatile unsigned *: uint_interlocked_compare_exchange, \
+        volatile unsigned long *: ulong_interlocked_compare_exchange, \
+        volatile unsigned long long *: ullong_interlocked_compare_exchange,\
+        void *volatile *: ptr_interlocked_compare_exchange)((DST), (P_CMP), (XCHG)))
+#    define interlocked_compare_exchange_acquire(DST, P_CMP, XCHG) \
+        (interlocked_compare_exchange((DST), (P_CMP), (XCHG)))
+#    define interlocked_and_release(DST, ARG) (_Generic((DST), \
+        (interlocked_and(DST, ARG))
+#    define interlocked_or_release(DST, ARG) \
+        (__atomic_fetch_and((DST), (ARG), __ATOMIC_RELEASE))
+#    define interlocked_and(DST, ARG) \
+        (__atomic_fetch_and((DST), (ARG), __ATOMIC_ACQ_REL))
+#    define interlocked_or(DST, ARG) \
+        (__atomic_fetch_and((DST), (ARG), __ATOMIC_ACQ_REL))
+#    define interlocked_add(DST, ARG) \
+        (__atomic_fetch_add((DST), (ARG), __ATOMIC_ACQ_REL))
+#    define interlocked_sub(DST, ARG) \
+        (__atomic_fetch_add((DST), (ARG), __ATOMIC_ACQ_REL))
+#    define interlocked_inc(DST, ARG) \
+        (interlocked_add((DST), 1))
+#    define interlocked_dec(DST, ARG) \
+        (interlocked_sub((DST), 1))
+#    define interlocked_exchange(DST, ARG) \
+        (__atomic_exchange_n((DST), (ARG), __ATOMIC_ACQ_REL))
 
-#	define bit_scan_reverse(x) (_Generic((x), \
-		CASE_ULLINT_BIT_SCAN_REVERSE \
+#    define bit_scan_reverse(x) (_Generic((x), \
+        CASE_ULLINT_BIT_SCAN_REVERSE \
         unsigned char: ussint_bit_scan_reverse(x), \
-		unsigned: (unsigned) ulint_bit_scan_reverse((unsigned long) (x)), \
-		unsigned long: ulint_bit_scan_reverse(x)))
-#	define bit_scan_forward(x) (_Generic((x), \
-		CASE_ULLINT_BIT_SCAN_FORWARD \
-		unsigned char: ussint_bit_scan_forward(x), \
-		unsigned: (unsigned) ulint_bit_scan_forward((unsigned long) (x)), \
-		unsigned long: ulint_bit_scan_forward(x), \
-		unsigned long long: ullint_bit_scan_forward(x)))
-#	define pop_cnt(x) (_Generic((x), \
-		CASE_ULLINT_POP_CNT \
-		unsigned short: __popcnt16(x), \
+        unsigned: (unsigned) ulint_bit_scan_reverse((unsigned long) (x)), \
+        unsigned long: ulint_bit_scan_reverse(x)))
+#    define bit_scan_forward(x) (_Generic((x), \
+        CASE_ULLINT_BIT_SCAN_FORWARD \
+        unsigned char: ussint_bit_scan_forward(x), \
+        unsigned: (unsigned) ulint_bit_scan_forward((unsigned long) (x)), \
+        unsigned long: ulint_bit_scan_forward(x)))
+#    define pop_cnt(x) (_Generic((x), \
+        CASE_ULLINT_POP_CNT \
+        unsigned short: __popcnt16(x), \
         unsigned: __popcnt(x), \
         unsigned long: (unsigned long) __popcnt((unsigned) x)))
 #endif
-
-unsigned char ussint_bit_scan_reverse(unsigned char);
-unsigned char ussint_bit_scan_forward(unsigned char);
-
-
-bool bool_load_acquire(volatile void *);
-uint8_t uint8_load_acquire(volatile void *);
-uint16_t uint16_load_acquire(volatile void *);
-uint32_t uint32_load_acquire(volatile void *);
-size_t size_load_acquire(volatile void *);
-void *ptr_load_acquire(volatile void *);
-void bool_store_release(volatile void *, bool);
-void uint8_store_release(volatile void *, uint8_t);
-void uint16_store_release(volatile void *, uint16_t);
-void uint32_store_release(volatile void *, uint32_t);
-void size_store_release(volatile void *, size_t);
-void ptr_store_release(volatile void*, void *);
 
 uint8_t uint8_interlocked_or(volatile void *, uint8_t);
 uint16_t uint16_interlocked_or(volatile void *, uint16_t);
@@ -246,9 +255,6 @@ size_t size_interlocked_inc(volatile void *);
 size_t size_interlocked_dec(volatile void *);
 size_t size_interlocked_add_sat(volatile void *, size_t);
 size_t size_interlocked_sub_sat(volatile void *, size_t);
-
-bool size_interlocked_compare_exchange(volatile void *, size_t *, size_t);
-bool ptr_interlocked_compare_exchange(volatile void *, void **, void *);
 
 size_t size_shl(size_t *, size_t, uint8_t);
 size_t size_shr(size_t *, size_t, uint8_t);

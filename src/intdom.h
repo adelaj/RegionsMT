@@ -5,28 +5,28 @@
 #include <limits.h>
 
 union int_val {
-	int i;
-	int8_t ib;
-	int16_t iw;
-	int32_t id;
-	int64_t iq;
-	ptrdiff_t iz;
-	intmax_t ij;
-	signed char ihh;
-	short ih;
-	long il;
-	long long ill;
-	unsigned u;
-	uint8_t ub;
-	uint16_t uw;
-	uint32_t ud;
-	uint64_t uq;
-	size_t uz;
-	uintmax_t uj;
-	unsigned char uhh;
-	unsigned short uh;
-	unsigned long ul;
-	unsigned long long ull;
+    int i;
+    int8_t ib;
+    int16_t iw;
+    int32_t id;
+    int64_t iq;
+    ptrdiff_t iz;
+    intmax_t ij;
+    signed char ihh;
+    short ih;
+    long il;
+    long long ill;
+    unsigned u;
+    uint8_t ub;
+    uint16_t uw;
+    uint32_t ud;
+    uint64_t uq;
+    size_t uz;
+    uintmax_t uj;
+    unsigned char uhh;
+    unsigned short uh;
+    unsigned long ul;
+    unsigned long long ull;
 };
 
 #if INT_MAX < INT8_MAX

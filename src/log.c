@@ -428,7 +428,7 @@ static struct message_result fmt_decode(struct fmt_result *res, const char *fmt,
 static struct message_result fmt_execute_int(enum fmt_int_spec int_spec, enum fmt_int_flags int_flags, char *buff, size_t *p_cnt, Va_list *p_arg, enum fmt_execute_flags flags)
 {
     bool u = int_flags & INT_FLAG_UNSIGNED, ptr = flags & FMT_EXE_FLAG_PTR;
-	union int_val val = { .uj = 0 };
+    union int_val val = { .uj = 0 };
     switch (int_spec)
     {
     case INT_SPEC_DEFAULT:

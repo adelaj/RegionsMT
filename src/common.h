@@ -53,23 +53,6 @@
 // Common value for the size of temporary buffer used for file reading
 #define BLOCK_READ 4096
 
-// Argument default promotion
-#define TYPE_TO_EXPR(T) (1 ? *((T *) NULL) : *((T *) NULL))
-#define ADP(T) _Generic(TYPE_TO_EXPR(T), \
-    float: double, \
-    double: double, \
-    bool: bool, \
-    char: char, \
-    signed char: signed char, \
-    int: int, \
-    long: long, \
-    long long: long long, \
-    unsigned char: unsigned char, \
-    unsigned: unsigned, \
-    unsigned long: unsigned long, \
-    unsigned long long: unsigned long long, \
-    default: T)   
-
 #if defined __GNUC__ || defined __clang__
 #   define GPUSH _Pragma("GCC diagnostic push")
 #   define GWRN(WRN) _Pragma(TOSTR(GCC diagnostic ignored TOSTR(-W ## WRN)))

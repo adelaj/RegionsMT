@@ -4,6 +4,52 @@
 #include <limits.h>
 #include <errno.h>
 
+#define DECLARE_POP_CNT(TYPE, PREFIX, BACKEND) \
+    TYPE PREFIX ## _pop_cnt(TYPE x) \
+    { \
+        return (TYPE) BACKEND(x); \
+    }
+
+#define X2(...) __VA_ARGS__, __VA_ARGS__
+#define X4(...) X2(__VA_ARGS__), X2(__VA_ARGS__)
+#define X8(...) X4(__VA_ARGS__), X4(__VA_ARGS__)
+#define X16(...) X8(__VA_ARGS__), X8(__VA_ARGS__)
+#define X32(...) X16(__VA_ARGS__), X16(__VA_ARGS__)
+#define X64(...) X32(__VA_ARGS__), X32(__VA_ARGS__)
+#define X128(...) X64(__VA_ARGS__), X64(__VA_ARGS__)
+
+unsigned char uchar_bit_scan_reverse(unsigned char x)
+{
+    static const unsigned char res[] = { UCHAR_MAX, 0, X2(1), X4(2), X8(3), X16(4), X32(5), X64(6), X128(7) };
+    _Static_assert(countof(res) == 1 << CHAR_BIT, "");
+    return res[x];
+}
+
+unsigned short ushrt_bit_scan_reverse(unsigned short x) { return (unsigned short) bit_scan_reverse((unsigned) x); }
+
+unsigned char uchar_bit_scan_forward(unsigned char x)
+{
+    return uchar_bit_scan_reverse((unsigned char) (x & (0 - x)));
+}
+
+unsigned short ushrt_bit_scan_forward(unsigned short x) { return (unsigned short) bit_scan_forward((unsigned) x); }
+
+#define P1(X) (X), (X) + 1
+#define P2(X) P1(X), P1((X) + 1)
+#define P3(X) P2(X), P2((X) + 1)
+#define P4(X) P3(X), P3((X) + 1)
+#define P5(X) P4(X), P4((X) + 1)
+#define P6(X) P5(X), P5((X) + 1)
+#define P7(X) P6(X), P6((X) + 1)
+#define P8(X) P7(X), P7((X) + 1)
+
+unsigned char uchar_pop_cnt(unsigned char x)
+{
+    static const unsigned char res[] = { P8(0) };
+    _Static_assert(countof(res) == 1 << CHAR_BIT, "");
+    return res[x];
+}
+
 #if defined __GNUC__ || defined __clang__
 
 #   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX) \
@@ -20,16 +66,64 @@
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize)
 #   endif
 
+#   define DECLARE_BIT_SCAN_REVERSE(TYPE, PREFIX, BACKEND, MAX) \
+        TYPE PREFIX ## _bit_scan_reverse(TYPE x) \
+        { \
+            return x ? sizeof(TYPE) * CHAR_BIT - (TYPE) BACKEND(x) - 1 : (MAX); \
+        }
+
+#   define DECLARE_BIT_SCAN_FORWARD(TYPE, PREFIX, BACKEND, MAX) \
+        TYPE PREFIX ## _bit_scan_forward(TYPE x) \
+        { \
+            return  x ? (TYPE) BACKEND(x) : (MAX); \
+        }
+
+DECLARE_BIT_SCAN_REVERSE(unsigned, uint, __builtin_clz, UINT_MAX)
+DECLARE_BIT_SCAN_REVERSE(unsigned long, ulong, __builtin_clzl, ULONG_MAX)
+
+DECLARE_BIT_SCAN_FORWARD(unsigned, uint, __builtin_ctz, UINT_MAX)
+DECLARE_BIT_SCAN_FORWARD(unsigned long, ulong, __builtin_ctzl, ULONG_MAX)
+
+unsigned short ushort_pop_cnt(unsigned short x) { return (unsigned short) pop_cnt((unsigned) x); }
+DECLARE_POP_CNT(unsigned, uint, __builtin_popcount)
+DECLARE_POP_CNT(unsigned long, ulong, __builtin_popcountl)
+
+#   ifdef __x86_64__
+DECLARE_BIT_SCAN_REVERSE(unsigned long long, ullong, __builtin_clzll, ULLONG_MAX)
+DECLARE_BIT_SCAN_FORWARD(unsigned long long, ullong, __builtin_ctzll, ULLONG_MAX)
+DECLARE_POP_CNT(unsigned long long, ullong, __builtin_popcountll)
+#   endif
+
 #elif defined _MSC_BUILD
 
-#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX) \
+#   define DECLARE_BIT_SCAN(TYPE, PREFIX, SUFFIX, BACKEND, MAX) \
+        TYPE PREFIX ## _bit_scan_ ## SUFFIX(TYPE x) \
+        { \
+            unsigned long res; \
+            return BACKEND(&res, x) ? (TYPE) res : MAX; \
+        }
+
+#   define DECLARE_POP_CNT(TYPE, PREFIX, BACKEND) \
+        TYPE PREFIX ## _pop_cnt(TYPE x) \
+        { \
+            return (TYPE) BACKEND(x); \
+        }
+
+unsigned uint_bit_scan_reverse(unsigned x) { return (unsigned) bit_scan_reverse((unsigned long) x); }
+DECLARE_BIT_SCAN(unsigned long, ulong, reverse, _BitScanReverse, ULONG_MAX)
+
+unsigned uint_bit_scan_forward(unsigned x) { return (unsigned) bit_scan_forward((unsigned long) x); }
+DECLARE_BIT_SCAN(unsigned long, ulong, forward, _BitScanForward, ULONG_MAX)
+
+DECLARE_POP_CNT(unsigned short, ushort, __popcnt16)
+DECLARE_POP_CNT(unsigned, uint, __popcnt)
+unsigned long ulong_pop_cnt(unsigned long x) { return (unsigned long) pop_cnt((unsigned) x); }
+
+#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
         bool PREFIX ## _interlocked_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
         { \
             TYPE cmp = *p_cmp; \
-            TYPE res = _Generic((res), \
-                unsigned long: (TYPE) _InterlockedCompareExchange((volatile long *) dst, (long) xchg, (long) cmp), \
-                unsigned long long: (TYPE) _InterlockedCompareExchange64((volatile long long *) dst, (long long) xchg, (long long) cmp), \
-                void *: (TYPE)_InterlockedCompareExchangePointer(dst, xchg, cmp)); \
+            TYPE res = (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) xchg, (BACKEND_TYPE) cmp); \
             if (res == cmp) return 1; \
             *p_cmp = res; \
             return 0; \
@@ -41,13 +135,6 @@ DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize)
             return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, (BACKEND_CAST) arg); \
         }
 
-#   define DECLARE_BIT_SCAN(TYPE, PREFIX, SUFFIX, BACKEND) \
-        TYPE PREFIX ## _bit_scan_ ## SUFFIX(TYPE x) \
-        { \
-            unsigned long res; \
-            return BACKEND(&res, x) ? (TYPE) res : _Generic((x), unsigned long: ULONG_MAX, unsigned long long: ULLONG_MAX); \
-        }
-
 static DECLARE_INTERLOCKED_OP(uint8_t, uint8, and_release, char, _InterlockedAnd8)
 static DECLARE_INTERLOCKED_OP(uint8_t, uint8, or_release, char, _InterlockedOr8)
 
@@ -57,17 +144,16 @@ DECLARE_INTERLOCKED_OP(uint8_t, uint8, and, char, _InterlockedAnd8)
 DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, short, _InterlockedAnd16)
 DECLARE_INTERLOCKED_OP(void *, ptr, exchange, void *, _InterlockedExchangePointer)
 
-DECLARE_BIT_SCAN(unsigned long, ulint, reverse, _BitScanReverse)
-DECLARE_BIT_SCAN(unsigned long, ulint, forward, _BitScanForward)
 
-DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned long, ulint)
-//DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned long long, ullint)
-//DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned long, ulong, long, _InterlockedCompareExchange)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned long long, ullong, long long, _InterlockedCompareExchange64)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, void *, _InterlockedCompareExchangePointer)
 
 #   ifdef _M_X64
+DECLARE_BIT_SCAN(unsigned long long, ullong, reverse, _BitScanReverse64, ULLONG_MAX)
+DECLARE_BIT_SCAN(unsigned long long, ullong, forward, _BitScanForward64, ULLONG_MAX)
+DECLARE_POP_CNT(unsigned long long, ullong, __popcnt64)
 
-DECLARE_BIT_SCAN_REVERSE(unsigned long long, ullint, reverse, _BitScanReverse64)
-DECLARE_BIT_SCAN_FORWARD(unsigned long long, ullint, forward, _BitScanForward64)
 
 DECLARE_INTERLOCKED_OP(size_t, size, add, long long, _InterlockedExchangeAdd64)
 
@@ -164,26 +250,6 @@ size_t size_sub(size_t *p_bor, size_t x, size_t y)
 
 #endif
 
-#define X2(...) __VA_ARGS__, __VA_ARGS__
-#define X4(...) X2(__VA_ARGS__), X2(__VA_ARGS__)
-#define X8(...) X4(__VA_ARGS__), X4(__VA_ARGS__)
-#define X16(...) X8(__VA_ARGS__), X8(__VA_ARGS__)
-#define X32(...) X16(__VA_ARGS__), X16(__VA_ARGS__)
-#define X64(...) X32(__VA_ARGS__), X32(__VA_ARGS__)
-#define X128(...) X64(__VA_ARGS__), X64(__VA_ARGS__)
-
-unsigned char ussint_bit_scan_reverse(unsigned char x)
-{
-    static const unsigned char res[] = { 255, 0, X2(1), X4(2), X8(3), X16(4), X32(5), X64(6), X128(7) };
-    return res[x];
-}
-
-unsigned char ussint_bit_scan_forward(unsigned char x)
-{
-    return ussint_bit_scan_reverse((unsigned char) (x & (0 - x)));
-}
-
-
 size_t size_interlocked_sub(volatile void *mem, size_t val)
 {
     return size_interlocked_add(mem, 0 - val);
@@ -202,14 +268,14 @@ size_t size_interlocked_dec(volatile void *mem)
 size_t size_interlocked_add_sat(volatile size_t *mem, size_t val)
 {
     size_t tmp = load_acquire(mem);
-    while (tmp < SIZE_MAX && !size_interlocked_compare_exchange(mem, &tmp, size_add_sat(tmp, val))) tmp = load_acquire(mem);
+    while (tmp < SIZE_MAX && !interlocked_compare_exchange(mem, &tmp, size_add_sat(tmp, val))) tmp = load_acquire(mem);
     return tmp;
 }
 
 size_t size_interlocked_sub_sat(volatile size_t *mem, size_t val)
 {
     size_t tmp = load_acquire(mem);
-    while (tmp && !size_interlocked_compare_exchange(mem, &tmp, size_sub_sat(tmp, val))) tmp = load_acquire(mem);
+    while (tmp && !interlocked_compare_exchange(mem, &tmp, size_sub_sat(tmp, val))) tmp = load_acquire(mem);
     return tmp;
 }
 
@@ -366,7 +432,7 @@ size_t m128i_byte_scan_forward(__m128i a)
 
 void spinlock_acquire(spinlock *spinlock)
 {
-    while (!spinlock_interlocked_compare_exchange_acquire(spinlock, &(spinlock_base) { 0 }, 1)) while (load_acquire(spinlock)) _mm_pause();
+    while (!interlocked_compare_exchange_acquire(spinlock, &(spinlock_base) { 0 }, 1)) while (load_acquire(spinlock)) _mm_pause();
 }
 
 GPUSH GWRN(implicit-fallthrough)
