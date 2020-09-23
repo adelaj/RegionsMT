@@ -19,6 +19,8 @@
 #define SIGN(x, y) \
     ((x) > (y) ? 1 : (x) < (y) ? -1 : 0)
 
+#define bitsof(X) (CHAR_BIT * sizeof(X))
+
 // Number of elements of array
 #define countof(ARR) (sizeof(ARR) / sizeof((ARR)[0]))
 

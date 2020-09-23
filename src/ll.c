@@ -10,61 +10,35 @@
         return (TYPE) BACKEND(x); \
     }
 
-#define X2(...) __VA_ARGS__, __VA_ARGS__
-#define X4(...) X2(__VA_ARGS__), X2(__VA_ARGS__)
-#define X8(...) X4(__VA_ARGS__), X4(__VA_ARGS__)
-#define X16(...) X8(__VA_ARGS__), X8(__VA_ARGS__)
-#define X32(...) X16(__VA_ARGS__), X16(__VA_ARGS__)
-#define X64(...) X32(__VA_ARGS__), X32(__VA_ARGS__)
-#define X128(...) X64(__VA_ARGS__), X64(__VA_ARGS__)
+#define XY1(X, Y) (X), (X) + (Y)
+#define XY2(X, Y) XY1((X), (Y)), XY1((X) + (Y), (Y))
+#define XY3(X, Y) XY2((X), (Y)), XY2((X) + (Y), (Y))
+#define XY4(X, Y) XY3((X), (Y)), XY3((X) + (Y), (Y))
+#define XY5(X, Y) XY4((X), (Y)), XY4((X) + (Y), (Y))
+#define XY6(X, Y) XY5((X), (Y)), XY5((X) + (Y), (Y))
+#define XY7(X, Y) XY6((X), (Y)), XY6((X) + (Y), (Y))
+#define XY8(X, Y) XY7((X), (Y)), XY7((X) + (Y), (Y))
 
 unsigned char uchar_bit_scan_reverse(unsigned char x)
 {
-    static const unsigned char res[] = { UCHAR_MAX, 0, X2(1), X4(2), X8(3), X16(4), X32(5), X64(6), X128(7) };
-    _Static_assert(countof(res) == 1 << CHAR_BIT, "");
+    static const unsigned char res[] = { UCHAR_MAX, 0, XY1(1, 0), XY2(2, 0), XY3(3, 0), XY4(4, 0), XY5(5, 0), XY6(6, 0), XY7(7, 0) };
+    _Static_assert(countof(res) - 1 == UCHAR_MAX, "");
     return res[x];
 }
 
 unsigned short ushrt_bit_scan_reverse(unsigned short x) { return (unsigned short) bit_scan_reverse((unsigned) x); }
 
-unsigned char uchar_bit_scan_forward(unsigned char x)
-{
-    return uchar_bit_scan_reverse((unsigned char) (x & (0 - x)));
-}
-
+unsigned char uchar_bit_scan_forward(unsigned char x) { return uchar_bit_scan_reverse((unsigned char) (x & (0 - x))); }
 unsigned short ushrt_bit_scan_forward(unsigned short x) { return (unsigned short) bit_scan_forward((unsigned) x); }
-
-#define P1(X) (X), (X) + 1
-#define P2(X) P1(X), P1((X) + 1)
-#define P3(X) P2(X), P2((X) + 1)
-#define P4(X) P3(X), P3((X) + 1)
-#define P5(X) P4(X), P4((X) + 1)
-#define P6(X) P5(X), P5((X) + 1)
-#define P7(X) P6(X), P6((X) + 1)
-#define P8(X) P7(X), P7((X) + 1)
 
 unsigned char uchar_pop_cnt(unsigned char x)
 {
-    static const unsigned char res[] = { P8(0) };
-    _Static_assert(countof(res) == 1 << CHAR_BIT, "");
+    static const unsigned char res[] = { XY8(0, 1) };
+    _Static_assert(countof(res) - 1 == UCHAR_MAX, "");
     return res[x];
 }
 
 #if defined __GNUC__ || defined __clang__
-
-#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX) \
-        bool PREFIX ## _interlocked_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
-        { \
-            TYPE cmp = *p_cmp; \
-            TYPE res = __sync_val_compare_and_swap(dst, cmp, xchg); \
-            if (res == cmp) return 1; \
-            *p_cmp = res; \
-            return 0; \
-        }
-
-#   if (defined __GNUC__ && defined __x86_64__) || (defined __clang__ && defined __i386__)
-DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize)
-#   endif
 
 #   define DECLARE_BIT_SCAN_REVERSE(TYPE, PREFIX, BACKEND, MAX) \
         TYPE PREFIX ## _bit_scan_reverse(TYPE x) \
@@ -78,20 +52,59 @@ DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Dsize_t, Dsize)
             return  x ? (TYPE) BACKEND(x) : (MAX); \
         }
 
+#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX) \
+        bool PREFIX ## _interlocked_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
+        { \
+            return __atomic_compare_exchange_n((TYPE volatile *) dst, p_cmp, xchg, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE); \
+        }
+
+// This should be used to force compiler to emit 'cmpxchg16b'/'cmpxchg8b' instuctions when:
+// 1) gcc is targeted to 'x86_64', even if '-mcx16' flag set (see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84522);
+// 2) clang is targeted to 'i386'.
+#   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE_2(TYPE, PREFIX) \
+        bool PREFIX ## _interlocked_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
+        { \
+            TYPE cmp = *p_cmp; \
+            TYPE res = __sync_val_compare_and_swap(dst, cmp, xchg); \
+            if (res == cmp) return 1; \
+            *p_cmp = res; \
+            return 0; \
+        }
+
+// Bit scan reverse
 DECLARE_BIT_SCAN_REVERSE(unsigned, uint, __builtin_clz, UINT_MAX)
 DECLARE_BIT_SCAN_REVERSE(unsigned long, ulong, __builtin_clzl, ULONG_MAX)
 
+// Bit scan forward
 DECLARE_BIT_SCAN_FORWARD(unsigned, uint, __builtin_ctz, UINT_MAX)
 DECLARE_BIT_SCAN_FORWARD(unsigned long, ulong, __builtin_ctzl, ULONG_MAX)
 
-unsigned short ushort_pop_cnt(unsigned short x) { return (unsigned short) pop_cnt((unsigned) x); }
+// Population count
+unsigned short ushrt_pop_cnt(unsigned short x) { return (unsigned short) pop_cnt((unsigned) x); }
 DECLARE_POP_CNT(unsigned, uint, __builtin_popcount)
 DECLARE_POP_CNT(unsigned long, ulong, __builtin_popcountl)
+
+// Atomic compare and swap
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned char, uchar)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned short, ushrt)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned, uint)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned long, ulong)
+#   if defined __clang__ && defined __i386__
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE_2(unsigned long long, ullong)
+#   else
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned long long, ullong)
+#   endif
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr)
 
 #   ifdef __x86_64__
 DECLARE_BIT_SCAN_REVERSE(unsigned long long, ullong, __builtin_clzll, ULLONG_MAX)
 DECLARE_BIT_SCAN_FORWARD(unsigned long long, ullong, __builtin_ctzll, ULLONG_MAX)
 DECLARE_POP_CNT(unsigned long long, ullong, __builtin_popcountll)
+#       ifdef __GNUC__
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE_2(Uint128_t, Uint128)
+#       else
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(Uint128_t, Uint128)
+#       endif
 #   endif
 
 #elif defined _MSC_BUILD
@@ -109,16 +122,6 @@ DECLARE_POP_CNT(unsigned long long, ullong, __builtin_popcountll)
             return (TYPE) BACKEND(x); \
         }
 
-unsigned uint_bit_scan_reverse(unsigned x) { return (unsigned) bit_scan_reverse((unsigned long) x); }
-DECLARE_BIT_SCAN(unsigned long, ulong, reverse, _BitScanReverse, ULONG_MAX)
-
-unsigned uint_bit_scan_forward(unsigned x) { return (unsigned) bit_scan_forward((unsigned long) x); }
-DECLARE_BIT_SCAN(unsigned long, ulong, forward, _BitScanForward, ULONG_MAX)
-
-DECLARE_POP_CNT(unsigned short, ushort, __popcnt16)
-DECLARE_POP_CNT(unsigned, uint, __popcnt)
-unsigned long ulong_pop_cnt(unsigned long x) { return (unsigned long) pop_cnt((unsigned) x); }
-
 #   define DECLARE_INTERLOCKED_COMPARE_EXCHANGE(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
         bool PREFIX ## _interlocked_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
         { \
@@ -129,33 +132,67 @@ unsigned long ulong_pop_cnt(unsigned long x) { return (unsigned long) pop_cnt((u
             return 0; \
         }
 
-#   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND_CAST, BACKEND) \
-        TYPE PREFIX ## _interlocked_ ## SUFFIX(volatile void *dst, TYPE arg) \
+#   define DECLARE_INTERLOCKED_OP(TYPE, PREFIX, SUFFIX, BACKEND_TYPE, BACKEND) \
+        TYPE PREFIX ## _interlocked_ ## SUFFIX(TYPE volatile *dst, TYPE arg) \
         { \
-            return (TYPE) BACKEND((BACKEND_CAST volatile *) dst, (BACKEND_CAST) arg); \
+            return (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) arg); \
         }
 
-static DECLARE_INTERLOCKED_OP(uint8_t, uint8, and_release, char, _InterlockedAnd8)
-static DECLARE_INTERLOCKED_OP(uint8_t, uint8, or_release, char, _InterlockedOr8)
+// Bit scan reverse
+unsigned uint_bit_scan_reverse(unsigned x) { return (unsigned) bit_scan_reverse((unsigned long) x); }
+DECLARE_BIT_SCAN(unsigned long, ulong, reverse, _BitScanReverse, ULONG_MAX)
 
-DECLARE_INTERLOCKED_OP(uint8_t, uint8, or, char, _InterlockedOr8)
-DECLARE_INTERLOCKED_OP(uint16_t, uint16, or, short, _InterlockedOr16)
-DECLARE_INTERLOCKED_OP(uint8_t, uint8, and, char, _InterlockedAnd8)
-DECLARE_INTERLOCKED_OP(uint16_t, uint16, and, short, _InterlockedAnd16)
-DECLARE_INTERLOCKED_OP(void *, ptr, exchange, void *, _InterlockedExchangePointer)
+// Bit scan forward
+unsigned uint_bit_scan_forward(unsigned x) { return (unsigned) bit_scan_forward((unsigned long) x); }
+DECLARE_BIT_SCAN(unsigned long, ulong, forward, _BitScanForward, ULONG_MAX)
 
+// Population count
+DECLARE_POP_CNT(unsigned short, ushrt, __popcnt16)
+DECLARE_POP_CNT(unsigned, uint, __popcnt)
+unsigned long ulong_pop_cnt(unsigned long x) { return (unsigned long) pop_cnt((unsigned) x); }
 
+// Atomic compare and swap
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned char, uchar, char, _InterlockedCompareExchange8)
+DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned short, ushrt, short, _InterlockedCompareExchange16)
+bool uint_interlocked_compare_exchange(volatile unsigned *dst, unsigned *p_cmp, unsigned xchg) { return interlocked_compare_exchange((volatile unsigned long *) dst, (unsigned long *) p_cmp, (unsigned long) xchg); }
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned long, ulong, long, _InterlockedCompareExchange)
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(unsigned long long, ullong, long long, _InterlockedCompareExchange64)
 DECLARE_INTERLOCKED_COMPARE_EXCHANGE(void *, ptr, void *, _InterlockedCompareExchangePointer)
+
+// Atomic AND
+DECLARE_INTERLOCKED_OP(unsigned char, uchar, and, char, _InterlockedAnd8)
+DECLARE_INTERLOCKED_OP(unsigned short, ushrt, and, short, _InterlockedAnd16)
+unsigned uint_interlocked_and(volatile unsigned *dst, unsigned arg) { return (unsigned) interlocked_and((volatile unsigned long *) dst, (unsigned long) arg); }
+DECLARE_INTERLOCKED_OP(unsigned long, ulint, and, long, _InterlockedAnd)
+
+// Atomic OR
+DECLARE_INTERLOCKED_OP(unsigned char, uchar, or, char, _InterlockedOr8)
+DECLARE_INTERLOCKED_OP(unsigned short, ushrt, or , short, _InterlockedOr16)
+unsigned uint_interlocked_or(volatile unsigned *dst, unsigned arg) { return (unsigned) interlocked_or((volatile unsigned long *) dst, (unsigned long) arg); }
+DECLARE_INTERLOCKED_OP(unsigned long, ulint, or, long, _InterlockedOr)
+
+// Atomic ADD
+DECLARE_INTERLOCKED_OP(unsigned char, uchar, add , char, _InterlockedExchangeAdd8)
+DECLARE_INTERLOCKED_OP(unsigned short, ushrt, add, short, _InterlockedExchangeAdd16)
+unsigned uint_interlocked_add(volatile unsigned *dst, unsigned arg) { return (unsigned) interlocked_add((volatile unsigned long *) dst, (unsigned long) arg); }
+DECLARE_INTERLOCKED_OP(unsigned long, ulint, add, long, _InterlockedExchangeAdd)
+
+// Atomic exchange
+DECLARE_INTERLOCKED_OP(unsigned char, uchar, exchange, char, _InterlockedExchange8)
+DECLARE_INTERLOCKED_OP(unsigned short, ushrt, exchange, short, _InterlockedExchange16)
+unsigned uint_interlocked_exchange(volatile unsigned *dst, unsigned arg) { return (unsigned) interlocked_exchange((volatile unsigned long *) dst, (unsigned long) arg); }
+DECLARE_INTERLOCKED_OP(unsigned long, ulint, exchange, long, _InterlockedExchange)
+DECLARE_INTERLOCKED_OP(void *, ptr, exchange, void *, _InterlockedExchangePointer)
 
 #   ifdef _M_X64
 DECLARE_BIT_SCAN(unsigned long long, ullong, reverse, _BitScanReverse64, ULLONG_MAX)
 DECLARE_BIT_SCAN(unsigned long long, ullong, forward, _BitScanForward64, ULLONG_MAX)
 DECLARE_POP_CNT(unsigned long long, ullong, __popcnt64)
-
-
-DECLARE_INTERLOCKED_OP(size_t, size, add, long long, _InterlockedExchangeAdd64)
+bool Uint128_interlocked_compare_exchange(volatile Uint128_t *dst, Uint128_t *p_cmp, Uint128_t xchg) { return _InterlockedCompareExchange128((volatile long long *) dst->qw, UINT128_HI(xchg), UINT128_LO(xchg), (long long *) p_cmp->qw); }
+DECLARE_INTERLOCKED_OP(unsigned long long, ullong, and, long long, _InterlockedAnd64)
+DECLARE_INTERLOCKED_OP(unsigned long long, ullong, or, long long, _InterlockedOr64)
+DECLARE_INTERLOCKED_OP(unsigned long long, ullong, add, long long, _InterlockedExchangeAdd64)
+DECLARE_INTERLOCKED_OP(unsigned long long, ullong, exchange, long long, _InterlockedExchange64)
 
 // Warning! 'y %= 64' is done internally!
 size_t size_shl(size_t *p_hi, size_t x, uint8_t y)
@@ -204,10 +241,6 @@ size_t size_bit_scan_forward(size_t x)
     return _BitScanForward64(&res, (unsigned long long) x) ? (size_t) res : SIZE_MAX;
 }
 
-#   elif defined _M_IX86
-
-DECLARE_INTERLOCKED_OP(size_t, size, add, long, _InterlockedExchangeAdd)
-
 #   endif
 #endif 
 
@@ -215,55 +248,40 @@ DECLARE_INTERLOCKED_OP(size_t, size, add, long, _InterlockedExchangeAdd)
 
 size_t size_shl(size_t *p_hi, size_t x, uint8_t y)
 {
-    Dsize_t val = DSIZELC(x) << (y % SIZE_BIT);
+    Dsize_t val = DSIZEC(x, 0) << (y % SIZE_BIT);
     *p_hi = DSIZE_HI(val);
     return DSIZE_LO(val);
 }
 
 size_t size_shr(size_t *p_lo, size_t x, uint8_t y)
 {
-    Dsize_t val = DSIZEHC(x) >> (y % SIZE_BIT);
+    Dsize_t val = DSIZEC(0, x) >> (y % SIZE_BIT);
     *p_lo = DSIZE_LO(val);
     return DSIZE_HI(val);
 }
 
 size_t size_mul(size_t *p_hi, size_t x, size_t y)
 {
-    Dsize_t val = DSIZELC(x) * DSIZELC(y);
+    Dsize_t val = DSIZEC(x, 0) * DSIZEC(y, 0);
     *p_hi = DSIZE_HI(val);
     return DSIZE_LO(val);
 }
 
 size_t size_add(size_t *p_car, size_t x, size_t y)
 {
-    Dsize_t val = DSIZELC(x) + DSIZELC(y);
+    Dsize_t val = DSIZEC(x, 0) + DSIZEC(y, 0);
     *p_car = DSIZE_HI(val);
     return DSIZE_LO(val);
 }
 
 size_t size_sub(size_t *p_bor, size_t x, size_t y)
 {
-    Dsize_t val = DSIZELC(x) - DSIZELC(y);
+    Dsize_t val = DSIZEC(x, 0) - DSIZEC(y, 0);
     *p_bor = 0 - DSIZE_HI(val);
     return DSIZE_LO(val);
 }
 
 #endif
-
-size_t size_interlocked_sub(volatile void *mem, size_t val)
-{
-    return size_interlocked_add(mem, 0 - val);
-}
-
-size_t size_interlocked_inc(volatile void *mem)
-{
-    return size_interlocked_add(mem, 1);
-}
-
-size_t size_interlocked_dec(volatile void *mem)
-{
-    return size_interlocked_sub(mem, 1);
-}
 
 size_t size_interlocked_add_sat(volatile size_t *mem, size_t val)
 {
@@ -572,7 +590,7 @@ bool size_mul_add_test(size_t *p_res, size_t m, size_t a)
 #define DECLARE_BIT_TEST_ACQUIRE(TYPE, PREFIX) \
     bool PREFIX ## _bit_test_acquire(volatile void *arr, size_t bit) \
     { \
-        return PREFIX ## _load_acquire((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE))) & ((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE))); \
+        return load_acquire((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE))) & ((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE))); \
     }
 
 #define DECLARE_BIT_TEST_SET(TYPE, PREFIX) \
@@ -588,7 +606,7 @@ bool size_mul_add_test(size_t *p_res, size_t m, size_t a)
 #define DECLARE_INTERLOCKED_BIT_TEST_SET(TYPE, PREFIX) \
     bool PREFIX ## _interlocked_bit_test_set(volatile void *arr, size_t bit) \
     { \
-        TYPE msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)), res = PREFIX ## _interlocked_or((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), msk); \
+        TYPE msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)), res = interlocked_or((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), msk); \
         return res & msk; \
     }
 
@@ -605,7 +623,7 @@ bool size_mul_add_test(size_t *p_res, size_t m, size_t a)
 #define DECLARE_INTERLOCKED_BIT_TEST_RESET(TYPE, PREFIX) \
     bool PREFIX ## _interlocked_bit_test_reset(volatile void *arr, size_t bit) \
     { \
-        TYPE msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)), res = PREFIX ## _interlocked_and((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), ~msk); \
+        TYPE msk = (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)), res = interlocked_and((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), ~msk); \
         return res & msk; \
     }
 
@@ -618,7 +636,7 @@ bool size_mul_add_test(size_t *p_res, size_t m, size_t a)
 #define DECLARE_INTERLOCKED_BIT_SET_RELEASE(TYPE, PREFIX) \
     void PREFIX ## _interlocked_bit_set_release(volatile void *arr, size_t bit) \
     { \
-        PREFIX ## _interlocked_or_release((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE))); \
+        interlocked_or_release((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), (TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE))); \
     }
 
 #define DECLARE_BIT_RESET(TYPE, PREFIX) \
@@ -630,7 +648,7 @@ bool size_mul_add_test(size_t *p_res, size_t m, size_t a)
 #define DECLARE_INTERLOCKED_BIT_RESET_RELEASE(TYPE, PREFIX) \
     void PREFIX ## _interlocked_bit_reset_release(volatile void *arr, size_t bit) \
     { \
-        PREFIX ## _interlocked_and_release((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), ~((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)))); \
+        interlocked_and_release((volatile TYPE *) arr + bit / (CHAR_BIT * sizeof(TYPE)), ~((TYPE) 1 << bit % (CHAR_BIT * sizeof(TYPE)))); \
     }
 
 #define DECLARE_BIT_FETCH_BURST(TYPE, PREFIX, STRIDE) \
