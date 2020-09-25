@@ -12,7 +12,7 @@
 #define ARGI(T, ARG) \
     ARG_PTR((ARG), &(T) { (ARG) })
 
-#define DECLARE_ARG_FETCH(PREFIX, TYPE, TYPE_DOM) \
+#define DECL_ARG_FETCH(PREFIX, TYPE, TYPE_DOM) \
     TYPE PREFIX ## _arg_fetch(void *p_arg, bool ptr) \
     { \
         return ptr ? \
@@ -20,26 +20,26 @@
             (TYPE) Va_arg(*(Va_list *) p_arg, TYPE_DOM); \
     }
 
-#define DECLARE_STRUCT_ARG_FETCH(PREFIX, TYPE) \
+#define DECL_STRUCT_ARG_FETCH(PREFIX, TYPE) \
     TYPE PREFIX ## _arg_fetch(void *p_arg, bool ptr) \
     { \
         return ptr ? *(TYPE *) *(*(void ***) p_arg)++ : Va_arg(*(Va_list *) p_arg, TYPE); \
     }
     */
 
-#define DECLARE_PTR_ARG_FETCH(PREFIX, TYPE) \
+#define DECL_PTR_ARG_FETCH(PREFIX, TYPE) \
     TYPE *PREFIX ## _arg_fetch(void *p_arg, bool ptr) \
     { \
         return ptr ? (TYPE *) *(*(void ***) p_arg)++ : Va_arg(*(Va_list *) p_arg, TYPE *); \
     }
 
-#define DECLARE_ARG_FETCH(PREFIX, TYPE, TYPE_DOM) \
+#define DECL_ARG_FETCH(PREFIX, TYPE, TYPE_DOM) \
     TYPE PREFIX ## _arg_fetch(void *p_arg, bool ptr) \
     { \
         return ptr ? *(TYPE *) *(*(void ***) p_arg)++ : (TYPE) Va_arg(*(Va_list *) p_arg, TYPE_DOM); \
     }
 
-#define DECLARE_STRUCT_ARG_FETCH(PREFIX, TYPE) \
+#define DECL_STRUCT_ARG_FETCH(PREFIX, TYPE) \
     TYPE PREFIX ## _arg_fetch(void *p_arg, bool ptr) \
     { \
         return ptr ? *(TYPE *) *(*(void ***) p_arg)++ : Va_arg(*(Va_list *) p_arg, TYPE); \

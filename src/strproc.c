@@ -76,7 +76,7 @@ bool str_handler(const char *str, size_t len, void *Ptr, void *context)
     return 1;
 }
 
-#define DECLARE_STR_TO_UINT(TYPE, SUFFIX, LIMIT, BACKEND_RETURN, BACKEND, RADIX) \
+#define DECL_STR_TO_UINT(TYPE, SUFFIX, LIMIT, BACKEND_RETURN, BACKEND, RADIX) \
     unsigned str_to_ ## SUFFIX(const char *str, const char **ptr, TYPE *p_res) \
     { \
         errno = 0; \
@@ -91,21 +91,21 @@ bool str_handler(const char *str, size_t len, void *Ptr, void *context)
         return err ? err == ERANGE ? CVT_OUT_OF_RANGE : 0 : 1; \
     }
 
-DECLARE_STR_TO_UINT(uint64_t, uint64, UINT64_MAX, unsigned long long, strtoull, 10)
-DECLARE_STR_TO_UINT(uint32_t, uint32, UINT32_MAX, unsigned long, strtoul, 10)
-DECLARE_STR_TO_UINT(uint16_t, uint16, UINT16_MAX, unsigned long, strtoul, 10)
-DECLARE_STR_TO_UINT(uint8_t, uint8, UINT8_MAX, unsigned long, strtoul, 10)
-DECLARE_STR_TO_UINT(uint64_t, uint64_hex, UINT64_MAX, unsigned long long, strtoull, 16)
-DECLARE_STR_TO_UINT(uint32_t, uint32_hex, UINT32_MAX, unsigned long, strtoul, 16)
-DECLARE_STR_TO_UINT(uint16_t, uint16_hex, UINT16_MAX, unsigned long, strtoul, 16)
-DECLARE_STR_TO_UINT(uint8_t, uint8_hex, UINT8_MAX, unsigned long, strtoul, 16)
+DECL_STR_TO_UINT(uint64_t, uint64, UINT64_MAX, unsigned long long, strtoull, 10)
+DECL_STR_TO_UINT(uint32_t, uint32, UINT32_MAX, unsigned long, strtoul, 10)
+DECL_STR_TO_UINT(uint16_t, uint16, UINT16_MAX, unsigned long, strtoul, 10)
+DECL_STR_TO_UINT(uint8_t, uint8, UINT8_MAX, unsigned long, strtoul, 10)
+DECL_STR_TO_UINT(uint64_t, uint64_hex, UINT64_MAX, unsigned long long, strtoull, 16)
+DECL_STR_TO_UINT(uint32_t, uint32_hex, UINT32_MAX, unsigned long, strtoul, 16)
+DECL_STR_TO_UINT(uint16_t, uint16_hex, UINT16_MAX, unsigned long, strtoul, 16)
+DECL_STR_TO_UINT(uint8_t, uint8_hex, UINT8_MAX, unsigned long, strtoul, 16)
 
 #if defined _M_X64 || defined __x86_64__
-DECLARE_STR_TO_UINT(size_t, size, SIZE_MAX, unsigned long long, strtoull, 10)
-DECLARE_STR_TO_UINT(size_t, size_hex, SIZE_MAX, unsigned long long, strtoull, 16)
+DECL_STR_TO_UINT(size_t, size, SIZE_MAX, unsigned long long, strtoull, 10)
+DECL_STR_TO_UINT(size_t, size_hex, SIZE_MAX, unsigned long long, strtoull, 16)
 #elif defined _M_IX86 || defined __i386__
-DECLARE_STR_TO_UINT(size_t, size, SIZE_MAX, unsigned long, strtoul, 10)
-DECLARE_STR_TO_UINT(size_t, size_hex, SIZE_MAX, unsigned long, strtoul, 16)
+DECL_STR_TO_UINT(size_t, size, SIZE_MAX, unsigned long, strtoul, 10)
+DECL_STR_TO_UINT(size_t, size_hex, SIZE_MAX, unsigned long, strtoul, 16)
 #endif
 
 unsigned str_to_flt64(const char *str, const char **ptr, double *p_res)
@@ -141,7 +141,7 @@ bool bool_handler2(const char *str, size_t len, void *Ptr, void *Context)
         empty_handler(str, len, Ptr, &(struct handler_context) { .bit_pos = ((struct bool_handler_context *) Context)->bit_pos });
 }
 
-#define DECLARE_INT_HANDLER(TYPE, PREFIX, CONV) \
+#define DECL_INT_HANDLER(TYPE, PREFIX, CONV) \
     bool PREFIX ## _handler(const char *str, size_t len, void *Ptr, void *Context) \
     { \
         (void) len; \
@@ -151,12 +151,12 @@ bool bool_handler2(const char *str, size_t len, void *Ptr, void *Context)
         return empty_handler(str, len, Ptr, Context); \
     }
 
-DECLARE_INT_HANDLER(uint64_t, uint64, str_to_uint64)
-DECLARE_INT_HANDLER(uint32_t, uint32, str_to_uint32)
-DECLARE_INT_HANDLER(uint16_t, uint16, str_to_uint16)
-DECLARE_INT_HANDLER(uint8_t, uint8, str_to_uint8)
-DECLARE_INT_HANDLER(size_t, size, str_to_size)
-DECLARE_INT_HANDLER(double, flt64, str_to_flt64)
+DECL_INT_HANDLER(uint64_t, uint64, str_to_uint64)
+DECL_INT_HANDLER(uint32_t, uint32, str_to_uint32)
+DECL_INT_HANDLER(uint16_t, uint16, str_to_uint16)
+DECL_INT_HANDLER(uint8_t, uint8, str_to_uint8)
+DECL_INT_HANDLER(size_t, size, str_to_size)
+DECL_INT_HANDLER(double, flt64, str_to_flt64)
 
 bool str_tbl_handler(const char *str, size_t len, void *p_Off, void *Context)
 {

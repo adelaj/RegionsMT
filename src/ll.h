@@ -48,6 +48,33 @@ typedef struct { uint64_t qw[2]; } Uint128_t, Dsize_t;
 #define SIZE_PROD_TEST(PROD, ARG, CNT) (size_prod_test((PROD), (ARG), (CNT)) == (CNT))
 #define SIZE_PROD_TEST_VA(PROD, ...) (size_prod_test((PROD), ARG(size_t, __VA_ARGS__)) == countof(((size_t []) { __VA_ARGS__ })))
 
+unsigned char uchar_add(unsigned char *, unsigned char, unsigned char);
+unsigned short ushrt_add(unsigned short *, unsigned short, unsigned short);
+unsigned uint_add(unsigned *, unsigned, unsigned);
+unsigned long ulong_add(unsigned long *, unsigned long, unsigned long);
+unsigned long long ullong_add(unsigned long long *, unsigned long long, unsigned long long);
+
+unsigned char uchar_sub(unsigned char *, unsigned char, unsigned char);
+unsigned short ushrt_sub(unsigned short *, unsigned short, unsigned short);
+unsigned uint_sub(unsigned *, unsigned, unsigned);
+unsigned long ulong_sub(unsigned long *, unsigned long, unsigned long);
+unsigned long long ullong_sub(unsigned long long *, unsigned long long, unsigned long long);
+
+unsigned char uchar_mul(unsigned char *, unsigned char, unsigned char);
+unsigned short ushrt_mul(unsigned short *, unsigned short, unsigned short);
+unsigned uint_mul(unsigned *, unsigned, unsigned);
+unsigned long ulong_mul(unsigned long *, unsigned long, unsigned long);
+
+unsigned char uchar_shl(unsigned char *, unsigned char, unsigned char);
+unsigned short ushrt_shl(unsigned short *, unsigned short, unsigned char);
+unsigned uint_shl(unsigned *, unsigned, unsigned char);
+unsigned long ulong_shl(unsigned long *, unsigned long, unsigned char);
+
+unsigned char uchar_shr(unsigned char *, unsigned char, unsigned char);
+unsigned short ushrt_shr(unsigned short *, unsigned short, unsigned char);
+unsigned uint_shr(unsigned *, unsigned, unsigned char);
+unsigned long ulong_shr(unsigned long *, unsigned long, unsigned char);
+
 unsigned char uchar_bit_scan_reverse(unsigned char);
 unsigned short ushrt_bit_scan_reverse(unsigned short);
 unsigned uint_bit_scan_reverse(unsigned);
@@ -74,6 +101,9 @@ bool ptr_atomic_compare_exchange(void *volatile *, void **, void *);
 #   define DSIZEC(LO, HI) UINT128C((LO), (HI))
 #   define DSIZE_LO(X) ((size_t) UINT128_LO((X)))
 #   define DSIZE_HI(X) ((size_t) UINT128_HI((X)))
+unsigned long long ullong_mul(unsigned long long *, unsigned long long, unsigned long long);
+unsigned long long ullong_shl(unsigned long long *, unsigned long long, unsigned char);
+unsigned long long ullong_shr(unsigned long long *, unsigned long long, unsigned char);
 unsigned long long ullong_bit_scan_reverse(unsigned long long);
 unsigned long long ullong_bit_scan_forward(unsigned long long);
 unsigned long long ullong_pop_cnt(unsigned long long);
@@ -86,26 +116,61 @@ bool Uint128_atomic_compare_exchange(volatile Uint128_t *, Uint128_t *, Uint128_
 #   define IF64(...)
 #endif
 
+#define add(P_HI, X, Y) (_Generic(*(P_HI), \
+    unsigned char: uchar_add, \
+    unsigned short: ushrt_add, \
+    unsigned: uint_add, \
+    unsigned long: ulong_add, \
+    unsigned long long: ullong_add)((P_HI), (X), (Y)))
+
+#define sub(P_HI, X, Y) (_Generic(*(P_HI), \
+    unsigned char: uchar_sub, \
+    unsigned short: ushrt_sub, \
+    unsigned: uint_sub, \
+    unsigned long: ulong_sub, \
+    unsigned long long: ullong_sub)((P_HI), (X), (Y)))
+
+#define mul(P_HI, X, Y) (_Generic(*(P_HI), \
+    unsigned char: uchar_mul, \
+    unsigned short: ushrt_mul, \
+    unsigned: uint_mul, \
+    unsigned long: ulong_mul IF64(, \
+    unsigned long long: ullong_mul))((P_HI), (X), (Y)))
+
+#define shl(P_HI, X, Y) (_Generic(*(P_HI), \
+    unsigned char: uchar_shl, \
+    unsigned short: ushrt_shl, \
+    unsigned: uint_shl, \
+    unsigned long: ulong_shl IF64(, \
+    unsigned long long: ullong_shl))((P_HI), (X), (Y)))
+
+#define shr(P_LO, X, Y) (_Generic(*(P_HI), \
+    unsigned char: uchar_shr, \
+    unsigned short: ushrt_shr, \
+    unsigned: uint_shr, \
+    unsigned long: ulong_shr IF64(, \
+    unsigned long long: ullong_shr))((P_LO), (X), (Y)))
+
 #define bit_scan_reverse(x) (_Generic((x), \
     unsigned char: uchar_bit_scan_reverse, \
     unsigned short: ushrt_bit_scan_reverse, \
     unsigned: uint_bit_scan_reverse, \
-    unsigned long: ulong_bit_scan_reverse \
-    IF64(, unsigned long long: ullong_bit_scan_reverse))(x))
+    unsigned long: ulong_bit_scan_reverse IF64(, \
+    unsigned long long: ullong_bit_scan_reverse))(x))
 
 #define bit_scan_forward(x) (_Generic((x), \
     unsigned char: uchar_bit_scan_forward, \
     unsigned short: ushrt_bit_scan_forward, \
     unsigned: uint_bit_scan_forward, \
-    unsigned long: ulong_bit_scan_forward \
-    IF64(, unsigned long long: ullong_bit_scan_forward))(x))
+    unsigned long: ulong_bit_scan_forward IF64(, \
+    unsigned long long: ullong_bit_scan_forward))(x))
 
 #define pop_cnt(x) (_Generic((x), \
     unsigned char: uchar_pop_cnt, \
     unsigned short: ushrt_pop_cnt, \
     unsigned: uint_pop_cnt, \
-    unsigned long: ulong_pop_cnt \
-    IF64(, unsigned long long: ullong_pop_cnt))(x))
+    unsigned long: ulong_pop_cnt IF64(, \
+    unsigned long long: ullong_pop_cnt))(x))
 
 #define atomic_compare_exchange(DST, P_CMP, XCHG) (_Generic((DST), \
     volatile unsigned char *: uchar_atomic_compare_exchange, \
@@ -113,8 +178,8 @@ bool Uint128_atomic_compare_exchange(volatile Uint128_t *, Uint128_t *, Uint128_
     volatile unsigned *: uint_atomic_compare_exchange, \
     volatile unsigned long *: ulong_atomic_compare_exchange, \
     volatile unsigned long long *: ullong_atomic_compare_exchange,\
-    void *volatile *: ptr_atomic_compare_exchange \
-    IF64(, volatile Uint128_t *: Uint128_atomic_compare_exchange))((DST), (P_CMP), (XCHG)))
+    void *volatile *: ptr_atomic_compare_exchange IF64(, \
+    volatile Uint128_t *: Uint128_atomic_compare_exchange))((DST), (P_CMP), (XCHG)))
 
 #if defined __GNUC__ || defined __clang__
 
@@ -189,34 +254,34 @@ unsigned long long ullong_atomic_exchange(volatile unsigned long long *, unsigne
         volatile unsigned char *: uchar_atomic_and, \
         volatile unsigned short *: ushrt_atomic_and, \
         volatile unsigned *: uint_atomic_and, \
-        volatile unsigned long *: ulong_atomic_and \
-        IF64(, unsigned long long *: ullong_atomic_and))((DST), (ARG)))
+        volatile unsigned long *: ulong_atomic_and IF64(, \
+        volatile unsigned long long *: ullong_atomic_and))((DST), (ARG)))
 #   define atomic_and_release(DST, ARG) (atomic_and(DST, ARG))
 #   define atomic_or(DST, ARG) (_Generic((DST), \
         volatile unsigned char *: uchar_atomic_or, \
         volatile unsigned short *: ushrt_atomic_or, \
         volatile unsigned *: uint_atomic_or, \
-        volatile unsigned long *: ulong_atomic_or \
-        IF64(, unsigned long long *: ullong_atomic_or))((DST), (ARG)))
+        volatile unsigned long *: ulong_atomic_or IF64(, \
+        volatile unsigned long long *: ullong_atomic_or))((DST), (ARG)))
 #   define atomic_or_release(DST, ARG) (atomic_or(DST, ARG))
 #   define atomic_add(DST, ARG) (_Generic((DST), \
         volatile unsigned char *: uchar_atomic_add, \
         volatile unsigned short *: ushrt_atomic_add, \
         volatile unsigned *: uint_atomic_add, \
-        volatile unsigned long *: ulong_atomic_add \
-        IF64(, unsigned long long *: ullong_atomic_add))((DST), (ARG)))
+        volatile unsigned long *: ulong_atomic_add IF64(, \
+        volatile unsigned long long *: ullong_atomic_add))((DST), (ARG)))
 #   define atomic_sub(DST, ARG) (_Generic((DST), \
         volatile unsigned char *: uchar_atomic_sub, \
         volatile unsigned short *: ushrt_atomic_sub, \
         volatile unsigned *: uint_atomic_sub, \
-        volatile unsigned long *: ulong_atomic_sub \
-        IF64(, unsigned long long *: ullong_atomic_sub))((DST), (ARG)))
+        volatile unsigned long *: ulong_atomic_sub IF64(, \
+        volatile unsigned long long *: ullong_atomic_sub))((DST), (ARG)))
 #   define atomic_exchange(DST, ARG) (_Generic((DST), \
         volatile unsigned char *: uchar_atomic_exchange, \
         volatile unsigned short *: ushrt_atomic_exchange, \
         volatile unsigned *: uint_atomic_exchange, \
-        volatile unsigned long *: ulong_atomic_exchange \
-        IF64(, unsigned long long *: ullong_atomic_exchange), \
+        volatile unsigned long *: ulong_atomic_exchange IF64(, \
+        volatile unsigned long long *: ullong_atomic_exchange), \
         void *volatile *: ptr_atomic_exchange)((DST), (ARG)))
 #endif
 

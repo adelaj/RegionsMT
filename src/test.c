@@ -23,7 +23,7 @@ struct test_metric {
     struct strl test_name, generator_name;
 };
 
-static DECLARE_PTR_ARG_FETCH(metric_ptr, struct test_metric)
+static DECL_PTR_ARG_FETCH(metric_ptr, struct test_metric)
 
 static struct message_result fmt_test_metric(char *buff, size_t *p_cnt, void *p_arg, const struct env *env, enum fmt_execute_flags flags)
 {

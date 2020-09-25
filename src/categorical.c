@@ -10,7 +10,7 @@
 #include <stdlib.h>
 #include <string.h>
 
-#define DECLARE_BITS_INIT(TYPE, PREFIX) \
+#define DECL_BITS_INIT(TYPE, PREFIX) \
     size_t PREFIX ## _bits_init(uint8_t *bits, size_t cnt, size_t ucnt, size_t *filter, TYPE *data) \
     { \
         size_t res = 0; \
@@ -22,8 +22,8 @@
         return res; \
     }
 
-static DECLARE_BITS_INIT(uint8_t, gen)
-static DECLARE_BITS_INIT(size_t, phen)
+static DECL_BITS_INIT(uint8_t, gen)
+static DECL_BITS_INIT(size_t, phen)
 
 static size_t gen_pop_cnt_alt_impl(enum mt_alt alt, uint8_t *bits, size_t pop_cnt)
 {

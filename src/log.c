@@ -12,36 +12,36 @@
 #include <stdlib.h>
 #include <string.h>
 
-DECLARE_PTR_ARG_FETCH(ptr, void)
-DECLARE_PTR_ARG_FETCH(env_ptr, struct env)
-DECLARE_PTR_ARG_FETCH(style_ptr, struct style)
-DECLARE_PTR_ARG_FETCH(Va_list_ptr, Va_list)
+DECL_PTR_ARG_FETCH(ptr, void)
+DECL_PTR_ARG_FETCH(env_ptr, struct env)
+DECL_PTR_ARG_FETCH(style_ptr, struct style)
+DECL_PTR_ARG_FETCH(Va_list_ptr, Va_list)
 
-DECLARE_ARG_FETCH(ussint, unsigned char, unsigned)
-DECLARE_ARG_FETCH(usint, unsigned short, unsigned)
-DECLARE_ARG_FETCH(uint, unsigned, unsigned)
-DECLARE_ARG_FETCH(ulint, unsigned long, unsigned long)
-DECLARE_ARG_FETCH(ullint, unsigned long long, unsigned long long)
-DECLARE_ARG_FETCH(uint8, uint8_t, Uint8_dom_t)
-DECLARE_ARG_FETCH(uint16, uint16_t, Uint16_dom_t)
-DECLARE_ARG_FETCH(uint32, uint32_t, Uint32_dom_t)
-DECLARE_ARG_FETCH(uint64, uint64_t, Uint64_dom_t)
-DECLARE_ARG_FETCH(size, size_t, Size_dom_t)
-DECLARE_ARG_FETCH(uintmax, uintmax_t, Uintmax_dom_t)
+DECL_ARG_FETCH(ussint, unsigned char, unsigned)
+DECL_ARG_FETCH(usint, unsigned short, unsigned)
+DECL_ARG_FETCH(uint, unsigned, unsigned)
+DECL_ARG_FETCH(ulint, unsigned long, unsigned long)
+DECL_ARG_FETCH(ullint, unsigned long long, unsigned long long)
+DECL_ARG_FETCH(uint8, uint8_t, Uint8_dom_t)
+DECL_ARG_FETCH(uint16, uint16_t, Uint16_dom_t)
+DECL_ARG_FETCH(uint32, uint32_t, Uint32_dom_t)
+DECL_ARG_FETCH(uint64, uint64_t, Uint64_dom_t)
+DECL_ARG_FETCH(size, size_t, Size_dom_t)
+DECL_ARG_FETCH(uintmax, uintmax_t, Uintmax_dom_t)
 
-DECLARE_ARG_FETCH(bool, bool, int)
-DECLARE_ARG_FETCH(Errno, Errno_t, Errno_dom_t)
-DECLARE_ARG_FETCH(ssint, signed char, int)
-DECLARE_ARG_FETCH(sint, short, int)
-DECLARE_ARG_FETCH(int, int, int)
-DECLARE_ARG_FETCH(lint, long, long)
-DECLARE_ARG_FETCH(llint, long long, long long)
-DECLARE_ARG_FETCH(int8, int8_t, Int8_dom_t)
-DECLARE_ARG_FETCH(int16, int16_t, Int16_dom_t)
-DECLARE_ARG_FETCH(int32, int32_t, Int32_dom_t)
-DECLARE_ARG_FETCH(int64, int64_t, Int64_dom_t)
-DECLARE_ARG_FETCH(ptrdiff, ptrdiff_t, Ptrdiff_dom_t)
-DECLARE_ARG_FETCH(intmax, intmax_t, Intmax_dom_t)
+DECL_ARG_FETCH(bool, bool, int)
+DECL_ARG_FETCH(Errno, Errno_t, Errno_dom_t)
+DECL_ARG_FETCH(ssint, signed char, int)
+DECL_ARG_FETCH(sint, short, int)
+DECL_ARG_FETCH(int, int, int)
+DECL_ARG_FETCH(lint, long, long)
+DECL_ARG_FETCH(llint, long long, long long)
+DECL_ARG_FETCH(int8, int8_t, Int8_dom_t)
+DECL_ARG_FETCH(int16, int16_t, Int16_dom_t)
+DECL_ARG_FETCH(int32, int32_t, Int32_dom_t)
+DECL_ARG_FETCH(int64, int64_t, Int64_dom_t)
+DECL_ARG_FETCH(ptrdiff, ptrdiff_t, Ptrdiff_dom_t)
+DECL_ARG_FETCH(intmax, intmax_t, Intmax_dom_t)
 
 // In: '*p_cnt' -- size of the buffer
 // Out: '*p_cnt' -- length of the string to be written (optional null-terminator is not taken in account)
@@ -507,7 +507,7 @@ static struct message_result fmt_execute_time_diff(char *buff, size_t *p_cnt, Va
     return print_time_diff(buff, p_cnt, start, stop, env);
 }
 
-static DECLARE_STRUCT_ARG_FETCH(code_metric, struct code_metric)
+static DECL_STRUCT_ARG_FETCH(code_metric, struct code_metric)
 
 static struct message_result fmt_execute_code_metric(char *buff, size_t *p_cnt, Va_list *p_arg, const struct env *env, enum fmt_execute_flags flags)
 {
@@ -549,7 +549,7 @@ static void fmt_execute_utf(uint32_t val, enum fmt_arg_mode mode, char *buff, si
     print(buff, p_cnt, (char *) str, len, 0);
 }
 
-static DECLARE_ARG_FETCH(fmt_callback, fmt_callback, fmt_callback)
+static DECL_ARG_FETCH(fmt_callback, fmt_callback, fmt_callback)
 
 static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg, const struct style *style, enum fmt_execute_flags flags)
 {
