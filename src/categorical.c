@@ -25,18 +25,18 @@
 static DECL_BITS_INIT(uint8_t, gen)
 static DECL_BITS_INIT(size_t, phen)
 
-static size_t gen_pop_cnt_alt_impl(enum mt_alt alt, uint8_t *bits, size_t pop_cnt)
+static size_t gen_pcnt_alt_impl(enum mt_alt alt, uint8_t *bits, size_t pcnt)
 {
     switch (alt)
     {
     case ALT_CD: // codominant
-        return pop_cnt;
+        return pcnt;
     case ALT_R: // recessive
-        return pop_cnt == 2 ? bits[0] == (1 | 4) || bits[0] == (2 | 4) ? 2 : 1 : MIN(pop_cnt, 2);
+        return pcnt == 2 ? bits[0] == (1 | 4) || bits[0] == (2 | 4) ? 2 : 1 : MIN(pcnt, 2);
     case ALT_D: // dominant
-        return pop_cnt == 2 ? bits[0] == (1 | 2) || bits[0] == (1 | 4) ? 2 : 1 : MIN(pop_cnt, 2);
+        return pcnt == 2 ? bits[0] == (1 | 2) || bits[0] == (1 | 4) ? 2 : 1 : MIN(pcnt, 2);
     case ALT_A: // allelic
-        return MIN(pop_cnt, 2);
+        return MIN(pcnt, 2);
     default:;
     }
     return 0;
@@ -123,7 +123,7 @@ static void gen_shuffle_alt_impl(enum mt_alt alt, size_t *dst, size_t *src, uint
 }
 
 struct categorical_snp_data {
-    size_t gen_mar[GEN_CNT * ALT_CNT], mar[ALT_CNT], cnt, gen_pop_cnt_alt[ALT_CNT], flags_pop_cnt;
+    size_t gen_mar[GEN_CNT * ALT_CNT], mar[ALT_CNT], cnt, gen_pcnt_alt[ALT_CNT], flags_pcnt;
     uint8_t gen_bits[UINT8_CNT(GEN_CNT)];
 };
 
@@ -237,14 +237,14 @@ static size_t filter_init(size_t *filter, uint8_t *gen, size_t *phen, size_t phe
     return cnt;
 }
 
-static size_t gen_pop_cnt_alt_init(size_t *gen_pop_cnt_alt, uint8_t *gen_bits, size_t gen_pop_cnt, enum mt_flags flags)
+static size_t gen_pcnt_alt_init(size_t *gen_pcnt_alt, uint8_t *gen_bits, size_t gen_pcnt, enum mt_flags flags)
 {
     size_t res = 0;
     for (enum mt_alt i = 0; i < ALT_CNT; i++, flags >>= 1) if (flags & 1)
     {
-        size_t tmp = gen_pop_cnt_alt_impl(i, gen_bits, gen_pop_cnt);
+        size_t tmp = gen_pcnt_alt_impl(i, gen_bits, gen_pcnt);
         if (tmp < 2) continue;
-        gen_pop_cnt_alt[i] = tmp;
+        gen_pcnt_alt[i] = tmp;
         res++;
     }
     return res;
@@ -259,13 +259,13 @@ static void contingency_table_init(size_t *tbl, uint8_t *gen, size_t *phen, size
     }
 }
 
-static void contingency_table_shuffle_alt_impl(enum mt_alt alt, size_t *dst, size_t *src, uint8_t *gen_bits, size_t gen_pop_cnt, uint8_t *phen_bits, size_t phen_pop_cnt)
+static void contingency_table_shuffle_alt_impl(enum mt_alt alt, size_t *dst, size_t *src, uint8_t *gen_bits, size_t gen_pcnt, uint8_t *phen_bits, size_t phen_pcnt)
 {
-    for (size_t i = 0, j = 0, off = 0; i < phen_pop_cnt; i++, j += GEN_CNT)
+    for (size_t i = 0, j = 0, off = 0; i < phen_pcnt; i++, j += GEN_CNT)
     {
         if (!uint8_bit_test(phen_bits, i)) continue;
         gen_shuffle_alt_impl(alt, dst + off, src + j, gen_bits);
-        off += gen_pop_cnt;
+        off += gen_pcnt;
     }
 }
 
@@ -377,7 +377,7 @@ struct mt_result categorical_impl(struct categorical_supp *supp, uint8_t *gen, s
 {    
     struct mt_result res;
     uint8_t gen_bits[UINT8_CNT(GEN_CNT)] = { 0 };
-    size_t gen_pop_cnt_alt[ALT_CNT] = { 0 };
+    size_t gen_pcnt_alt[ALT_CNT] = { 0 };
     size_t gen_val[GEN_CNT];
 
     array_broadcast(res.pv, countof(res.pv), sizeof(*res.pv), &(double) { nan(__func__) });
@@ -390,12 +390,12 @@ struct mt_result categorical_impl(struct categorical_supp *supp, uint8_t *gen, s
     if (!cnt) return res;
     
     // Counting unique genotypes
-    if (!gen_pop_cnt_alt_init(gen_pop_cnt_alt, gen_bits, gen_bits_init(gen_bits, cnt, GEN_CNT, supp->filter, gen), flags)) return res;
+    if (!gen_pcnt_alt_init(gen_pcnt_alt, gen_bits, gen_bits_init(gen_bits, cnt, GEN_CNT, supp->filter, gen), flags)) return res;
     
     // Counting unique phenotypes
     memset(supp->phen_bits, 0, sizeof(*supp->phen_bits) * UINT8_CNT(phen_ucnt));
-    size_t phen_pop_cnt = phen_bits_init(supp->phen_bits, cnt, phen_ucnt, supp->filter, phen);
-    if (phen_pop_cnt < 2) return res;
+    size_t phen_pcnt = phen_bits_init(supp->phen_bits, cnt, phen_ucnt, supp->filter, phen);
+    if (phen_pcnt < 2) return res;
 
     // Building contingency table
     memset(supp->tbl + table_disp, 0, table_disp * sizeof(*supp->tbl));
@@ -404,20 +404,20 @@ struct mt_result categorical_impl(struct categorical_supp *supp, uint8_t *gen, s
     // Performing computations for each alternative
     for (enum mt_alt i = 0; i < ALT_CNT; i++)
     {
-        size_t gen_pop_cnt = gen_pop_cnt_alt[i];
-        if (!gen_pop_cnt) continue;
+        size_t gen_pcnt = gen_pcnt_alt[i];
+        if (!gen_pcnt) continue;
 
-        contingency_table_shuffle_alt_impl(i, supp->tbl, supp->tbl + table_disp, gen_bits, gen_pop_cnt, supp->phen_bits, phen_pop_cnt);
+        contingency_table_shuffle_alt_impl(i, supp->tbl, supp->tbl + table_disp, gen_bits, gen_pcnt, supp->phen_bits, phen_pcnt);
 
         // Computing sums
         size_t gen_mar[GEN_CNT] = { 0 }, mar = 0;
-        memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
-        mar_init(supp->tbl, gen_mar, supp->phen_mar, &mar, gen_pop_cnt, phen_pop_cnt);
+        memset(supp->phen_mar, 0, phen_pcnt * sizeof(*supp->phen_mar));
+        mar_init(supp->tbl, gen_mar, supp->phen_mar, &mar, gen_pcnt, phen_pcnt);
 
         // Computing p-value
         res.pv[i] = 
-            outer_combined_init(supp->outer, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt) ? 
-            stat_chisq(supp->tbl, supp->outer, mar, gen_pop_cnt, phen_pop_cnt) : 
+            outer_combined_init(supp->outer, gen_mar, supp->phen_mar, mar, gen_pcnt, phen_pcnt) ? 
+            stat_chisq(supp->tbl, supp->outer, mar, gen_pcnt, phen_pcnt) : 
             stat_exact(supp->tbl, gen_mar, supp->phen_mar);
         
         // Computing qas
@@ -426,7 +426,7 @@ struct mt_result categorical_impl(struct categorical_supp *supp, uint8_t *gen, s
         {
             val_init(gen_val, gen_bits, GEN_CNT);
             val_init(supp->phen_val, supp->phen_bits, phen_ucnt);
-            res.qas[i] = qas_fisher(supp->tbl, gen_val, supp->phen_val, gen_mar, supp->phen_mar, mar, gen_pop_cnt, phen_pop_cnt);
+            res.qas[i] = qas_fisher(supp->tbl, gen_val, supp->phen_val, gen_mar, supp->phen_mar, mar, gen_pcnt, phen_pcnt);
         }
     }
     return res;
@@ -449,14 +449,14 @@ struct adj_result categorical_adj_average(struct categorical_adj_average_supp *s
         supp->snp_data[i].cnt = cnt;
 
         // Counting unique genotypes
-        size_t flags_pop_cnt = gen_pop_cnt_alt_init(supp->snp_data[i].gen_pop_cnt_alt, supp->snp_data[i].gen_bits, gen_bits_init(supp->snp_data[i].gen_bits, cnt, GEN_CNT, supp->filter + off, gen + off), flags);
-        if (!flags_pop_cnt) continue;
-        supp->snp_data[i].flags_pop_cnt = flags_pop_cnt;
+        size_t flags_pcnt = gen_pcnt_alt_init(supp->snp_data[i].gen_pcnt_alt, supp->snp_data[i].gen_bits, gen_bits_init(supp->snp_data[i].gen_bits, cnt, GEN_CNT, supp->filter + off, gen + off), flags);
+        if (!flags_pcnt) continue;
+        supp->snp_data[i].flags_pcnt = flags_pcnt;
 
         // Counting unique phenotypes
         memset(supp->phen_bits, 0, UINT8_CNT(phen_ucnt));
-        size_t phen_pop_cnt = phen_bits_init(supp->phen_bits, cnt, phen_ucnt, supp->filter + off, phen);
-        if (phen_pop_cnt < 2) continue;
+        size_t phen_pcnt = phen_bits_init(supp->phen_bits, cnt, phen_ucnt, supp->filter + off, phen);
+        if (phen_pcnt < 2) continue;
 
         // Building contingency table
         memset(supp->tbl + table_disp, 0, table_disp * sizeof(*supp->tbl));
@@ -465,16 +465,16 @@ struct adj_result categorical_adj_average(struct categorical_adj_average_supp *s
         // Performing computations for each alternative
         for (enum mt_alt j = 0; j < ALT_CNT; j++)
         {
-            size_t gen_pop_cnt = supp->snp_data[i].gen_pop_cnt_alt[j];
-            if (!gen_pop_cnt) continue;
+            size_t gen_pcnt = supp->snp_data[i].gen_pcnt_alt[j];
+            if (!gen_pcnt) continue;
 
-            contingency_table_shuffle_alt_impl(j, supp->tbl, supp->tbl + table_disp, supp->snp_data[i].gen_bits, gen_pop_cnt, supp->phen_bits, phen_pop_cnt);
+            contingency_table_shuffle_alt_impl(j, supp->tbl, supp->tbl + table_disp, supp->snp_data[i].gen_bits, gen_pcnt, supp->phen_bits, phen_pcnt);
 
             // Computing sums
-            memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
-            mar_init(supp->tbl, supp->snp_data[i].gen_mar + (size_t) j * GEN_CNT, supp->phen_mar, supp->snp_data[i].mar + j, gen_pop_cnt, phen_pop_cnt);
-            outer_init(supp->outer, supp->snp_data[i].gen_mar + (size_t) j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-            double st = log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt)); // log10(...)
+            memset(supp->phen_mar, 0, phen_pcnt * sizeof(*supp->phen_mar));
+            mar_init(supp->tbl, supp->snp_data[i].gen_mar + (size_t) j * GEN_CNT, supp->phen_mar, supp->snp_data[i].mar + j, gen_pcnt, phen_pcnt);
+            outer_init(supp->outer, supp->snp_data[i].gen_mar + (size_t) j * GEN_CNT, supp->phen_mar, gen_pcnt, phen_pcnt);
+            double st = log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pcnt, phen_pcnt)); // log10(...)
             if (isnan(st)) continue;
             density[j] -= st;
             density_cnt[j]++;            
@@ -505,12 +505,12 @@ struct adj_result categorical_adj_average(struct categorical_adj_average_supp *s
         for (size_t i = 0, off = 0; i < snp_cnt; i++, off += phen_cnt)
         {
             size_t cnt = supp->snp_data[i].cnt;
-            if (!cnt || !supp->snp_data[i].flags_pop_cnt) continue;
+            if (!cnt || !supp->snp_data[i].flags_pcnt) continue;
 
             // Counting unique phenotypes
             memset(supp->phen_bits, 0, UINT8_CNT(phen_ucnt));
-            size_t phen_pop_cnt = phen_bits_init(supp->phen_bits, cnt, phen_ucnt, supp->filter + off, supp->phen_perm);
-            if (phen_pop_cnt < 2) continue;
+            size_t phen_pcnt = phen_bits_init(supp->phen_bits, cnt, phen_ucnt, supp->filter + off, supp->phen_perm);
+            if (phen_pcnt < 2) continue;
 
             // Building contingency table
             memset(supp->tbl + table_disp, 0, table_disp * sizeof(*supp->tbl));
@@ -519,16 +519,16 @@ struct adj_result categorical_adj_average(struct categorical_adj_average_supp *s
             // Performing computations for each alternative
             for (enum mt_alt j = 0; j < ALT_CNT; j++) if (alt_rpl[j])
             {
-                size_t gen_pop_cnt = supp->snp_data[i].gen_pop_cnt_alt[j];
-                if (!gen_pop_cnt) continue;
+                size_t gen_pcnt = supp->snp_data[i].gen_pcnt_alt[j];
+                if (!gen_pcnt) continue;
 
-                contingency_table_shuffle_alt_impl(j, supp->tbl, supp->tbl + table_disp, supp->snp_data[i].gen_bits, gen_pop_cnt, supp->phen_bits, phen_pop_cnt);
+                contingency_table_shuffle_alt_impl(j, supp->tbl, supp->tbl + table_disp, supp->snp_data[i].gen_bits, gen_pcnt, supp->phen_bits, phen_pcnt);
 
                 // Computing sums
-                memset(supp->phen_mar, 0, phen_pop_cnt * sizeof(*supp->phen_mar));
-                ymar_init(supp->tbl, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-                outer_init(supp->outer, supp->snp_data[i].gen_mar + (size_t) j * GEN_CNT, supp->phen_mar, gen_pop_cnt, phen_pop_cnt);
-                double st = log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pop_cnt, phen_pop_cnt)); // log10(...)
+                memset(supp->phen_mar, 0, phen_pcnt * sizeof(*supp->phen_mar));
+                ymar_init(supp->tbl, supp->phen_mar, gen_pcnt, phen_pcnt);
+                outer_init(supp->outer, supp->snp_data[i].gen_mar + (size_t) j * GEN_CNT, supp->phen_mar, gen_pcnt, phen_pcnt);
+                double st = log(stat_chisq(supp->tbl, supp->outer, supp->snp_data[i].mar[j], gen_pcnt, phen_pcnt)); // log10(...)
                 if (isnan(st)) continue;
                 density_perm[j] -= st;
                 density_perm_cnt[j]++;

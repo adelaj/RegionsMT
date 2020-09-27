@@ -26,7 +26,7 @@ struct array_result ranks_stable(size_t **, const void *, size_t, size_t, stable
 void orders_apply_impl(uintptr_t *restrict, size_t, size_t, void *restrict, uint8_t *restrict, void *restrict, size_t);
 struct array_result orders_apply(uintptr_t *restrict, size_t, size_t, void *restrict, void *restrict, size_t);
 
-#define QUICK_SORT_CUTOFF 20 // The actual quick sort is applied only for arrays of counts, greater than this value
+#define QUICK_SORT_CUTOFF 20u // The actual quick sort is applied only for arrays of counts, greater than this value
 #define QUICK_SORT_CACHED // Enables the more optimal utilization of the CPU caches
 
 Dsize_t quick_sort_partition(void *restrict, size_t, size_t, size_t, cmp_callback, void *, void *restrict, size_t);

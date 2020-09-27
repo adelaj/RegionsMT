@@ -435,7 +435,7 @@ void quick_sort(void *restrict arr, size_t cnt, size_t sz, cmp_callback cmp, voi
         size_t tot = cnt * stride;
         if (cnt > QUICK_SORT_CUTOFF)
         {
-            size_t lin_cutoff = QUICK_SORT_CUTOFF * stride, log_cutoff = size_sub_sat(size_log2(cnt, 1), size_log2(QUICK_SORT_CUTOFF, 0) << 1);
+            size_t lin_cutoff = QUICK_SORT_CUTOFF * stride, log_cutoff = size_sub_sat(ulog2(cnt, 1), ulog2(QUICK_SORT_CUTOFF, 0) << 1);
 #       ifdef QUICK_SORT_CACHED
             quick_sort_impl(arr, tot, sz, cmp, context, swp, stride, lin_cutoff, insertion_sort_impl, log_cutoff, comb_sort_impl);
 #       else
@@ -510,7 +510,7 @@ enum {
 
 struct array_result hash_table_init(struct hash_table *tbl, size_t cnt, size_t szk, size_t szv)
 {
-    size_t lcnt = size_log2(size_add_sat(cnt, 3), 1);
+    size_t lcnt = ulog2(size_add_sat(cnt, 3), 1);
     if (lcnt == SIZE_BIT) return (struct array_result) { .error = ARRAY_OVERFLOW };
     cnt = (size_t) 1 << lcnt;
     struct array_result res = array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT);
@@ -624,10 +624,10 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
         size_t lcnt;
         if ((cap >> 1) <= tbl->cnt)
         {
-            lcnt = size_log2(size_add_sat(cap, 1), 1);
+            lcnt = ulog2(size_add_sat(cap, 1), 1);
             if (lcnt == SIZE_BIT) return (struct array_result) { .error = ARRAY_OVERFLOW };
         }
-        else lcnt = cap > 5 ? size_log2(cap - 1, 1) : 2;
+        else lcnt = cap > 5 ? size_ulog2(cap - 1, 1) : 2;
         size_t cnt = (size_t) 1 << lcnt;
         if (tbl->cnt >= (size_t) ((double) cnt * .77 + .5) || cap == cnt) res.status |= HASH_UNTOUCHED; // Magic constants from the 'khash.h'
         else

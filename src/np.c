@@ -45,7 +45,7 @@ static bool utf8_str_to_wstr(const char *restrict str, wchar_t **p_wstr, size_t 
         if (!utf8_decode(ch, &val, NULL, &ulen, &context)) return 0;
         if (context) continue;
         size_t car;
-        wcnt = size_add(&car, wcnt, utf16_len(val));
+        wcnt = add(&car, wcnt, utf16_len(val));
         if (car) return 0;
     }
     if (context) return 0;
@@ -56,6 +56,7 @@ static bool utf8_str_to_wstr(const char *restrict str, wchar_t **p_wstr, size_t 
         utf8_decode(str[i], &val, NULL, NULL, &context); // No checks are required
         if (context) continue;
         uint8_t tmp;
+        _Static_assert(sizeof(*wstr) == sizeof(uint16_t), "");
         utf16_encode(val, (uint16_t *) wstr + j, &tmp, 0);
         j += tmp;
     }

@@ -585,6 +585,7 @@ static bool wargv_to_argv_impl(size_t argc, wchar_t **wargv, char *base, char **
         uint8_t context = 0;
         for (wchar_t *word = wargv[i]; *word; word++)
         {
+            _Static_assert(sizeof(*word) == sizeof(uint16_t), "");
             if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context, 0)) return 0;
             if (context) continue;
             uint8_t len;

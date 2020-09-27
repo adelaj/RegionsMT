@@ -87,7 +87,7 @@ static unsigned sort_thread(void *Ind, void *Data, void *tls)
 {
     (void) tls;
     struct sort_mt *data = Data;
-    size_t ind = (size_t) Ind, lev = size_log2(ind, 0) + 1, a, b;
+    size_t ind = (size_t) Ind, lev = size_ulog2(ind, 0) + 1, a, b;
     if (ind)
     {
         // Warning! Acquire semantic is provided by 'Dsize_interlocked_compare_exchange' in task condition
@@ -108,7 +108,7 @@ static unsigned sort_thread(void *Ind, void *Data, void *tls)
 
 bool sort_mt_init(struct thread_pool *pool,  struct log *log)
 {
-    size_t dep = size_log2(thread_pool_get_count(pool), 0), task_cnt = (size_t) 1 << dep, cnt = task_cnt - 1;
+    size_t dep = size_ulog2(thread_pool_get_count(pool), 0), task_cnt = (size_t) 1 << dep, cnt = task_cnt - 1;
     struct sort_mt *data;
     // Note, that aligned allocation below is superfluous on all platforms under consideration
     if (!array_assert(log, CODE_METRIC, array_init_impl(&data, NULL, alignof(struct sort_mt), fam_countof(struct sort_mt, ran, cnt), fam_sizeof(struct sort_mt, ran), fam_diffof(struct sort_mt, ran, cnt), ARRAY_STRICT | ARRAY_ALIGN))) return 0;
@@ -119,7 +119,7 @@ bool sort_mt_init(struct thread_pool *pool,  struct log *log)
 bool sort_mt_init(void *arr, size_t cnt, size_t sz, cmp_callback cmp, void *context, struct thread_pool *pool, struct sort_mt_sync *sync)
 {
     struct sort_mt_sync *snc = sync ? sync : &(struct sort_mt_sync) { 0 };
-    size_t dep = size_bit_scan_reverse(thread_pool_get_count(pool)); // Max value of 'dep' is 63 under x86_64 and 31 under x86 
+    size_t dep = size_bsr(thread_pool_get_count(pool)); // Max value of 'dep' is 63 under x86_64 and 31 under x86 
     const size_t s_cnt = (size_t) 1 << dep, m_cnt = s_cnt - 1;
 
     struct sort_mt *res;

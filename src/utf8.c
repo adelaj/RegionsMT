@@ -3,8 +3,8 @@
 
 uint8_t utf8_len(uint32_t utf8_val)
 {
-    uint8_t mode = (uint8_t) uint32_bit_scan_reverse(utf8_val);
-    if (mode <= 6 || mode == UINT8_MAX) return 1;
+    uint8_t mode = (uint8_t) bsr(utf8_val);
+    if (mode <= 6 || mode == umax(mode)) return 1;
     else return (mode + 4) / 5;
 }
 
@@ -16,9 +16,9 @@ bool utf8_is_overlong(uint32_t utf8_val, uint8_t utf8_len)
     case 1:
         break;
     case 2:
-        return uint32_bit_scan_reverse(utf8_val) <= 6;
+        return bsr(utf8_val) <= 6;
     default:
-        return uint32_bit_scan_reverse(utf8_val) <= 5 * ((uint32_t) utf8_len - 1);
+        return bsr(utf8_val) <= 5 * ((uint32_t) utf8_len - 1);
     }
     return 0;
 }
@@ -107,8 +107,8 @@ bool utf8_is_xml_name_char_len(uint32_t utf8_val, uint8_t utf8_len)
 
 void utf8_encode(uint32_t utf8_val, uint8_t *restrict utf8_byte, uint8_t *restrict p_utf8_len)
 {
-    uint8_t mode = (uint8_t) uint32_bit_scan_reverse(utf8_val);
-    if (mode <= 6 || mode == UINT8_MAX)
+    uint8_t mode = (uint8_t) bsr(utf8_val);
+    if (mode <= 6 || mode == umax(mode))
     {
         utf8_byte[0] = (uint8_t) utf8_val;
         if (p_utf8_len) *p_utf8_len = 1;
@@ -141,7 +141,7 @@ bool utf8_decode(uint8_t byte, uint32_t *restrict p_utf8_val, uint8_t *restrict 
     }
     else
     {
-        uint8_t mode = uint8_bit_scan_reverse(~byte);
+        uint8_t mode = bsr((uint8_t) ~byte);
         switch (mode)
         {
         case UINT8_MAX: // Invalid UTF-8 bytes: '\xff'
@@ -192,21 +192,21 @@ void utf16_encode(uint32_t utf16_val, uint16_t *restrict utf16_word, uint8_t *re
     {
         if (p_utf16_len) *p_utf16_len = 1;
         uint16_t w0 = (uint16_t) utf16_val;
-        utf16_word[0] = be ? uint16_rol(w0, 8) : w0;
+        utf16_word[0] = be ? rol(w0, 8) : w0;
     }
     else
     {
         if (p_utf16_len) *p_utf16_len = 2;
         utf16_val -= 0x10000;
         uint16_t w0 = (uint16_t) (0xd800 | ((utf16_val >> 10) & 0x3ff)), w1 = (uint16_t) (0xdc00 | (utf16_val & 0x3ff));
-        if (be) utf16_word[0] = uint16_rol(w0, 8), utf16_word[1] = uint16_rol(w1, 8);
+        if (be) utf16_word[0] = rol(w0, 8), utf16_word[1] = rol(w1, 8);
         else utf16_word[0] = w0, utf16_word[1] = w1;
     }
 }
 
 bool utf16_decode(uint16_t word, uint32_t *restrict p_utf16_val, uint16_t *restrict utf16_word, uint8_t *restrict p_utf16_len, uint8_t *restrict p_utf16_context, bool be)
 {
-    uint16_t wordle = be ? uint16_rol(word, 8) : word;
+    uint16_t wordle = be ? rol(word, 8) : word;
     if (*p_utf16_context)
     {
         if (0xdc00 <= wordle && wordle <= 0xdfff)

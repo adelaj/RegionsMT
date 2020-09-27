@@ -107,7 +107,7 @@ struct thread_pool {
 
 static bool thread_pool_enqueue_impl(struct thread_pool *pool, size_t cnt, struct log *log)
 {
-    size_t car, probe = size_add(&car, load_acquire(&pool->task_hint), cnt);
+    size_t car, probe = add(&car, load_acquire(&pool->task_hint), cnt);
     if (!crt_assert_impl(log, CODE_METRIC, car ? ERANGE : 0) ||
         !array_assert(log, CODE_METRIC, persistent_array_test(&pool->dispatched_task, probe, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK))) return 0;
     for (size_t i = pool->task_cnt; i < probe; i++)

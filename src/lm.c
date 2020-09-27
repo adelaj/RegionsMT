@@ -470,7 +470,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
                 return 1;
             }
             else if (context->len || utf8.val < '0' || utf8.val > '9') log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
-            else if (!size_mul_add_test(&context->val.uz, 10, (size_t) (utf8.val - '0'))) log_message_error_xml(log, CODE_METRIC, context->metric, XML_OUT_OF_RANGE);
+            else if (!size_test_ma(&context->val.uz, 10, (size_t) (utf8.val - '0'))) log_message_error_xml(log, CODE_METRIC, context->metric, XML_OUT_OF_RANGE);
             else return 1;
         }
         break;
@@ -625,7 +625,7 @@ static bool term_cmp(const void *A, const void *B, void *Thunk)
     int cmp = 0;
     size_t i = 0;
     for (; i < thunk->blk0 && !cmp; cmp = size_sign(a[i], b[i]), i++);
-    for (; i < thunk->blk && !cmp; cmp = size_sign(size_bit_scan_forward(~a[i] & b[i]), size_bit_scan_forward(a[i] & ~b[i])), i++);
+    for (; i < thunk->blk && !cmp; cmp = size_sign(size_bsf(~a[i] & b[i]), size_bsf(a[i] & ~b[i])), i++);
     return cmp > 0;
 }
 
@@ -688,13 +688,13 @@ static bool lm_term_cnt(size_t *data, size_t blk0, size_t blk, size_t *p_cnt)
     else if (blk)
     {
         if (data[0] == SIZE_MAX) return 0;
-        size_t m = size_pop_cnt(data[0]);
+        size_t m = size_pcnt(data[0]);
         if (m) cnt = (size_t) 1 << m;
     }
     for (; i < blk; i++)
     {
         if (data[i] == SIZE_MAX) return 0;
-        size_t m = size_pop_cnt(data[i]);
+        size_t m = size_pcnt(data[i]);
         if (!m) continue;
         size_t hi;
         cnt = size_mul(&hi, cnt, (size_t) 1 << m);
