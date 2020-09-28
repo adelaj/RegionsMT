@@ -12,7 +12,7 @@
 typedef unsigned spinlock_base;
 typedef volatile spinlock_base spinlock;
 
-#if defined __GNUC__ || defined __clang__ || defined _M_IX86 || defined __i386__
+#if defined __GNUC__ || defined __LLVM__ || defined _M_IX86 || defined __i386__
 #   if defined _M_X64 || defined __x86_64__
 
 GPUSH GWRN(pedantic) 
@@ -40,29 +40,37 @@ typedef struct { uint64_t qw[2]; } Uint128_t, Dsize_t;
     IF_ ## A(IF_ ## B(__VA_ARGS__)) \
     IF_ ## A(IFN_ ## B(__VA_ARGS__)) \
     IFN_ ## A(IF_ ## B(__VA_ARGS__))
+#define OR2(A, B, ...) \
+    IF_ ## A(IF_ ## B(__VA_ARGS__)) \
+    IF_ ## A(IFN_ ## B(__VA_ARGS__)) \
+    IFN_ ## A(IF_ ## B(__VA_ARGS__))
+#define NAND(A, B, ...) \
+    IFN_ ## A(IFN_ ## B(__VA_ARGS__))
+#define NAND2(A, B, ...) \
+    IFN_ ## A(IFN_ ## B(__VA_ARGS__))
 
 #ifdef __GNUC__
 #   define IF_GCC(...) __VA_ARGS__
 #   define IFN_GCC(...)
-#else
+#elif __clang__
+#   define IF_LLVM(...) __VA_ARGS__
+#   define IFN_LLVM(...)
+#elif _MSC_BUILD
+#   define IF_MSVC(...) __VA_ARGS__
+#   define IFN_MSVC(...)
+#endif
+
+#ifndef IF_GCC
 #   define IF_GCC(...)
 #   define IFN_GCC(...) __VA_ARGS__
 #endif
 
-#ifdef __clang__
-#   define IF_CLANG(...) __VA_ARGS__
-#   define IFN_CLANG(...)
-#else
-#   define IF_CLANG(...)
-#   define IFN_CLANG(...) __VA_ARGS__
+#ifndef IF_LLVM
+#   define IF_LLVM(...)
+#   define IFN_LLVM(...) __VA_ARGS__
 #endif
 
-#define IF_GCC_CLANG(...) OR(GCC, CLANG, __VA_ARGS__)
-
-#ifdef _MSC_BUILD
-#   define IF_MSVC(...) __VA_ARGS__
-#   define IFN_MSVC(...)
-#else
+#ifndef IF_MSVC
 #   define IF_MSVC(...)
 #   define IFN_MSVC(...) __VA_ARGS__
 #endif
@@ -70,20 +78,27 @@ typedef struct { uint64_t qw[2]; } Uint128_t, Dsize_t;
 #if defined __x86_64__ || defined _M_X64
 #   define IF_X64(...) __VA_ARGS__
 #   define IFN_X64(...)
-#else
+#elif defined __i386__ || defined _M_IX86
+#   define IF_X32(...) __VA_ARGS__
+#   define IFN_X32(...)
+#endif
+
+#ifndef IF_X64
 #   define IF_X64(...)
 #   define IFN_X64(...) __VA_ARGS__
 #endif
 
-#if defined __i386__ || defined _M_IX86
-#   define IF_X32(...) __VA_ARGS__
-#   define IFN_X32(...)
-#else
+#ifndef IF_X32
 #   define IF_X32(...)
 #   define IFN_X32(...) __VA_ARGS__
 #endif
 
+#define IF_GCC_LLVM(...) OR(GCC, LLVM, __VA_ARGS__)
+#define IFN_GCC_LLVM(...) NAND(GCC, LLVM, __VA_ARGS__)
 #define IF_MSVC_X32(...) OR(MSVC, X32, __VA_ARGS__)
+#define IFN_MSVC_X32(...) NAND(MSVC, X32, __VA_ARGS__)
+#define IF_GCC_LLVM_MSVC(...) OR2(GCC_LLVM, MSVC, __VA_ARGS__)
+#define IFN_GCC_LLVM_MSVC(...) NAND2(GCC_LLVM, MSVC, __VA_ARGS__)
 
 // Rounding down/up to the nearest power of 2 for the inline usage 
 #define RP2_SUPP(X, Y) ((X) | ((X) >> (Y)))
@@ -110,44 +125,259 @@ typedef struct { uint64_t qw[2]; } Uint128_t, Dsize_t;
     unsigned long: ULONG_MAX, \
     unsigned long long: ULLONG_MAX))
 
+// Add
 unsigned char uchar_add(unsigned char *, unsigned char, unsigned char);
 unsigned short ushrt_add(unsigned char *, unsigned short, unsigned short);
 unsigned uint_add(unsigned char *, unsigned, unsigned);
 unsigned long ulong_add(unsigned char *, unsigned long, unsigned long);
 unsigned long long ullong_add(unsigned char *, unsigned long long, unsigned long long);
 
+#define add(P_CAR, X, Y) (_Generic((X), \
+    unsigned char: uchar_add, \
+    unsigned short: ushrt_add, \
+    unsigned: uint_add, \
+    unsigned long: ulong_add, \
+    unsigned long long: ullong_add)((P_CAR), (X), (Y)))
+
+// Subtract
 unsigned char uchar_sub(unsigned char *, unsigned char, unsigned char);
 unsigned short ushrt_sub(unsigned char *, unsigned short, unsigned short);
 unsigned uint_sub(unsigned char *, unsigned, unsigned);
 unsigned long ulong_sub(unsigned char *, unsigned long, unsigned long);
 unsigned long long ullong_sub(unsigned char *, unsigned long long, unsigned long long);
 
+#define sub(P_BOR, X, Y) (_Generic((X), \
+    unsigned char: uchar_sub, \
+    unsigned short: ushrt_sub, \
+    unsigned: uint_sub, \
+    unsigned long: ulong_sub, \
+    unsigned long long: ullong_sub)((P_BOR), (X), (Y)))
+
+// Multiply
 unsigned char uchar_mul(unsigned char *, unsigned char, unsigned char);
 unsigned short ushrt_mul(unsigned short *, unsigned short, unsigned short);
 unsigned uint_mul(unsigned *, unsigned, unsigned);
 unsigned long ulong_mul(unsigned long *, unsigned long, unsigned long);
+unsigned long long ullong_mul(unsigned long long *, unsigned long long, unsigned long long);
 
+#define mul(P_HI, X, Y) (_Generic(*(P_HI), \
+    unsigned char: uchar_mul, \
+    unsigned short: ushrt_mul, \
+    unsigned: uint_mul, \
+    unsigned long: ulong_mul, \
+    unsigned long long: ullong_mul)((P_HI), (X), (Y)))
+
+// Multiply–accumulate
+unsigned char uchar_ma(unsigned char *, unsigned char, unsigned char);
+unsigned short ushrt_ma(unsigned short *, unsigned short, unsigned short);
+unsigned uint_ma(unsigned *, unsigned, unsigned);
+unsigned long ulong_ma(unsigned long *, unsigned long, unsigned long);
+unsigned long long ullong_ma(unsigned long long *, unsigned long long, unsigned long long);
+
+#define ma(P_RES, X, Y) (_Generic(*(P_RES), \
+    unsigned char: uchar_ma, \
+    unsigned short: ushrt_ma, \
+    unsigned: uint_ma, \
+    unsigned long: ulong_ma, \
+    unsigned long long: ullong_ma)((P_RES), (X), (Y)))
+
+// Shift left
 unsigned char uchar_shl(unsigned char *, unsigned char, unsigned char);
 unsigned short ushrt_shl(unsigned short *, unsigned short, unsigned char);
 unsigned uint_shl(unsigned *, unsigned, unsigned char);
 unsigned long ulong_shl(unsigned long *, unsigned long, unsigned char);
+unsigned long long ullong_shl(unsigned long long *, unsigned long long, unsigned char);
 
+#define shl(P_HI, X, Y) (_Generic(*(P_HI), \
+    unsigned char: uchar_shl, \
+    unsigned short: ushrt_shl, \
+    unsigned: uint_shl, \
+    unsigned long: ulong_shl, \
+    unsigned long long: ullong_shl)((P_HI), (X), (Y)))
+
+// Shift right
 unsigned char uchar_shr(unsigned char *, unsigned char, unsigned char);
 unsigned short ushrt_shr(unsigned short *, unsigned short, unsigned char);
 unsigned uint_shr(unsigned *, unsigned, unsigned char);
 unsigned long ulong_shr(unsigned long *, unsigned long, unsigned char);
+unsigned long long ullong_shr(unsigned long long *, unsigned long long, unsigned char);
 
+#define shr(P_LO, X, Y) (_Generic(*(P_HI), \
+    unsigned char: uchar_shr, \
+    unsigned short: ushrt_shr, \
+    unsigned: uint_shr, \
+    unsigned long: ulong_shr IF64(, \
+    unsigned long long: ullong_shr))((P_LO), (X), (Y)))
+
+// Rotate left
 unsigned char uchar_rol(unsigned char, unsigned char);
 unsigned short ushrt_rol(unsigned short, unsigned char);
 unsigned uint_rol(unsigned, unsigned char);
 unsigned long ulong_rol(unsigned long, unsigned char);
 unsigned long long ullong_rol(unsigned long long, unsigned char);
 
+#define rol(X, Y) (_Generic((X), \
+    unsigned char: uchar_rol, \
+    unsigned short: ushrt_rol, \
+    unsigned: uint_rol, \
+    unsigned long: ulong_rol, \
+    unsigned long long: ullong_rol)((X), (Y)))
+
+// Rotate right
 unsigned char uchar_ror(unsigned char, unsigned char);
 unsigned short ushrt_ror(unsigned short, unsigned char);
 unsigned uint_ror(unsigned, unsigned char);
 unsigned long ulong_ror(unsigned long, unsigned char);
 unsigned long long ullong_ror(unsigned long long, unsigned char);
+
+#define ror(X, Y) (_Generic((X), \
+    unsigned char: uchar_ror, \
+    unsigned short: ushrt_ror, \
+    unsigned: uint_ror, \
+    unsigned long: ulong_ror, \
+    unsigned long long: ullong_ror)((X), (Y)))
+
+// Saturated add
+unsigned char uchar_add_sat(unsigned char, unsigned char);
+unsigned short ushrt_add_sat(unsigned short, unsigned short);
+unsigned uint_add_sat(unsigned, unsigned);
+unsigned long ulong_add_sat(unsigned long, unsigned long);
+unsigned long long ullong_add_sat(unsigned long long, unsigned long long);
+
+#define add_sat(X, Y) (_Generic((X), \
+    unsigned char: uchar_add_sat, \
+    unsigned short: ushrt_add_sat, \
+    unsigned: uint_add_sat, \
+    unsigned long: ulong_add_sat, \
+    unsigned long long: ullong_add_sat)((X), (Y)))
+
+// Saturated subtract
+unsigned char uchar_sub_sat(unsigned char, unsigned char);
+unsigned short ushrt_sub_sat(unsigned short, unsigned short);
+unsigned uint_sub_sat(unsigned, unsigned);
+unsigned long ulong_sub_sat(unsigned long, unsigned long);
+unsigned long long ullong_sub_sat(unsigned long long, unsigned long long);
+
+#define sub_sat(X, Y) (_Generic((X), \
+    unsigned char: uchar_sub_sat, \
+    unsigned short: ushrt_sub_sat, \
+    unsigned: uint_sub_sat, \
+    unsigned long: ulong_sub_sat, \
+    unsigned long long: ullong_sub_sat)((X), (Y)))
+
+// Sign of the difference of unsigned integers
+int uchar_usign(unsigned char, unsigned char);
+int ushrt_usign(unsigned short, unsigned short);
+int uint_usign(unsigned, unsigned);
+int ulong_usign(unsigned long, unsigned long);
+int ullong_usign(unsigned long long, unsigned long long);
+
+#define usign(X, Y) (_Generic((X), \
+    unsigned char: uchar_usign, \
+    unsigned short: ushrt_usign, \
+    unsigned: uint_usign, \
+    unsigned long: ulong_usign, \
+    unsigned long long: ullong_usign)((X), (Y)))
+
+// Absolute difference of unsigned integers
+unsigned char uchar_udist(unsigned char, unsigned char);
+unsigned short ushrt_udist(unsigned short, unsigned short);
+unsigned uint_udist(unsigned, unsigned);
+unsigned long ulong_udist(unsigned long, unsigned long);
+unsigned long long ullong_udist(unsigned long long, unsigned long long);
+
+#define udist(X, Y) (_Generic((X), \
+    unsigned char: uchar_udist, \
+    unsigned short: ushrt_udist, \
+    unsigned: uint_udist, \
+    unsigned long: ulong_udist, \
+    unsigned long long: ullong_udist)((X), (Y)))
+
+// Non-destructive add with overflow test
+bool uchar_test_add(unsigned char *, unsigned char, unsigned char);
+bool ushrt_test_add(unsigned short *, unsigned short, unsigned short);
+bool uint_test_add(unsigned *, unsigned, unsigned);
+bool ulong_test_add(unsigned long *, unsigned long, unsigned long);
+bool ullong_test_add(unsigned long long *, unsigned long long, unsigned long long);
+
+#define test_add(P_RES, X, Y) (_Generic(*(P_RES), \
+    unsigned char: uchar_test_add, \
+    unsigned short: ushrt_test_add, \
+    unsigned: uint_test_add, \
+    unsigned long: ulong_test_add, \
+    unsigned long long: ullong_test_add)((P_RES), (X), (Y)))
+
+// Non-destructive subtract with overflow test
+bool uchar_test_sub(unsigned char *, unsigned char, unsigned char);
+bool ushrt_test_sub(unsigned short *, unsigned short, unsigned short);
+bool uint_test_sub(unsigned *, unsigned, unsigned);
+bool ulong_test_sub(unsigned long *, unsigned long, unsigned long);
+bool ullong_test_sub(unsigned long long *, unsigned long long, unsigned long long);
+
+#define test_sub(P_RES, X, Y) (_Generic(*(P_RES), \
+    unsigned char: uchar_test_sub, \
+    unsigned short: ushrt_test_sub, \
+    unsigned: uint_test_sub, \
+    unsigned long: ulong_test_sub, \
+    unsigned long long: ullong_test_sub)((P_RES), (X), (Y)))
+
+// Non-destructive multiply with overflow test
+bool uchar_test_mul(unsigned char *, unsigned char, unsigned char);
+bool ushrt_test_mul(unsigned short *, unsigned short, unsigned short);
+bool uint_test_mul(unsigned *, unsigned, unsigned);
+bool ulong_test_mul(unsigned long *, unsigned long, unsigned long);
+bool ullong_test_mul(unsigned long long *, unsigned long long, unsigned long long);
+
+#define test_mul(P_RES, X, Y) (_Generic(*(P_RES), \
+    unsigned char: uchar_test_mul, \
+    unsigned short: ushrt_test_mul, \
+    unsigned: uint_test_mul, \
+    unsigned long: ulong_test_mul, \
+    unsigned long long: ullong_test_mul)((P_RES), (X), (Y)))
+
+// Non-destructive multiply–accumulate with overflow test
+bool uchar_test_ma(unsigned char *, unsigned char, unsigned char);
+bool ushrt_test_ma(unsigned short *, unsigned short, unsigned short);
+bool uint_test_ma(unsigned *, unsigned, unsigned);
+bool ulong_test_ma(unsigned long *, unsigned long, unsigned long);
+bool ullong_test_ma(unsigned long long *, unsigned long long, unsigned long long);
+
+#define test_ma(P_RES, X, Y) (_Generic(*(P_RES), \
+    unsigned char: uchar_test_ma, \
+    unsigned short: ushrt_test_ma, \
+    unsigned: uint_test_ma, \
+    unsigned long: ulong_test_ma, \
+    unsigned long long: ullong_test_ma)((P_RES), (X), (Y)))
+
+// Non-destructive sum with overflow test
+size_t uchar_test_sum(unsigned char *, unsigned char *, size_t);
+size_t ushrt_test_sum(unsigned short *, unsigned short *, size_t);
+size_t uint_test_sum(unsigned *, unsigned *, size_t);
+size_t ulong_test_sum(unsigned long *, unsigned long *, size_t);
+size_t ullong_test_sum(unsigned long long *, unsigned long long *, size_t);
+
+#define test_sum(P_RES, L, C) (_Generic(*(P_RES), \
+    unsigned char: uchar_test_sum, \
+    unsigned short: ushrt_test_sum, \
+    unsigned: uint_test_sum, \
+    unsigned long: ulong_test_sum, \
+    unsigned long long: ullong_test_sum)((P_RES), (L), (C)))
+
+// Non-destructive product with overflow test
+size_t uchar_test_prod(unsigned char *, unsigned char *, size_t);
+size_t ushrt_test_prod(unsigned short *, unsigned short *, size_t);
+size_t uint_test_prod(unsigned *, unsigned *, size_t);
+size_t ulong_test_prod(unsigned long *, unsigned long *, size_t);
+size_t ullong_test_prod(unsigned long long *, unsigned long long *, size_t);
+
+#define test_prod(P_RES, L, C) (_Generic(*(P_RES), \
+    unsigned char: uchar_test_prod, \
+    unsigned short: ushrt_test_prod, \
+    unsigned: uint_test_prod, \
+    unsigned long: ulong_test_prod, \
+    unsigned long long: ullong_test_prod)((P_RES), (L), (C)))
+
+
 
 unsigned char uchar_bsr(unsigned char);
 unsigned short ushrt_bsr(unsigned short);
@@ -195,61 +425,6 @@ bool Uint128_atomic_compare_exchange(volatile Uint128_t *, Uint128_t *, Uint128_
 
 #endif
 
-// Add
-#define add(P_HI, X, Y) (_Generic((X), \
-    unsigned char: uchar_add, \
-    unsigned short: ushrt_add, \
-    unsigned: uint_add, \
-    unsigned long: ulong_add, \
-    unsigned long long: ullong_add)((P_HI), (X), (Y)))
-
-// Subtract
-#define sub(P_HI, X, Y) (_Generic((X), \
-    unsigned char: uchar_sub, \
-    unsigned short: ushrt_sub, \
-    unsigned: uint_sub, \
-    unsigned long: ulong_sub, \
-    unsigned long long: ullong_sub)((P_HI), (X), (Y)))
-
-// Multiply
-#define mul(P_HI, X, Y) (_Generic(*(P_HI), \
-    unsigned char: uchar_mul, \
-    unsigned short: ushrt_mul, \
-    unsigned: uint_mul, \
-    unsigned long: ulong_mul IF64(, \
-    unsigned long long: ullong_mul))((P_HI), (X), (Y)))
-
-// Shift left
-#define shl(P_HI, X, Y) (_Generic(*(P_HI), \
-    unsigned char: uchar_shl, \
-    unsigned short: ushrt_shl, \
-    unsigned: uint_shl, \
-    unsigned long: ulong_shl IF64(, \
-    unsigned long long: ullong_shl))((P_HI), (X), (Y)))
-
-// Shift right
-#define shr(P_LO, X, Y) (_Generic(*(P_HI), \
-    unsigned char: uchar_shr, \
-    unsigned short: ushrt_shr, \
-    unsigned: uint_shr, \
-    unsigned long: ulong_shr IF64(, \
-    unsigned long long: ullong_shr))((P_LO), (X), (Y)))
-
-// Rotate left
-#define rol(X, Y) (_Generic((X), \
-    unsigned char: uchar_rol, \
-    unsigned short: ushrt_rol, \
-    unsigned: uint_rol, \
-    unsigned long: ulong_rol, \
-    unsigned long long: ullong_rol)((X), (Y)))
-
-// Rotate right
-#define ror(X, Y) (_Generic((X), \
-    unsigned char: uchar_ror, \
-    unsigned short: ushrt_ror, \
-    unsigned: uint_ror, \
-    unsigned long: ulong_ror, \
-    unsigned long long: ullong_ror)((X), (Y)))
 
 // Bit scan reverse
 #define bsr(x) (_Generic((x), \
@@ -285,7 +460,7 @@ bool Uint128_atomic_compare_exchange(volatile Uint128_t *, Uint128_t *, Uint128_
     void *volatile *: ptr_atomic_compare_exchange IF64(, \
     volatile Uint128_t *: Uint128_atomic_compare_exchange))((DST), (P_CMP), (XCHG)))
 
-#if defined __GNUC__ || defined __clang__
+#if defined __GNUC__ || defined __LLVM__
 
 #   define load_acquire(SRC) (__atomic_load_n((SRC), __ATOMIC_ACQUIRE))
 #   define store_release(DST, VAL) (__atomic_store_n((DST), (VAL), __ATOMIC_RELEASE))

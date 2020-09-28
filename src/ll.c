@@ -20,6 +20,15 @@
         return (TYPE) SUFFIX((OP_TYPE) x); \
     }
 
+// Define operations via GCC intrinsics such as '__builtin_add_overflow' or '__builtin_sub_overflow'
+#define DECL_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
+    TYPE PREFIX ## _ ## SUFFIX(TYPE *p_hi, TYPE x, TYPE y) \
+    { \
+        TYPE res; \
+        *p_hi = BACKEND(x, y, &res); \
+        return res; \
+    }
+
 // Define operations via intel intrinsics such as '_addcarry_u32' and '_subborrow_u32'
 #define DECL_OP_INTEL(TYPE, PREFIX, SUFFIX, BACKEND) \
     TYPE PREFIX ## _ ## SUFFIX(unsigned char *p_hi, TYPE x, TYPE y) \
@@ -55,6 +64,30 @@
         return (TYPE) res; \
     }
 
+#define DECL_MUL_WIDE(TYPE, PREFIX, OP_TYPE) \
+    TYPE PREFIX ## _mul(TYPE *p_hi, TYPE x, TYPE y) \
+    { \
+        _Static_assert(2 * sizeof(OP_TYPE) == sizeof(TYPE), ""); \
+        unsigned char car1 = 0, car2 = 0; /* Warning! 'car1' and 'car2' are never set simultaneously */ \
+        OP_TYPE \
+            xl = (OP_TYPE) x, xh = (OP_TYPE) (x >> bitsof(OP_TYPE)), \
+            yl = (OP_TYPE) y, yh = (OP_TYPE) (y >> bitsof(OP_TYPE)), \
+            llh, lll = mul(&llh, xl, yl), hlh, lhh, hhh, \
+            l = add(&car2, add(&car1, llh, mul(&lhh, xl, yh)), mul(&hlh, xh, yl)), \
+            h = add(&car2, add(&car1, mul(&hhh, xh, yh), lhh), hlh); \
+        *p_hi = ((TYPE) (hhh + car1 + car2) << bitsof(OP_TYPE)) | h; \
+        return ((TYPE) l << bitsof(OP_TYPE)) | lll; \
+    }
+
+#define DECL_MA(TYPE, PREFIX) \
+    TYPE PREFIX ## _ma(TYPE *p_res, TYPE m, TYPE a) \
+    { \
+        TYPE hi, lo = mul(&hi, *p_res, m); \
+        unsigned char car = 0; \
+        *p_res = add(&car, lo, a); \
+        return hi + car; /* Never overflows! */ \
+    }
+
 #define DECL_SHL(TYPE, PREFIX, OP_TYPE) \
     TYPE PREFIX ## _shl(TYPE *p_hi, TYPE x, unsigned char y) \
     { \
@@ -73,58 +106,86 @@
         return (TYPE) (val >> bitsof(TYPE)); \
     }
 
+#define DECL_SH_SSE(TYPE, PREFIX, SUFFIX, SHL, SHR) \
+    TYPE PREFIX ## _ ## SUFFIX(TYPE *p_hl, TYPE x, TYPE y) \
+    { \
+        _Static_assert(2 * sizeof(TYPE) == sizeof(__m128i), ""); \
+        TYPE res; \
+        __m128i x0 = _mm_set_epi64x(0, x); \
+        _mm_storeu_si64(&res, SHL(x0, y %= bitsof(TYPE))); \
+        _mm_storeu_si64(p_hl, SHR(x0, bitsof(TYPE) - y)); \
+        return res; \
+    }
+
+#define DECL_RO_GCC(TYPE, PREFIX, SUFFIX, SHL, SHR) \
+    TYPE PREFIX ## _ ## SUFFIX(TYPE x, unsigned char y) \
+    { \
+        return (x SHL y % bitsof(TYPE)) | (x SHR (0 - y) % bitsof(TYPE)); \
+    }
+
+#define DECL_RO_MSVC(TYPE, PREFIX, SUFFIX, BACKEND) \
+    TYPE PREFIX ## _ ## SUFFIX(TYPE x, unsigned char y) \
+    { \
+        return BACKEND(x, y); \
+    }
+
+#define DECL_RO_COPY(TYPE, PREFIX, SUFFIX, OP_TYPE) \
+    TYPE PREFIX ## _ ## SUFFIX(TYPE x, unsigned char y) \
+    { \
+        _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
+        return (TYPE) SUFFIX((OP_TYPE) x, y); \
+    }
+
 #define DECL_ADD_SAT(TYPE, PREFIX) \
     TYPE PREFIX ## _add_sat(TYPE x, TYPE y) \
     { \
-        TYPE car, res = add(&car, x, y); \
-        return car ? umax(TYPE) : res; \
+        unsigned char car = 0; \
+        TYPE res = add(&car, x, y); \
+        return car ? umax(x) : res; \
     }
 
 #define DECL_SUB_SAT(TYPE, PREFIX) \
     TYPE PREFIX ## _sub_sat(TYPE x, TYPE y) \
     { \
-        TYPE bor, res = sub(&bor, x, y); \
+        unsigned char bor = 0; \
+        TYPE res = sub(&bor, x, y); \
         return bor ? 0 : res; \
     }
 
 #define DECL_USIGN(TYPE, PREFIX) \
     int PREFIX ## _usign(TYPE x, TYPE y) \
     { \
-        TYPE bor; \
+        unsigned char bor = 0; \
         return sub(&bor, x, y) ? 1 - (int) (bor << 1) : 0; \
     }
 
 #define DECL_UDIST(TYPE, PREFIX) \
-    int PREFIX ## _udist(TYPE x, TYPE y) \
+    TYPE PREFIX ## _udist(TYPE x, TYPE y) \
     { \
-        TYPE bor; diff = sub(&bor, x, y); \
+        unsigned char bor = 0; \
+        TYPE diff = sub(&bor, x, y); \
         return bor ? 0 - diff : diff; \
     }
 
-#define DECL_FMA(TYPE, PREFIX) \
-    TYPE PREFIX ## _fma(TYPE *p_res, TYPE m, TYPE a) \
+#define DECL_TEST_OP(TYPE, PREFIX, SUFFIX, HI_TYPE) \
+    bool PREFIX ## _test_ ## SUFFIX(TYPE *p_res, TYPE x, TYPE y) \
     { \
-        TYPE hi, lo = mul(&hi, *p_res, m), car; \
-        *p_res = add(&car, lo, a); \
-        return hi + car; \
-    }
-
-#define DECL_SUM(TYPE, PREFIX) \
-    TYPE PREFIX ## _sum(TYPE *p_hi, TYPE *argl, size_t cnt) \
-    { \
-        if (!cnt) return *p_hi = 0; \
-        TYPE lo = argl[0], hi = 0, car; \
-        for (size_t i = 1; i < cnt; lo = add(&car, lo, argl[i++]), hi += car); \
-        *p_hi = hi; \
-        return lo; \
-    }
-
-#define DECL_TEST_ADD(TYPE, PREFIX, BACKEND) \
-    TYPE PREFIX ## _test_add(TYPE *p_res, TYPE x, TYPE y) \
-    { \
-        TYPE hi, res = add(&hi, x, y); \
+        HI_TYPE hi; \
+        TYPE res = SUFFIX(&hi, x, y); \
         if (hi) return 0; \
-        *p_res = res; \
+        *p_res = res; /* On failure '*p_res' is untouched */ \
+        return 1; \
+    }
+
+#define DECL_TEST_MUL(TYPE, PREFIX, SUFFIX) \
+    DECL_TEST_OP(TYPE, PREFIX, SUFFIX, TYPE)
+
+#define DECL_TEST_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
+    bool PREFIX ## _test_ ## SUFFIX(TYPE *p_res, TYPE x, TYPE y) \
+    { \
+        TYPE res; \
+        if (!(BACKEND(x, y, &res))) return 0; \
+        *p_res = res; /* On failure '*p_res' is untouched */ \
         return 1; \
     }
 
@@ -134,6 +195,35 @@
         if (test_mul(&m, *p_res, m) || test_add(&a, m, a)) return 0; \
         *p_res = a; /* On failure '*p_res' is untouched */ \
         return 1; \
+    }
+
+#define DECL_TEST_REP(TYPE, PREFIX, SUFFIX, ZERO, OP_SUFFIX) \
+    size_t PREFIX ## _test_ ## SUFFIX(TYPE *p_res, TYPE *argl, size_t cnt) \
+    { \
+        if (!cnt) return (*p_res = (ZERO), 0); \
+        TYPE res = argl[0]; \
+        for (size_t i = 1; i < cnt; i++) if (!(test_ ## OP_SUFFIX(&res, res, argl[i]))) return i; \
+        *p_res = res; \
+        return cnt; \
+    }
+
+#define DECL_BSR_GCC(TYPE, PREFIX, BACKEND) \
+    TYPE PREFIX ## _bsr(TYPE x) \
+    { \
+        return x ? bitsof(TYPE) - (TYPE) BACKEND(x) - 1 : umax(x); \
+    }
+
+#define DECL_BSF_GCC(TYPE, PREFIX, BACKEND) \
+    TYPE PREFIX ## _bsf(TYPE x) \
+    { \
+        return  x ? (TYPE) BACKEND(x) : umax(x); \
+    }
+
+#define DECL_BS_MSVC(TYPE, PREFIX, SUFFIX, BACKEND) \
+    TYPE PREFIX ## _bit_scan_ ## SUFFIX(TYPE x) \
+    { \
+        unsigned long res; \
+        return BACKEND(&res, x) ? (TYPE) res : umax(x); \
     }
 
 #define DECL_ATOMIC_ADD_SAT(TYPE, PREFIX) \
@@ -152,6 +242,13 @@
         return tmp; \
     }
 
+#define DECL2(SUFFIX, ...) \
+    DECL ## _ ## SUFFIX(unsigned char, uchar __VA_ARGS__) \
+    DECL ## _ ## SUFFIX(unsigned short, ushrt __VA_ARGS__) \
+    DECL ## _ ## SUFFIX(unsigned, uint __VA_ARGS__) \
+    DECL ## _ ## SUFFIX(unsigned long, ulong __VA_ARGS__) \
+    DECL ## _ ## SUFFIX(unsigned long long, ullong __VA_ARGS__)
+
 #define XY1(X, Y) (X), (X) + (Y)
 #define XY2(X, Y) XY1((X), (Y)), XY1((X) + (Y), (Y))
 #define XY3(X, Y) XY2((X), (Y)), XY2((X) + (Y), (Y))
@@ -162,25 +259,136 @@
 #define XY8(X, Y) XY7((X), (Y)), XY7((X) + (Y), (Y))
 
 // Add
-DECL_OP_INTEL(unsigned, uint, add, _addcarry_u32)
-IF_MSVC_X32(DECL_OP_COPY(unsigned long, ulong, add, unsigned))
-IF_MSVC_X32(DECL_OP_WIDE(unsigned long long, ullong, add, unsigned))
-
+IF_GCC_LLVM(DECL_OP_GCC(unsigned char, uchar, add, __builtin_add_overflow))
+IF_MSVC(DECL_OP_INTEL(unsigned char, uchar, add, _addcarry_u8))
+IF_GCC_LLVM(DECL_OP_GCC(unsigned short, ushrt, add, __builtin_add_overflow))
+IF_MSVC(DECL_OP_INTEL(unsigned short, ushrt, add, _addcarry_u16))
+IF_GCC_LLVM_MSVC(DECL_OP_INTEL(unsigned, uint, add, _addcarry_u32))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_OP_COPY(unsigned long, ulong, add, unsigned)))
+IF_GCC_LLVM(IF_X64(DECL_OP_COPY(unsigned long, ulong, add, unsigned long long)))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_OP_WIDE(unsigned long long, ullong, add, unsigned)))
+IF_GCC_LLVM_MSVC(IF_X64(DECL_OP_INTEL(unsigned long long, ullong, add, _addcarry_u64)))
 
 // Subtract
-DECL_OP_INTEL(unsigned, uint, sub, _subborrow_u32)
+IF_GCC_LLVM(DECL_OP_GCC(unsigned char, uchar, sub, __builtin_sub_overflow))
+IF_MSVC(DECL_OP_INTEL(unsigned char, uchar, sub, _subborrow_u8))
+IF_GCC_LLVM(DECL_OP_GCC(unsigned short, ushrt, sub, __builtin_sub_overflow))
+IF_MSVC(DECL_OP_INTEL(unsigned short, ushrt, sub, _subborrow_u16))
+IF_GCC_LLVM_MSVC(DECL_OP_INTEL(unsigned, uint, sub, _subborrow_u32))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_OP_COPY(unsigned long, ulong, sub, unsigned)))
+IF_GCC_LLVM(IF_X64(DECL_OP_COPY(unsigned long, ulong, sub, unsigned long long)))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_OP_WIDE(unsigned long long, ullong, sub, unsigned)))
+IF_GCC_LLVM_MSVC(IF_X64(DECL_OP_INTEL(unsigned long long, ullong, sub, _subborrow_u64)))
 
 // Multiply
-DECL_MUL(unsigned char, uchar, unsigned short)
-DECL_MUL(unsigned short, ushort, unsigned)
+IF_GCC_LLVM_MSVC(DECL_MUL(unsigned char, uchar, unsigned short))
+IF_GCC_LLVM_MSVC(DECL_MUL(unsigned short, ushrt, unsigned))
+IF_GCC_LLVM(DECL_MUL(unsigned, uint, unsigned long))
+IF_MSVC(DECL_MUL(unsigned, uint, unsigned long long))
+IF_GCC_LLVM(DECL_MUL(unsigned long, ulong, Uint128_t))
+IF_MSVC(DECL_MUL(unsigned long, ulong, unsigned long long))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_MUL_WIDE(unsigned long long, ullong, unsigned)))
+IF_GCC_LLVM(IF_X64(DECL_MUL(unsigned long long, ullong, Uint128_t)))
+
+IF_MSVC(IF_X64(
+unsigned long long ullong_mul(unsigned long long *p_hi, unsigned long long x, unsigned long long y)
+{
+    return _umul128(x, y, p_hi);
+}))
+
+// Multiply–accumulate
+DECL2(MA)
 
 // Shift left
-DECL_SHL(unsigned char, uchar, unsigned short)
-DECL_SHL(unsigned short, ushort, unsigned)
+IF_GCC_LLVM_MSVC(DECL_SHL(unsigned char, uchar, unsigned short))
+IF_GCC_LLVM_MSVC(DECL_SHL(unsigned short, ushrt, unsigned))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHL(unsigned, uint, unsigned long long)))
+IF_GCC_LLVM(IF_X64(DECL_SHL(unsigned, uint, unsigned long)))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHL(unsigned long, ulong, unsigned long long)))
+IF_GCC_LLVM(IF_X64(DECL_SHL(unsigned long, ulong, Uint128_t)))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_SH_SSE(unsigned long long, ullong, shl, _mm_slli_epi64, _mm_srli_epi64)))
+IF_GCC_LLVM(IF_X64(DECL_SHL(unsigned long long, ullong, Uint128_t)))
+
+IF_MSVC(IF_X64(
+unsigned long long ullong_shl(unsigned long long *p_hi, unsigned long long x, unsigned char y)
+{
+    *p_hi = __shiftleft128(x, 0, y); // Warning! 'y %= 64' is done internally!
+    return x << y;
+}))
 
 // Shift right
-DECL_SHR(unsigned char, uchar, unsigned short)
-DECL_SHR(unsigned short, ushort, unsigned)
+IF_GCC_LLVM_MSVC(DECL_SHR(unsigned char, uchar, unsigned short))
+IF_GCC_LLVM_MSVC(DECL_SHR(unsigned short, ushrt, unsigned))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHR(unsigned, uint, unsigned long long)))
+IF_GCC_LLVM(IF_X64(DECL_SHR(unsigned, uint, unsigned long)))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHR(unsigned long, ulong, unsigned long long)))
+IF_GCC_LLVM(IF_X64(DECL_SHR(unsigned long, ulong, Uint128_t)))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_SH_SSE(unsigned long long, ullong, shl, _mm_srli_epi64, _mm_slli_epi64)))
+IF_GCC_LLVM(IF_X64(DECL_SHR(unsigned long long, ullong, Uint128_t)))
+
+IF_MSVC(IF_X64(
+unsigned long long ullong_shr(unsigned long long *p_lo, unsigned long long x, unsigned char y)
+{
+    *p_lo = __shiftright128(0, x, y); // Warning! 'y %= 64' is done internally!
+    return x >> y;
+}))
+
+// Rotate left
+IF_GCC_LLVM(DECL_RO_GCC(unsigned char, uchar, rol, <<, >>))
+IF_MSVC(DECL_RO_MSVC(unsigned char, uchar, rol, _rotl8))
+IF_GCC_LLVM(DECL_RO_GCC(unsigned short, ushrt, rol, <<, >>))
+IF_MSVC(DECL_RO_MSVC(unsigned short, ushrt, rol, _rotl16))
+IF_GCC_LLVM(DECL_RO_GCC(unsigned, uint, rol, <<, >>))
+IF_MSVC(DECL_RO_MSVC(unsigned, uint, rol, _rotl))
+IF_GCC_LLVM(DECL_RO_GCC(unsigned long, ulong, rol, <<, >>))
+IF_MSVC(DECL_RO_COPY(unsigned long, ulong, rol, unsigned))
+IF_GCC_LLVM(DECL_RO_GCC(unsigned long long, ullong, rol, <<, >>))
+IF_MSVC(DECL_RO_MSVC(unsigned long long, ullong, rol, _rotl64))
+
+// Rotate right
+IF_GCC_LLVM(DECL_RO_GCC(unsigned char, uchar, ror, >>, <<))
+IF_MSVC(DECL_RO_MSVC(unsigned char, uchar, ror, _rotr8))
+IF_GCC_LLVM(DECL_RO_GCC(unsigned short, ushrt, ror, >>, <<))
+IF_MSVC(DECL_RO_MSVC(unsigned short, ushrt, ror, _rotr16))
+IF_GCC_LLVM(DECL_RO_GCC(unsigned, uint, ror, >>, <<))
+IF_MSVC(DECL_RO_MSVC(unsigned, uint, ror, _rotr))
+IF_GCC_LLVM(DECL_RO_GCC(unsigned long, ulong, ror, >>, <<))
+IF_MSVC(DECL_RO_COPY(unsigned long, ulong, ror, unsigned))
+IF_GCC_LLVM(DECL_RO_GCC(unsigned long long, ullong, ror, >>, <<))
+IF_MSVC(DECL_RO_MSVC(unsigned long long, ullong, ror, _rotr64))
+
+// Saturated add
+DECL2(ADD_SAT)
+
+// Saturated subtract
+DECL2(SUB_SAT)
+
+// Sign of the difference of unsigned integers
+DECL2(USIGN)
+
+// Absolute difference of unsigned integers
+DECL2(UDIST)
+
+// Non-destructive add with overflow test
+IF_GCC_LLVM(DECL2(TEST_OP_GCC, , add, __builtin_add_overflow))
+IF_MSVC(DECL2(TEST_OP, , add, unsigned char))
+
+// Non-destructive subtract with overflow test
+IF_GCC_LLVM(DECL2(TEST_OP_GCC, , sub, __builtin_add_overflow))
+IF_MSVC(DECL2(TEST_OP, , sub, unsigned char))
+
+// Non-destructive multiply with overflow test
+IF_GCC_LLVM(DECL2(TEST_OP_GCC, , mul, __builtin_mul_overflow))
+IF_MSVC(DECL2(TEST_MUL, , mul))
+
+// Non-destructive multiply–accumulate with overflow test
+DECL2(TEST_MA)
+
+// Non-destructive sum with overflow test
+DECL2(TEST_REP, , sum, 0, add)
+
+// Non-destructive product with overflow test
+DECL2(TEST_REP, , prod, 1, mul)
 
 // Bit scan reverse
 unsigned char uchar_bsr(unsigned char x)
@@ -208,68 +416,9 @@ unsigned char uchar_pcnt(unsigned char x)
     return res[x];
 }
 
-unsigned long long ullong_mul(unsigned long long *p_hi, unsigned long long x, unsigned long long y)
-{
-    _Static_assert(2 * sizeof(unsigned) == sizeof(unsigned long long), "");
-    unsigned char car1 = 0, car2 = 0; // Warning! 'car1' and 'car2' are never set simultaneously
-    unsigned
-        xl = (unsigned) x, xh = (unsigned) (x >> bitsof(unsigned)),
-        yl = (unsigned) y, yh = (unsigned) (y >> bitsof(unsigned)),
-        llh, lll = mul(&llh, xl, yl), hlh, lhh, hhh,
-        l = add(&car2, add(&car1, llh, mul(&lhh, xl, yh)), mul(&hlh, xh, yl)),
-        h = add(&car2, add(&car1, mul(&hhh, xh, yh), lhh), hlh);
-    *p_hi = ((unsigned long long) (hhh + car1 + car2) << bitsof(unsigned)) | h;
-    return ((unsigned long long) l << bitsof(unsigned)) | lll;
-}
+#if 0
 
-// Add (MSVC or [GCC, 32 bit])
-IF_MSVC_X32(DECL_OP_COPY(unsigned long, ulong, add, unsigned))
-DECL_OP_WIDE(unsigned long long, ullong, add, unsigned)
-
-// Subtract (MSVC or [GCC, 32 bit])
-DECL_OP_COPY(unsigned long, ulong, sub, unsigned)
-DECL_OP_WIDE(unsigned long long, ullong, sub, unsigned)
-
-// Multiply (MSVC or [GCC, 32 bit])
-DECL_MUL(unsigned, uint, unsigned long long)
-DECL_MUL(unsigned long, ulong, unsigned long long)
-
-// Shift left (MSVC or [GCC, 32 bit])
-DECL_SHL(unsigned, uint, unsigned long long)
-DECL_SHL(unsigned long, ulong, unsigned long long)
-
-// Shift right (MSVC or [GCC, 32 bit])
-DECL_SHR(unsigned, uint, unsigned long long)
-DECL_SHR(unsigned long, ulong, unsigned long long)
-
-
-#if defined __GCCC__ || defined __clang__
-
-#   define DECL_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
-        TYPE PREFIX ## _ ## SUFFIX(TYPE *p_hi, TYPE x, TYPE y) \
-        { \
-            TYPE res; \
-            *p_hi = BACKEND(x, y, &res); \
-            return res; \
-        }
-
-#   define DECL_RO_GCC(TYPE, PREFIX, SUFFIX, SHL, SHR) \
-        TYPE PREFIX ## _ ## SUFFIX(TYPE x, unsigned char y) \
-        { \
-            return (x SHL y % bitsof(TYPE)) | (x SHR (0 - y) % bitsof(TYPE)); \
-        }
-
-#   define DECL_BSR_GCC(TYPE, PREFIX, BACKEND) \
-        TYPE PREFIX ## _bsr(TYPE x) \
-        { \
-            return x ? bitsof(TYPE) - (TYPE) BACKEND(x) - 1 : umax(x); \
-        }
-
-#   define DECL_BSF_GCC(TYPE, PREFIX, BACKEND) \
-        TYPE PREFIX ## _bsf(TYPE x) \
-        { \
-            return  x ? (TYPE) BACKEND(x) : umax(x); \
-        }
+#if defined __GCCC__ || defined __LLVM__
 
 #   define DECL_ATOMIC_COMPARE_EXCHANGE_GCC(TYPE, PREFIX) \
         bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
@@ -291,26 +440,9 @@ DECL_SHR(unsigned long, ulong, unsigned long long)
         }
 
 // Add (GCC)
-DECL_OP_GCC(unsigned char, uchar, add, __builtin_add_overflow)
-DECL_OP_GCC(unsigned short, ushrt, add, __builtin_add_overflow)
 
-// Subtract (GCC)
-DECL_OP_GCC(unsigned char, uchar, sub, __builtin_sub_overflow)
-DECL_OP_GCC(unsigned short, ushrt, sub, __builtin_sub_overflow)
 
-// Rotate left
-DECL_RO_GCC(unsigned char, uchar, rol, <<, >>)
-DECL_RO_GCC(unsigned short, ushrt, rol, <<, >>)
-DECL_RO_GCC(unsigned, uint, rol, <<, >>)
-DECL_RO_GCC(unsigned long, ulong, rol, <<, >>)
-DECL_RO_GCC(unsigned long long, ullong, rol, <<, >>)
 
-// Rotate right
-DECL_RO_GCC(unsigned char, uchar, ror, >>, <<)
-DECL_RO_GCC(unsigned short, ushrt, ror, >>, <<)
-DECL_RO_GCC(unsigned, uint, ror, >>, <<)
-DECL_RO_GCC(unsigned long, ulong, ror, >>, <<)
-DECL_RO_GCC(unsigned long long, ullong, ror, >>, <<)
 
 // Bit scan reverse (GCC)
 DECL_BSR_GCC(unsigned, uint, __builtin_clz)
@@ -335,7 +467,7 @@ DECL_ATOMIC_COMPARE_EXCHANGE_GCC(void *, ptr)
 #   ifdef __i386__
 
 // Atomic compare and swap (GCC, 32 bit)
-#       ifdef __clang__
+#       ifdef __LLVM__
 DECL_ATOMIC_COMPARE_EXCHANGE_SYNC(unsigned long long, ullong)
 #       else
 DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned long long, ullong)
@@ -343,28 +475,6 @@ DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned long long, ullong)
 
 #   elif defined __x86_64__
 
-// Add (GCC)
-DECL_COPY(unsigned long, ulong, add, unsigned long long)
-
-
-// Subtract (GCC)
-DECL_OP_GCC(unsigned char, uchar, sub, __builtin_sub_overflow)
-DECL_OP_GCC(unsigned short, ushrt, sub, __builtin_sub_overflow)
-
-// Multiply (GCC, 64 bit)
-DECL_MUL(unsigned, uint, unsigned long)
-DECL_MUL(unsigned long, ulong, Uint128_t)
-DECL_MUL(unsigned long long, ullong, Uint128_t)
-
-// Shift left (GCC, 64 bit)
-DECL_SHL(unsigned, uint, unsigned long)
-DECL_SHL(unsigned long, ulong, Uint128_t)
-DECL_SHL(unsigned long long, ullong, Uint128_t)
-
-// Shift right (GCC, 64 bit)
-DECL_SHR(unsigned, uint, unsigned long)
-DECL_SHR(unsigned long, ulong, Uint128_t)
-DECL_SHR(unsigned long long, ullong, Uint128_t)
 
 // Bit scan reverse (GCC, 64 bit)
 DECL_BSR_GCC(unsigned long long, ullong, __builtin_clzll)
@@ -384,19 +494,6 @@ DECL_ATOMIC_COMPARE_EXCHANGE_GCC(Uint128_t, Uint128)
 #   endif
 
 #elif defined _MSC_BUILD
-
-#   define DECL_RO_MSVC(TYPE, PREFIX, SUFFIX, BACKEND) \
-        TYPE PREFIX ## _ ## SUFFIX(TYPE x, unsigned char y) \
-        { \
-            return BACKEND(x, y); \
-        }
-
-#   define DECL_BS_MSVC(TYPE, PREFIX, SUFFIX, BACKEND) \
-        TYPE PREFIX ## _bit_scan_ ## SUFFIX(TYPE x) \
-        { \
-            unsigned long res; \
-            return BACKEND(&res, x) ? (TYPE) res : umax(x); \
-        }
 
 #   define DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
         bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
@@ -422,53 +519,7 @@ DECL_ATOMIC_COMPARE_EXCHANGE_GCC(Uint128_t, Uint128)
             return (TYPE) atomic_add((TYPE volatile *) dst, 0 - arg); \
         }
 
-// Add (MSVC)
-DECL_OP_INTEL(unsigned char, uchar, add, _addcarry_u8)
-DECL_OP_INTEL(unsigned short, ushort, add, _addcarry_u16)
-DECL_OP_INTEL(unsigned, uint, add, _addcarry_u32)
 
-unsigned long ulong_add(unsigned char *p_car, unsigned long x, unsigned long y) 
-{ 
-    IS_UINT_EQ_ULONG;
-    return (unsigned long) add(p_car, (unsigned) x, (unsigned) y); 
-}
-
-// Subtract (MSVC)
-DECL_OP_INTEL(unsigned char, uchar, sub, _subborrow_u8)
-DECL_OP_INTEL(unsigned short, ushort, sub, _subborrow_u16)
-DECL_OP_INTEL(unsigned, uint, sub, _subborrow_u32)
-
-unsigned long ulong_sub(unsigned char *p_car, unsigned long x, unsigned long y)
-{ 
-    IS_UINT_EQ_ULONG;
-    return (unsigned long) sub(p_car, (unsigned) x, (unsigned) y); 
-}
-
-// Rotate left
-DECL_RO(unsigned char, uchar, rol, _rotl8)
-DECL_RO(unsigned short, ushrt, rol, _rotl16)
-DECL_RO(unsigned, uint, rol, _rotl)
-
-unsigned long ulong_rol(unsigned long x, unsigned char y)
-{
-    IS_UINT_EQ_ULONG;
-    return (unsigned long) rol((unsigned) x, (unsigned char) y);
-}
-
-DECL_RO(unsigned long long, ullong, rol, _rotl64)
-
-// Rotate right
-DECL_RO(unsigned char, uchar, ror, _rotr8)
-DECL_RO(unsigned short, ushrt, ror, _rotr16)
-DECL_RO(unsigned, uint, ror, _rotr)
-
-unsigned long ulong_ror(unsigned long x, unsigned char y)
-{
-    IS_UINT_EQ_ULONG;
-    return (unsigned long) ror((unsigned) x, (unsigned char) y);
-}
-
-DECL_RO(unsigned long long, ullong, ror, _rotr64)
 
 // Bit scan reverse (MSVC)
 unsigned uint_bsr(unsigned x) 
@@ -570,39 +621,8 @@ DECL_ATOMIC_OP(void *, ptr, exchange, void *, _InterlockedExchangePointer)
 
 #   ifdef _M_IX86
 
-// Add (MSVC, 32 bit)
-DECL_OP_3(unsigned long long, ullong, add, unsigned, _addcarry_u32)
-
-// Subtract (MSVC, 32 bit)
-DECL_OP_3(unsigned long long, ullong, sub, unsigned, _subborrow_u32)
-
 #   elif defined _M_X64
 
-// Add (MSVC, 64 bit)
-DECL_OP_2(unsigned long long, ullong, add, _addcarry_u64)
-
-// Subtract (MSVC, 64 bit)
-DECL_OP_2(unsigned long long, ullong, sub, _subborrow_u64)
-
-// Multiply (MSVC, 64 bit)
-unsigned long long ullong_mul(unsigned long long *p_hi, unsigned long long x, unsigned long long y) 
-{ 
-    return _umul128(x, y, p_hi); 
-}
-
-// Shift left (MSVC, 64 bit)
-unsigned long long ullong_shl(unsigned long long *p_hi, unsigned long long x, unsigned char y)
-{
-    *p_hi = __shiftleft128(x, 0, y); // Warning! 'y %= 64' is done internally!
-    return x << y;
-}
-
-// Shift right (MSVC, 64 bit)
-unsigned long long ullong_shr(unsigned long long *p_lo, unsigned long long x, unsigned char y)
-{
-    *p_lo = __shiftright128(0, x, y); // Warning! 'y %= 64' is done internally!
-    return x >> y;
-}
 
 // Bit scan reverse (MSVC, 64 bit)
 DECL_BS(unsigned long long, ullong, reverse, _BitScanReverse64)
@@ -637,29 +657,7 @@ DECL_ATOMIC_OP(unsigned long long, ullong, exchange, long long, _InterlockedExch
 
 #   endif
 #endif 
-
-size_t test_prod(size_t *p_res, size_t *argl, size_t cnt)
-{
-    if (!cnt) return (*p_res = 1, 0);
-    size_t res = argl[0];
-    for (size_t i = 1; i < cnt; i++) if (__builtin_mul_overflow(res, argl[i], &res)) return i;
-    *p_res = res;
-    return cnt;
-}
-
-size_t size_prod_test(size_t *p_res, size_t *argl, size_t cnt)
-{
-    if (!cnt) return (*p_res = 1, 0);
-    size_t res = argl[0];
-    for (size_t i = 1; i < cnt; i++)
-    {
-        size_t hi;
-        res = mul(&hi, res, argl[i]);
-        if (hi) return i;
-    }
-    *p_res = res;
-    return cnt;
-}
+#endif
 
 #define DECL_UINT_LOG10(TYPE, PREFIX, MAX, ...) \
     TYPE PREFIX ## _log10(TYPE x, bool ceil) \
