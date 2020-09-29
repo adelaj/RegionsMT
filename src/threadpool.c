@@ -70,7 +70,7 @@ void loop_generator(void *Task, size_t ind, void *Context)
 bool loop_mt(struct thread_pool *pool, task_callback callback, struct task_cond cond, struct task_aggr aggr, void *context, size_t *restrict cntl, size_t cnt, size_t *restrict offl, bool hi, struct log *log)
 {
     size_t prod, tot = 0;
-    if (!crt_assert_impl(log, CODE_METRIC, !SIZE_PROD_TEST(&prod, cntl, cnt) || prod == SIZE_MAX || !SIZE_PROD_TEST_VA(&tot, prod, cnt) ? ERANGE : 0)) return 0;
+    if (!crt_assert_impl(log, CODE_METRIC, test_prod(&prod, cntl, cnt) == cnt && prod != SIZE_MAX && test_mul(&tot, prod, cnt) ? 0 : ERANGE)) return 0;
     struct loop_mt *data;
     if (!array_assert(log, CODE_METRIC, array_init(&data, NULL, fam_countof(struct loop_mt, ind, tot), fam_sizeof(struct loop_mt, ind), fam_diffof(struct loop_mt, ind, tot), ARRAY_STRICT))) return 0;
     store_release(&data->mem.fail, 0);
@@ -107,8 +107,8 @@ struct thread_pool {
 
 static bool thread_pool_enqueue_impl(struct thread_pool *pool, size_t cnt, struct log *log)
 {
-    size_t car, probe = add(&car, load_acquire(&pool->task_hint), cnt);
-    if (!crt_assert_impl(log, CODE_METRIC, car ? ERANGE : 0) ||
+    size_t probe;
+    if (!crt_assert_impl(log, CODE_METRIC, test_add(&probe, load_acquire(&pool->task_hint), cnt) ? 0 : ERANGE) ||
         !array_assert(log, CODE_METRIC, persistent_array_test(&pool->dispatched_task, probe, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK))) return 0;
     for (size_t i = pool->task_cnt; i < probe; i++)
         store_release(&((struct dispatched_task *) persistent_array_fetch(&pool->dispatched_task, i, sizeof(struct dispatched_task)))->not_garbage, 0);
@@ -197,7 +197,7 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
         // Execute the task
         struct tls_base *tls = arg->tls;
         tls->storage = dispatched_task->storage;
-        tls->exec = dispatched_task->exec = size_add_sat(dispatched_task->exec, 1);
+        tls->exec = dispatched_task->exec = add_sat(dispatched_task->exec, 1);
         unsigned res = dispatched_task->callback ? dispatched_task->callback(dispatched_task->arg, dispatched_task->context, tls): TASK_SUCCESS;
         if (res == TASK_YIELD)
         {
@@ -461,8 +461,8 @@ struct thread_pool *thread_pool_create(size_t cnt, size_t tls_sz, size_t task_hi
 bool thread_pool_add(struct thread_pool *pool, size_t diff, size_t tls_sz, struct log *log)
 {
     spinlock_acquire(&pool->add);
-    size_t car, l = thread_pool_get_count(pool), r = size_add(&car, l, diff), tmp = 0;
-    if (crt_assert_impl(log, CODE_METRIC, car ? ERANGE : 0) &&
+    size_t l = thread_pool_get_count(pool), r, tmp = 0;
+    if (crt_assert_impl(log, CODE_METRIC, test_add(&r, l, diff) ? 0 : ERANGE) &&
         array_assert(log, CODE_METRIC, persistent_array_test(&pool->arg, r, sizeof(struct thread_arg), 0)))
     {
         tmp = thread_pool_start_range(pool, tls_sz, l, r, log);

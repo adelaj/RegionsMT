@@ -19,7 +19,7 @@ struct array_result matrix_init(void *p_Src, size_t *restrict p_cap, size_t xdim
 {
     size_t xtot = ydim;
     if (flags & ARRAY_FAILSAFE) xtot = xtot * sz + ydiff;
-    else if (!size_test_ma(&xtot, sz, ydiff)) return (struct array_result) { .error = ARRAY_OVERFLOW };
+    else if (!test_ma(&xtot, sz, ydiff)) return (struct array_result) { .error = ARRAY_OVERFLOW };
     struct array_result res = array_init(p_Src, p_cap, xdim, xtot, xdiff, flags);
     if (p_cap && res.status == ARRAY_SUCCESS) *p_cap *= ydim;
     return res;
@@ -50,7 +50,8 @@ struct array_result array_init_impl(void *p_Src, size_t *restrict p_cap, size_t 
     void **restrict p_src = p_Src, *src = *p_src;
     if (src && p_cap && (flags & ARRAY_REALLOC))
     {
-        size_t bor = 0, tmp = sub(&bor, cnt, *p_cap);
+        unsigned char bor = 0;
+        size_t tmp = sub(&bor, cnt, *p_cap);
         if (bor) // cnt < *p_cap
         {
             if (!(flags & ARRAY_REDUCE)) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
@@ -70,7 +71,7 @@ struct array_result array_init_impl(void *p_Src, size_t *restrict p_cap, size_t 
     }
     size_t tot = cnt;
     if ((flags & ARRAY_STRICT) && (flags & ARRAY_FAILSAFE)) tot *= sz, tot += diff;
-    else if (!size_test_ma(&tot, sz, diff)) return (struct array_result) { .error = ARRAY_OVERFLOW };
+    else if (!test_ma(&tot, sz, diff)) return (struct array_result) { .error = ARRAY_OVERFLOW };
     void *res;
     if (src && (flags & ARRAY_REALLOC))
     {
@@ -97,8 +98,10 @@ struct array_result array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, 
 
 struct array_result array_test_impl(void *p_Arr, size_t *restrict p_cap, size_t sz, size_t diff, enum array_flags flags, size_t *restrict cntl, size_t cnt)
 {
-    size_t hi, sum = size_sum(&hi, cntl, cnt);
-    return hi ? (struct array_result) { .error = ARRAY_OVERFLOW } : array_init(p_Arr, p_cap, sum, sz, diff, flags | ARRAY_REALLOC);
+    size_t sum;
+    return test_sum(&sum, cntl, cnt) == cnt ? 
+        array_init(p_Arr, p_cap, sum, sz, diff, flags | ARRAY_REALLOC) : 
+        (struct array_result) { .error = ARRAY_OVERFLOW };
 }
 
 struct array_result queue_init(struct queue *queue, size_t cnt, size_t sz)
@@ -122,7 +125,8 @@ struct array_result queue_test(struct queue *queue, size_t diff, size_t sz)
     struct array_result res = array_test(&queue->arr, &cap, sz, 0, 0, queue->cnt, diff);
     if (!res.status || (res.status & ARRAY_UNTOUCHED)) return res;
 
-    size_t bor, rem = sub(&bor, queue->begin, queue->cap - queue->cnt);
+    unsigned char bor = 0;
+    size_t rem = sub(&bor, queue->begin, queue->cap - queue->cnt);
     if (!bor && rem) // queue->begin > queue->cap - queue->cnt
     {
         size_t off = sub(&bor, rem, cap - queue->cap);
@@ -140,7 +144,8 @@ struct array_result queue_test(struct queue *queue, size_t diff, size_t sz)
 
 void *queue_fetch(struct queue *queue, size_t offset, size_t sz)
 {
-    size_t bor, diff = sub(&bor, queue->begin, queue->cap - offset);
+    unsigned char bor = 0;
+    size_t diff = sub(&bor, queue->begin, queue->cap - offset);
     if (!bor) return (char *) queue->arr + diff * sz;
     return (char *) queue->arr + (queue->begin + offset) * sz;
 }
@@ -148,10 +153,12 @@ void *queue_fetch(struct queue *queue, size_t offset, size_t sz)
 // This function should be called ONLY if 'queue_test' succeeds
 static void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
 {
-    size_t bor, left = sub(&bor, queue->begin, queue->cap - queue->cnt);
+    unsigned char bor = 0;
+    size_t left = sub(&bor, queue->begin, queue->cap - queue->cnt);
     if (bor) left += queue->cap;
     size_t diff = queue->cap - left; // Never overflows
-    size_t bor2, diff2 = sub(&bor2, cnt, diff);
+    unsigned char bor2 = 0;
+    size_t diff2 = sub(&bor2, cnt, diff);
     if (!bor2 && diff2) // cnt > queue->cap - left
     {
         size_t tot = diff * sz;
@@ -164,10 +171,12 @@ static void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, s
 
 static void queue_enqueue_yield_lo(struct queue *restrict queue, generator_callback generator, void *context, size_t cnt, size_t sz)
 {
-    size_t bor, left = sub(&bor, queue->begin, queue->cap - queue->cnt);
+    unsigned char bor = 0;
+    size_t left = sub(&bor, queue->begin, queue->cap - queue->cnt);
     if (bor) left += queue->cap;
     size_t diff = queue->cap - left; // Never overflows
-    size_t bor2, diff2 = sub(&bor2, cnt, diff);
+    unsigned char bor2 = 0;
+    size_t diff2 = sub(&bor2, cnt, diff);
     if (!bor2 && diff2) // cnt > queue->cap - left
     {
         size_t ind = 0;
@@ -181,7 +190,8 @@ static void queue_enqueue_yield_lo(struct queue *restrict queue, generator_callb
 // This function should be called ONLY if 'queue_test' succeeds
 static void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
 {
-    size_t bor, diff = sub(&bor, queue->begin, cnt);
+    unsigned char bor = 0;
+    size_t diff = sub(&bor, queue->begin, cnt);
     if (bor && diff) // cnt > queue->begin
     {
         diff = 0 - diff;
@@ -200,7 +210,8 @@ static void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, s
 
 static void queue_enqueue_yield_hi(struct queue *restrict queue, generator_callback generator, void *context, size_t cnt, size_t sz)
 {
-    size_t bor, diff = sub(&bor, queue->begin, cnt);
+    unsigned char bor = 0;
+    size_t diff = sub(&bor, queue->begin, cnt);
     if (bor && diff) // cnt > queue->begin
     {
         diff = 0 - diff;
@@ -237,7 +248,8 @@ void queue_dequeue(struct queue *queue, size_t offset, size_t sz)
 {
     if (offset)
     {
-        size_t bor, ind = sub(&bor, queue->begin, queue->cap - offset);
+        unsigned char bor = 0;
+        size_t ind = sub(&bor, queue->begin, queue->cap - offset);
         if (bor) ind += queue->cap;
         memcpy((char *) queue->arr + ind * sz, (char *) queue->arr + queue->begin * sz, sz);
     }
@@ -262,7 +274,7 @@ struct array_result persistent_array_init(struct persistent_array *arr, size_t c
     if (!res.status) return res;
     size_t tot = res.tot;
     res = array_init(arr->ptr, NULL, ((size_t) 2 << off) - 1, sz, 0, ARRAY_STRICT | (flags & PERSISTENT_ARRAY_CLEAR));
-    if (res.status) return (struct array_result) { .status = ARRAY_SUCCESS, .tot = size_add_sat(tot, res.tot) };
+    if (res.status) return (struct array_result) { .status = ARRAY_SUCCESS, .tot = add_sat(tot, res.tot) };
     free(arr->ptr);
     return res;
 }
@@ -278,7 +290,7 @@ struct array_result persistent_array_test(struct persistent_array *arr, size_t c
     if (!arr->bck) return persistent_array_init(arr, cnt, sz, flags);
     size_t cap1 = (size_t) 2 << (arr->bck - 1) << arr->off; // 'cap1' equals to the actual capacity plus one
     if (cnt <= cap1 - 1) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED }; // Do not replace condition with 'cnt < cap1'!
-    size_t cnt1 = size_add_sat(cnt, 1), bck = ulog2(cnt1, 1) - arr->off, tot = 0;
+    size_t cnt1 = add_sat(cnt, 1), bck = ulog2(cnt1, 1) - arr->off, tot = 0;
     if (flags & PERSISTENT_ARRAY_WEAK)
     {
         struct array_result res = array_test(&arr->ptr, &arr->cap, sizeof(*arr->ptr), 0, 0, bck);
@@ -293,7 +305,7 @@ struct array_result persistent_array_test(struct persistent_array *arr, size_t c
             arr->bck = i;
             return res;
         }
-        tot = size_add_sat(tot, res.tot);
+        tot = add_sat(tot, res.tot);
     }
     arr->bck = bck;
     return (struct array_result) { .status = ARRAY_SUCCESS, .tot = tot };
@@ -301,6 +313,6 @@ struct array_result persistent_array_test(struct persistent_array *arr, size_t c
 
 void *persistent_array_fetch(struct persistent_array *arr, size_t ind, size_t sz)
 {
-    size_t ind1 = ind + 1, off = size_sub_sat(ulog2(ind1, 0), arr->off);
+    size_t ind1 = ind + 1, log2 = ulog2(ind1, 0), off = sub_sat(log2, arr->off);
     return (char *) arr->ptr[off] + (off ? ind1 - ((size_t) 1 << arr->off << off) : ind) * sz;
 }

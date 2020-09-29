@@ -37,13 +37,9 @@ typedef struct { uint64_t qw[2]; } Uint128_t, Dsize_t;
 #endif
 
 #define OR(A, B, ...) \
-    IF_ ## A(IF_ ## B(__VA_ARGS__)) \
-    IF_ ## A(IFN_ ## B(__VA_ARGS__)) \
-    IFN_ ## A(IF_ ## B(__VA_ARGS__))
+    IF_ ## A(IF_ ## B(__VA_ARGS__)) IF_ ## A(IFN_ ## B(__VA_ARGS__)) IFN_ ## A(IF_ ## B(__VA_ARGS__))
 #define OR2(A, B, ...) \
-    IF_ ## A(IF_ ## B(__VA_ARGS__)) \
-    IF_ ## A(IFN_ ## B(__VA_ARGS__)) \
-    IFN_ ## A(IF_ ## B(__VA_ARGS__))
+    IF_ ## A(IF_ ## B(__VA_ARGS__)) IF_ ## A(IFN_ ## B(__VA_ARGS__)) IFN_ ## A(IF_ ## B(__VA_ARGS__))
 #define NAND(A, B, ...) \
     IFN_ ## A(IFN_ ## B(__VA_ARGS__))
 #define NAND2(A, B, ...) \
@@ -114,9 +110,6 @@ typedef struct { uint64_t qw[2]; } Uint128_t, Dsize_t;
 #define SIZE_CNT(BIT) TYPE_CNT(BIT, SIZE_BIT)
 #define UINT32_BIT (bitsof(uint32_t))
 #define UINT64_BIT (bitsof(uint64_t))
-
-#define SIZE_PROD_TEST(PROD, ARG, CNT) (size_prod_test((PROD), (ARG), (CNT)) == (CNT))
-#define SIZE_PROD_TEST_VA(PROD, ...) (size_prod_test((PROD), ARG(size_t, __VA_ARGS__)) == countof(((size_t []) { __VA_ARGS__ })))
 
 #define umax(X) (_Generic((X), \
     unsigned char: UCHAR_MAX, \
@@ -579,9 +572,6 @@ unsigned long long ullong_atomic_exchange(volatile unsigned long long *, unsigne
 #define atomic_dec(DST) (atomic_sub((DST), 1))
 #define ulog2(X, CEIL) (bsr(X) + ((CEIL) && (X) && ((X) & ((X) - 1))))
 
-size_t size_sum(size_t *, size_t *, size_t);
-size_t size_prod_test(size_t *, size_t *, size_t);
-
 uint32_t uint32_log10(uint32_t, bool);
 uint64_t uint64_log10(uint64_t, bool);
 
@@ -601,10 +591,6 @@ void spinlock_acquire(spinlock *);
 typedef void *(*double_lock_callback)(void *);
 void *double_lock_execute(spinlock *, double_lock_callback, double_lock_callback, void *, void *);
 
-size_t size_add_sat(size_t, size_t);
-size_t size_sub_sat(size_t, size_t);
-int size_sign(size_t, size_t);
-
 int size_stable_cmp_dsc(const void *, const void *, void *);
 int size_stable_cmp_asc(const void *, const void *, void *);
 bool size_cmp_dsc(const void *, const void *, void *);
@@ -616,10 +602,6 @@ int flt64_stable_cmp_asc_abs(const void *, const void *, void *);
 int flt64_stable_cmp_dsc_nan(const void *, const void *, void *);
 int flt64_stable_cmp_asc_nan(const void *, const void *, void *);
 int flt64_sign(double x);
-
-uint32_t uint32_fused_mul_add(uint32_t *, uint32_t, uint32_t);
-size_t size_fused_mul_add(size_t *, size_t, size_t);
-bool size_test_ma(size_t *, size_t m, size_t a);
 
 bool uint8_bit_test(uint8_t *, size_t);
 bool uint8_bit_test_set(uint8_t *, size_t);

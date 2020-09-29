@@ -22,7 +22,7 @@
 
 // Define operations via GCC intrinsics such as '__builtin_add_overflow' or '__builtin_sub_overflow'
 #define DECL_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
-    TYPE PREFIX ## _ ## SUFFIX(TYPE *p_hi, TYPE x, TYPE y) \
+    TYPE PREFIX ## _ ## SUFFIX(unsigned char *p_hi, TYPE x, TYPE y) \
     { \
         TYPE res; \
         *p_hi = BACKEND(x, y, &res); \
@@ -107,11 +107,12 @@
     }
 
 #define DECL_SH_SSE(TYPE, PREFIX, SUFFIX, SHL, SHR) \
-    TYPE PREFIX ## _ ## SUFFIX(TYPE *p_hl, TYPE x, TYPE y) \
+    TYPE PREFIX ## _ ## SUFFIX(TYPE *p_hl, TYPE x, unsigned char y) \
     { \
         _Static_assert(2 * sizeof(TYPE) == sizeof(__m128i), ""); \
+        _Static_assert(sizeof(TYPE) == sizeof(long long), ""); \
         TYPE res; \
-        __m128i x0 = _mm_set_epi64x(0, x); \
+        __m128i x0 = _mm_set_epi64x(0ll, (long long) x); \
         _mm_storeu_si64(&res, SHL(x0, y %= bitsof(TYPE))); \
         _mm_storeu_si64(p_hl, SHR(x0, bitsof(TYPE) - y)); \
         return res; \
@@ -177,8 +178,8 @@
         return 1; \
     }
 
-#define DECL_TEST_MUL(TYPE, PREFIX, SUFFIX) \
-    DECL_TEST_OP(TYPE, PREFIX, SUFFIX, TYPE)
+#define DECL_TEST_MUL(TYPE, PREFIX) \
+    DECL_TEST_OP(TYPE, PREFIX, mul, TYPE)
 
 #define DECL_TEST_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
     bool PREFIX ## _test_ ## SUFFIX(TYPE *p_res, TYPE x, TYPE y) \
@@ -213,10 +214,26 @@
         return x ? bitsof(TYPE) - (TYPE) BACKEND(x) - 1 : umax(x); \
     }
 
+#define DECL_BSR_WIDE(TYPE, PREFIX, OP_TYPE) \
+    TYPE PREFIX ## _bsr(TYPE x) \
+    { \
+        _Static_assert(2 * sizeof(OP_TYPE) == sizeof(TYPE), ""); \
+        OP_TYPE lo = (OP_TYPE) x, hi = (OP_TYPE) (x >> bitsof(OP_TYPE)); \
+        return hi ? (TYPE) bsr(hi) + bitsof(OP_TYPE) : lo ? (TYPE) bsr(lo) : umax(x); \
+    }
+
 #define DECL_BSF_GCC(TYPE, PREFIX, BACKEND) \
     TYPE PREFIX ## _bsf(TYPE x) \
     { \
         return  x ? (TYPE) BACKEND(x) : umax(x); \
+    }
+
+#define DECL_BSF_WIDE(TYPE, PREFIX, OP_TYPE) \
+    TYPE PREFIX ## _bsf(TYPE x) \
+    { \
+        _Static_assert(2 * sizeof(OP_TYPE) == sizeof(TYPE), ""); \
+        OP_TYPE lo = (OP_TYPE) x, hi = (OP_TYPE) (x >> bitsof(OP_TYPE)); \
+        return lo ? (TYPE) bsf(lo) : hi ? (TYPE) bsf(hi) + bitsof(OP_TYPE) : umax(x); \
     }
 
 #define DECL_BS_MSVC(TYPE, PREFIX, SUFFIX, BACKEND) \
@@ -224,6 +241,13 @@
     { \
         unsigned long res; \
         return BACKEND(&res, x) ? (TYPE) res : umax(x); \
+    }
+
+#define DECL_PCNT_WIDE(TYPE, PREFIX, OP_TYPE) \
+    TYPE PREFIX ## _pcnt(TYPE x) \
+    { \
+        _Static_assert(2 * sizeof(OP_TYPE) == sizeof(TYPE), ""); \
+        return (TYPE) pcnt((OP_TYPE) x) + (TYPE) pcnt((OP_TYPE) (x >> bitsof(OP_TYPE))); \
     }
 
 #define DECL_ATOMIC_ADD_SAT(TYPE, PREFIX) \
@@ -297,7 +321,7 @@ unsigned long long ullong_mul(unsigned long long *p_hi, unsigned long long x, un
 }))
 
 // Multiply–accumulate
-DECL2(MA)
+DECL2(MA, )
 
 // Shift left
 IF_GCC_LLVM_MSVC(DECL_SHL(unsigned char, uchar, unsigned short))
@@ -323,7 +347,7 @@ IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHR(unsigned, uint, unsigned long long)))
 IF_GCC_LLVM(IF_X64(DECL_SHR(unsigned, uint, unsigned long)))
 IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHR(unsigned long, ulong, unsigned long long)))
 IF_GCC_LLVM(IF_X64(DECL_SHR(unsigned long, ulong, Uint128_t)))
-IF_GCC_LLVM_MSVC(IF_X32(DECL_SH_SSE(unsigned long long, ullong, shl, _mm_srli_epi64, _mm_slli_epi64)))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_SH_SSE(unsigned long long, ullong, shr, _mm_srli_epi64, _mm_slli_epi64)))
 IF_GCC_LLVM(IF_X64(DECL_SHR(unsigned long long, ullong, Uint128_t)))
 
 IF_MSVC(IF_X64(
@@ -358,16 +382,16 @@ IF_GCC_LLVM(DECL_RO_GCC(unsigned long long, ullong, ror, >>, <<))
 IF_MSVC(DECL_RO_MSVC(unsigned long long, ullong, ror, _rotr64))
 
 // Saturated add
-DECL2(ADD_SAT)
+DECL2(ADD_SAT, )
 
 // Saturated subtract
-DECL2(SUB_SAT)
+DECL2(SUB_SAT, )
 
 // Sign of the difference of unsigned integers
-DECL2(USIGN)
+DECL2(USIGN, )
 
 // Absolute difference of unsigned integers
-DECL2(UDIST)
+DECL2(UDIST, )
 
 // Non-destructive add with overflow test
 IF_GCC_LLVM(DECL2(TEST_OP_GCC, , add, __builtin_add_overflow))
@@ -379,10 +403,10 @@ IF_MSVC(DECL2(TEST_OP, , sub, unsigned char))
 
 // Non-destructive multiply with overflow test
 IF_GCC_LLVM(DECL2(TEST_OP_GCC, , mul, __builtin_mul_overflow))
-IF_MSVC(DECL2(TEST_MUL, , mul))
+IF_MSVC(DECL2(TEST_MUL, ))
 
 // Non-destructive multiply–accumulate with overflow test
-DECL2(TEST_MA)
+DECL2(TEST_MA, )
 
 // Non-destructive sum with overflow test
 DECL2(TEST_REP, , sum, 0, add)
@@ -816,7 +840,7 @@ GPOP
 int size_stable_cmp_dsc(const void *A, const void *B, void *thunk)
 {
     (void) thunk;
-    return size_sign(*(size_t *) B, *(size_t *) A);
+    return usign(*(size_t *) B, *(size_t *) A);
 }
 
 DECL_STABLE_CMP_ASC(size, )
