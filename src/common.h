@@ -6,6 +6,66 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define OR(A, B, ...) \
+    IF_ ## A(IF_ ## B(__VA_ARGS__)) IF_ ## A(IFN_ ## B(__VA_ARGS__)) IFN_ ## A(IF_ ## B(__VA_ARGS__))
+#define OR2(A, B, ...) \
+    IF_ ## A(IF_ ## B(__VA_ARGS__)) IF_ ## A(IFN_ ## B(__VA_ARGS__)) IFN_ ## A(IF_ ## B(__VA_ARGS__))
+#define NAND(A, B, ...) \
+    IFN_ ## A(IFN_ ## B(__VA_ARGS__))
+#define NAND2(A, B, ...) \
+    IFN_ ## A(IFN_ ## B(__VA_ARGS__))
+
+#ifdef __GNUC__
+#   define IF_GCC(...) __VA_ARGS__
+#   define IFN_GCC(...)
+#elif __clang__
+#   define IF_LLVM(...) __VA_ARGS__
+#   define IFN_LLVM(...)
+#elif _MSC_BUILD
+#   define IF_MSVC(...) __VA_ARGS__
+#   define IFN_MSVC(...)
+#endif
+
+#ifndef IF_GCC
+#   define IF_GCC(...)
+#   define IFN_GCC(...) __VA_ARGS__
+#endif
+
+#ifndef IF_LLVM
+#   define IF_LLVM(...)
+#   define IFN_LLVM(...) __VA_ARGS__
+#endif
+
+#ifndef IF_MSVC
+#   define IF_MSVC(...)
+#   define IFN_MSVC(...) __VA_ARGS__
+#endif
+
+#if defined __x86_64__ || defined _M_X64
+#   define IF_X64(...) __VA_ARGS__
+#   define IFN_X64(...)
+#elif defined __i386__ || defined _M_IX86
+#   define IF_X32(...) __VA_ARGS__
+#   define IFN_X32(...)
+#endif
+
+#ifndef IF_X64
+#   define IF_X64(...)
+#   define IFN_X64(...) __VA_ARGS__
+#endif
+
+#ifndef IF_X32
+#   define IF_X32(...)
+#   define IFN_X32(...) __VA_ARGS__
+#endif
+
+#define IF_GCC_LLVM(...) OR(GCC, LLVM, __VA_ARGS__)
+#define IFN_GCC_LLVM(...) NAND(GCC, LLVM, __VA_ARGS__)
+#define IF_MSVC_X32(...) OR(MSVC, X32, __VA_ARGS__)
+#define IFN_MSVC_X32(...) NAND(MSVC, X32, __VA_ARGS__)
+#define IF_GCC_LLVM_MSVC(...) OR2(GCC_LLVM, MSVC, __VA_ARGS__)
+#define IFN_GCC_LLVM_MSVC(...) NAND2(GCC_LLVM, MSVC, __VA_ARGS__)
+
 #define MAX(a, b) \
     ((a) >= (b) ? (a) : (b))
 #define MIN(a, b) \
@@ -55,21 +115,12 @@
 // Common value for the size of temporary buffer used for file reading
 #define BLOCK_READ 4096
 
-#if defined __GNUC__ || defined __clang__
-#   define GPUSH _Pragma("GCC diagnostic push")
-#   define GWRN(WRN) _Pragma(TOSTR(GCC diagnostic ignored TOSTR(-W ## WRN)))
-#   define GPOP _Pragma("GCC diagnostic pop")
-#   define MPUSH
-#   define MWRN(WRN)
-#   define MPOP
-#elif defined _MSC_BUILD
-#   define GPUSH
-#   define GWRN(WRN)
-#   define GPOP
-#   define MPUSH _Pragma("warning (push)")
-#   define MWRN(WRN) _Pragma(TOSTR(warning (disable: WRN)))
-#   define MPOP _Pragma("warning (pop)")
-#endif
+#define GPUSH IF_GCC_LLVM(_Pragma("GCC diagnostic push"))
+#define GWRN(WRN) IF_GCC_LLVM(_Pragma(TOSTR(GCC diagnostic ignored TOSTR(-W ## WRN))))
+#define GPOP IF_GCC_LLVM(_Pragma("GCC diagnostic pop"))
+#define MPUSH IF_MSVC(_Pragma("warning (push)"))
+#define MWRN(WRN) IF_MSVC(_Pragma(TOSTR(warning (disable: WRN))))
+#define MPOP IF_MSVC(_Pragma("warning (pop)"))
 
 //MWRN(4116) // "Unnamed type definition in parentheses"
 MWRN(4200) // "Zero-sized array in structure/union"

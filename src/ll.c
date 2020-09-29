@@ -185,7 +185,7 @@
     bool PREFIX ## _test_ ## SUFFIX(TYPE *p_res, TYPE x, TYPE y) \
     { \
         TYPE res; \
-        if (!(BACKEND(x, y, &res))) return 0; \
+        if (BACKEND(x, y, &res)) return 0; \
         *p_res = res; /* On failure '*p_res' is untouched */ \
         return 1; \
     }
@@ -250,20 +250,69 @@
         return (TYPE) pcnt((OP_TYPE) x) + (TYPE) pcnt((OP_TYPE) (x >> bitsof(OP_TYPE))); \
     }
 
-#define DECL_ATOMIC_ADD_SAT(TYPE, PREFIX) \
-    TYPE PREFIX ## _atomic_add_sat(TYPE volatile *mem, TYPE val) \
+#define DECL_ATOMIC_OP_MSVC(TYPE, PREFIX, SUFFIX, BACKEND_TYPE, BACKEND) \
+    TYPE PREFIX ## _atomic_ ## SUFFIX(TYPE volatile *dst, TYPE arg) \
     { \
-        TYPE tmp = load_acquire(mem); \
-        while (tmp < umax(tmp) && !atomic_compare_exchange(mem, &tmp, add_sat(tmp, val))) tmp = load_acquire(mem); \
-        return tmp; \
+        _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
+        return (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) arg); \
     }
 
-#define DECL_ATOMIC_SUB_SAT(TYPE, PREFIX) \
-    TYPE PREFIX ## _atomic_sub_sat(TYPE volatile *mem, TYPE val) \
+#define DECL_ATOMIC_OP_COPY(TYPE, PREFIX, SUFFIX, OP_TYPE) \
+    TYPE PREFIX ## _atomic_ ## SUFFIX(TYPE volatile *dst, TYPE arg) \
     { \
-        TYPE tmp = load_acquire(mem); \
-        while (tmp && !atomic_compare_exchange(mem, &tmp, sub_sat(tmp, val))) tmp = load_acquire(mem); \
-        return tmp; \
+        _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
+        return (TYPE) atomic_ ## SUFFIX((OP_TYPE volatile *) dst, (OP_TYPE) arg); \
+    }
+
+#define DECL_ATOMIC_SUB_MSVC(TYPE, PREFIX) \
+    TYPE PREFIX ## _atomic_sub(TYPE volatile *dst, TYPE arg) \
+    { \
+        return (TYPE) atomic_add((TYPE volatile *) dst, 0 - arg); \
+    }
+
+#define DECL_ATOMIC_COMPARE_EXCHANGE_GCC(TYPE, PREFIX) \
+    bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
+    { \
+        return __atomic_compare_exchange_n((TYPE volatile *) dst, p_cmp, xchg, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE); \
+    }
+
+// This should be used to force compiler to emit 'cmpxchg16b'/'cmpxchg8b' instuctions when:
+// 1) gcc is targeted to 'x86_64', even if '-mcx16' flag set (see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84522);
+// 2) clang is targeted to 'i386'.
+#define DECL_ATOMIC_COMPARE_EXCHANGE_SYNC(TYPE, PREFIX) \
+    bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
+    { \
+        TYPE cmp = *p_cmp; \
+        TYPE res = __sync_val_compare_and_swap(dst, cmp, xchg); \
+        if (res == cmp) return 1; \
+        *p_cmp = res; \
+        return 0; \
+    }
+
+#define DECL_ATOMIC_COMPARE_EXCHANGE_COPY(TYPE, PREFIX, OP_TYPE) \
+    bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
+    { \
+        _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
+        return atomic_compare_exchange((OP_TYPE volatile *) dst, (OP_TYPE *) p_cmp, (OP_TYPE) xchg); \
+    }
+
+#define DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
+    bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
+    { \
+        _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
+        TYPE cmp = *p_cmp; \
+        TYPE res = (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) xchg, (BACKEND_TYPE) cmp); \
+        if (res == cmp) return 1; \
+        *p_cmp = res; \
+        return 0; \
+    }
+
+#define DECL_ATOMIC_OP_WIDE(TYPE, PREFIX, SUFFIX, COND, FUN) \
+    TYPE PREFIX ## _atomic_ ## SUFFIX(TYPE volatile *mem, TYPE val) \
+    { \
+        TYPE probe = *mem; \
+        while (COND(probe) && !atomic_compare_exchange(mem, &probe, (TYPE) FUN(probe, val))) probe = *mem; \
+        return probe; \
     }
 
 #define DECL2(SUFFIX, ...) \
@@ -405,7 +454,7 @@ IF_MSVC(DECL2(TEST_OP, , sub, unsigned char))
 IF_GCC_LLVM(DECL2(TEST_OP_GCC, , mul, __builtin_mul_overflow))
 IF_MSVC(DECL2(TEST_MUL, ))
 
-// Non-destructive multiply–accumulate with overflow test
+// Non-destructive multiply-accumulate with overflow test
 DECL2(TEST_MA, )
 
 // Non-destructive sum with overflow test
@@ -422,7 +471,14 @@ unsigned char uchar_bsr(unsigned char x)
     return res[x];
 }
 
-DECL_1_COPY(unsigned short, ushrt, bsr, unsigned)
+IF_GCC_LLVM_MSVC(DECL_1_COPY(unsigned short, ushrt, bsr, unsigned))
+IF_GCC_LLVM(DECL_BSR_GCC(unsigned, uint, __builtin_clz))
+IF_MSVC(DECL_1_COPY(unsigned, uint, bsr, unsigned long))
+IF_GCC_LLVM(DECL_BSR_GCC(unsigned long, ulong, __builtin_clzl))
+IF_MSVC(DECL_BS_MSVC(unsigned long, ulong, reverse, _BitScanReverse))
+IF_GCC_LLVM(DECL_BSR_GCC(unsigned long long, ullong, __builtin_clzll))
+IF_MSVC(IF_X32(DECL_BSR_WIDE(unsigned long long, ullong, unsigned)))
+IF_MSVC(IF_X64(DECL_BS_MSVC(unsigned long long, ullong, reverse, _BitScanReverse64)))
 
 // Bit scan forward
 unsigned char uchar_bsf(unsigned char x) 
@@ -430,7 +486,14 @@ unsigned char uchar_bsf(unsigned char x)
     return bsr((unsigned char) (x & (0 - x))); 
 }
 
-DECL_1_COPY(unsigned short, ushrt, bsf, unsigned)
+IF_GCC_LLVM_MSVC(DECL_1_COPY(unsigned short, ushrt, bsf, unsigned))
+IF_GCC_LLVM(DECL_BSF_GCC(unsigned, uint, __builtin_ctz))
+IF_MSVC(DECL_1_COPY(unsigned, uint, bsf, unsigned long))
+IF_GCC_LLVM(DECL_BSF_GCC(unsigned long, ulong, __builtin_ctzl))
+IF_MSVC(DECL_BS_MSVC(unsigned long, ulong, forward, _BitScanForward))
+IF_GCC_LLVM(DECL_BSF_GCC(unsigned long long, ullong, __builtin_ctzll))
+IF_MSVC(IF_X32(DECL_BSF_WIDE(unsigned long long, ullong, unsigned)))
+IF_MSVC(IF_X64(DECL_BS_MSVC(unsigned long long, ullong, forward, _BitScanForward64)))
 
 // Population count
 unsigned char uchar_pcnt(unsigned char x)
@@ -440,165 +503,68 @@ unsigned char uchar_pcnt(unsigned char x)
     return res[x];
 }
 
-#if 0
+IF_GCC_LLVM(DECL_1_COPY(unsigned short, ushrt, pcnt, unsigned))
+IF_MSVC(DECL_1(unsigned short, ushrt, pcnt, __popcnt16))
+IF_GCC_LLVM(DECL_1(unsigned, uint, pcnt, __builtin_popcount))
+IF_MSVC(DECL_1(unsigned, uint, pcnt, __popcnt))
+IF_GCC_LLVM(DECL_1(unsigned long, ulong, pcnt, __builtin_popcountl))
+IF_MSVC(DECL_1_COPY(unsigned long, ulong, pcnt, unsigned))
+IF_GCC_LLVM(DECL_1(unsigned long long, ullong, pcnt, __builtin_popcountll))
+IF_MSVC(IF_X32(DECL_PCNT_WIDE(unsigned long long, ullong, unsigned)))
+IF_MSVC(IF_X64(DECL_1(unsigned long long, ullong, pcnt, __popcnt64)))
 
-#if defined __GCCC__ || defined __LLVM__
+// Atomic compare and swap
+IF_GCC_LLVM(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned char, uchar))
+IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(unsigned char, uchar, char, _InterlockedCompareExchange8))
+IF_GCC_LLVM(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned short, ushrt))
+IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(unsigned short, ushrt, short, _InterlockedCompareExchange16))
+IF_GCC_LLVM(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned, uint))
+IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_COPY(unsigned, uint, unsigned long))
+IF_GCC_LLVM(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned long, ulong))
+IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(unsigned long, ulong, long, _InterlockedCompareExchange))
+IF_GCC(IF_X32(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned long long, ullong)))
+IF_LLVM(IF_X32(DECL_ATOMIC_COMPARE_EXCHANGE_SYNC(unsigned long long, ullong)))
+IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(unsigned long long, ullong, long long, _InterlockedCompareExchange64))
+IF_GCC_LLVM(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(void *, ptr))
+IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(void *, ptr, void *, _InterlockedCompareExchangePointer))
+IF_GCC(IF_X64(DECL_ATOMIC_COMPARE_EXCHANGE_SYNC(Uint128_t, Uint128)))
+IF_LLVM(IF_X64(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(Uint128_t, Uint128)))
 
-#   define DECL_ATOMIC_COMPARE_EXCHANGE_GCC(TYPE, PREFIX) \
-        bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
-        { \
-            return __atomic_compare_exchange_n((TYPE volatile *) dst, p_cmp, xchg, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE); \
-        }
-
-// This should be used to force compiler to emit 'cmpxchg16b'/'cmpxchg8b' instuctions when:
-// 1) gcc is targeted to 'x86_64', even if '-mcx16' flag set (see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84522);
-// 2) clang is targeted to 'i386'.
-#   define DECL_ATOMIC_COMPARE_EXCHANGE_SYNC(TYPE, PREFIX) \
-        bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
-        { \
-            TYPE cmp = *p_cmp; \
-            TYPE res = __sync_val_compare_and_swap(dst, cmp, xchg); \
-            if (res == cmp) return 1; \
-            *p_cmp = res; \
-            return 0; \
-        }
-
-// Add (GCC)
-
-
-
-
-// Bit scan reverse (GCC)
-DECL_BSR_GCC(unsigned, uint, __builtin_clz)
-DECL_BSR_GCC(unsigned long, ulong, __builtin_clzl)
-
-// Bit scan forward (GCC)
-DECL_BSF_GCC(unsigned, uint, __builtin_ctz)
-DECL_BSF_GCC(unsigned long, ulong, __builtin_ctzl)
-
-// Population count (GCC)
-DECL_1_COPY(unsigned short, ushrt, pcnt, unsigned)
-DECL_1(unsigned, uint, pcnt, __builtin_popcount)
-DECL_1(unsigned long, ulong, pcnt, __builtin_popcountl)
-
-// Atomic compare and swap (GCC)
-DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned char, uchar)
-DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned short, ushrt)
-DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned, uint)
-DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned long, ulong)
-DECL_ATOMIC_COMPARE_EXCHANGE_GCC(void *, ptr)
-
-#   ifdef __i386__
-
-// Atomic compare and swap (GCC, 32 bit)
-#       ifdef __LLVM__
-DECL_ATOMIC_COMPARE_EXCHANGE_SYNC(unsigned long long, ullong)
-#       else
-DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned long long, ullong)
-#       endif
-
-#   elif defined __x86_64__
-
-
-// Bit scan reverse (GCC, 64 bit)
-DECL_BSR_GCC(unsigned long long, ullong, __builtin_clzll)
-
-// Bit scan forward (GCC, 64 bit)
-DECL_BSF_GCC(unsigned long long, ullong, __builtin_ctzll)
-
-// Population count (GCC, 64 bit)
-DECL_1(unsigned long long, ullong, pcnt, __builtin_popcountll)
-
-// Atomic compare and swap (GCC, 64 bit)
-#       ifdef __GCCC__
-DECL_ATOMIC_COMPARE_EXCHANGE_SYNC(Uint128_t, Uint128)
-#       else
-DECL_ATOMIC_COMPARE_EXCHANGE_GCC(Uint128_t, Uint128)
-#       endif
-#   endif
-
-#elif defined _MSC_BUILD
-
-#   define DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
-        bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
-        { \
-            _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
-            TYPE cmp = *p_cmp; \
-            TYPE res = (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) xchg, (BACKEND_TYPE) cmp); \
-            if (res == cmp) return 1; \
-            *p_cmp = res; \
-            return 0; \
-        }
-
-#   define DECL_ATOMIC_OP_MSVC(TYPE, PREFIX, SUFFIX, BACKEND_TYPE, BACKEND) \
-        TYPE PREFIX ## _atomic_ ## SUFFIX(TYPE volatile *dst, TYPE arg) \
-        { \
-            _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
-            return (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) arg); \
-        }
-
-#   define DECL_ATOMIC_SUB_MSVC(TYPE, PREFIX) \
-        TYPE PREFIX ## _atomic_sub(TYPE volatile *dst, TYPE arg) \
-        { \
-            return (TYPE) atomic_add((TYPE volatile *) dst, 0 - arg); \
-        }
-
-
-
-// Bit scan reverse (MSVC)
-unsigned uint_bsr(unsigned x) 
-{ 
-    IS_UINT_EQ_ULONG;
-    return (unsigned) bsr((unsigned long) x); 
-}
-
-DECL_BS(unsigned long, ulong, reverse, _BitScanReverse)
-
-// Bit scan forward (MSVC)
-unsigned uint_bsf(unsigned x) 
-{ 
-    IS_UINT_EQ_ULONG;
-    return (unsigned) bsf((unsigned long) x); 
-}
-
-DECL_BS(unsigned long, ulong, forward, _BitScanForward)
-
-// Population count (MSVC)
-
-DECL_1(unsigned short, ushrt, pcnt, __popcnt16)
-DECL_1(unsigned, uint, pcnt, __popcnt)
-
-unsigned long ulong_pcnt(unsigned long x) 
-{ 
-    IS_UINT_EQ_ULONG;
-    return (unsigned long) pcnt((unsigned) x); 
-}
-
-// Atomic compare and swap (MSVC)
-DECL_ATOMIC_COMPARE_EXCHANGE(unsigned char, uchar, char, _InterlockedCompareExchange8)
-DECL_ATOMIC_COMPARE_EXCHANGE(unsigned short, ushrt, short, _InterlockedCompareExchange16)
-
-bool uint_atomic_compare_exchange(volatile unsigned *dst, unsigned *p_cmp, unsigned xchg) 
-{ 
-    IS_UINT_EQ_ULONG;
-    return atomic_compare_exchange((volatile unsigned long *) dst, (unsigned long *) p_cmp, (unsigned long) xchg);
-}
-
-DECL_ATOMIC_COMPARE_EXCHANGE(unsigned long, ulong, long, _InterlockedCompareExchange)
-DECL_ATOMIC_COMPARE_EXCHANGE(unsigned long long, ullong, long long, _InterlockedCompareExchange64)
-DECL_ATOMIC_COMPARE_EXCHANGE(void *, ptr, void *, _InterlockedCompareExchangePointer)
+IF_MSVC(IF_X64(
+bool Uint128_atomic_compare_exchange(volatile Uint128_t *dst, Uint128_t *p_cmp, Uint128_t xchg)
+{
+    _Static_assert(sizeof(dst->qw) == 2 * sizeof(long long), "");
+    return _InterlockedCompareExchange128((volatile long long *) dst->qw, UINT128_HI(xchg), UINT128_LO(xchg), (long long *) p_cmp->qw);
+}))
 
 // Atomic AND (MSVC)
-DECL_ATOMIC_OP(unsigned char, uchar, and, char, _InterlockedAnd8)
-DECL_ATOMIC_OP(unsigned short, ushrt, and, short, _InterlockedAnd16)
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, and, char, _InterlockedAnd8))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, and, short, _InterlockedAnd16))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uintm, and, unsigned long))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, and, long, _InterlockedAnd))
+IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, and, long long, _InterlockedAnd64)))
 
-unsigned uint_atomic_and(volatile unsigned *dst, unsigned arg) 
-{ 
-    IS_UINT_EQ_ULONG;
-    return (unsigned) atomic_and((volatile unsigned long *) dst, (unsigned long) arg); 
-}
 
-DECL_ATOMIC_OP(unsigned long, ulong, and, long, _InterlockedAnd)
+// Atomic saturated add
+#define COND(P) ((P) < umax(P))
+#define FUN(P, V) (add_sat((P), (V)))
+
+DECL_ATOMIC_OP_WIDE(unsigned long, ulong, add_sat, COND, FUN)
+
+#undef FUN
+#undef COND
+
+
+// Atomic saturated subtract
+#define COND(P) ((P))
+#define FUN(P, V) (sub_sat((P), (V)))
+
+DECL_ATOMIC_OP_WIDE(unsigned long, ulong, sub_sat, COND, FUN)
+
+#undef FUN
+#undef COND
+
+#if 0
 
 // Atomic OR (MSVC)
 DECL_ATOMIC_OP(unsigned char, uchar, or, char, _InterlockedOr8)
@@ -647,25 +613,10 @@ DECL_ATOMIC_OP(void *, ptr, exchange, void *, _InterlockedExchangePointer)
 
 #   elif defined _M_X64
 
-
-// Bit scan reverse (MSVC, 64 bit)
-DECL_BS(unsigned long long, ullong, reverse, _BitScanReverse64)
-
-// Bit scan forward (MSVC, 64 bit)
-DECL_BS(unsigned long long, ullong, forward, _BitScanForward64)
-
-// Population count (MSVC, 64 bit)
-DECL_1(unsigned long long, ullong, pcnt, __popcnt64)
-
 // Atomic compare and swap (MSVC, 64 bit)
-bool Uint128_atomic_compare_exchange(volatile Uint128_t *dst, Uint128_t *p_cmp, Uint128_t xchg)
-{ 
-    _Static_assert(sizeof(dst->qw) == 2 * sizeof(long long), "");
-    return _InterlockedCompareExchange128((volatile long long *) dst->qw, UINT128_HI(xchg), UINT128_LO(xchg), (long long *) p_cmp->qw);
-}
 
 // Atomic AND (MSVC, 64 bit)
-DECL_ATOMIC_OP(unsigned long long, ullong, and, long long, _InterlockedAnd64)
+
 
 // Atomic OR (MSVC, 64 bit)
 DECL_ATOMIC_OP(unsigned long long, ullong, or, long long, _InterlockedOr64)
@@ -681,7 +632,6 @@ DECL_ATOMIC_OP(unsigned long long, ullong, exchange, long long, _InterlockedExch
 
 #   endif
 #endif 
-#endif
 
 #define DECL_UINT_LOG10(TYPE, PREFIX, MAX, ...) \
     TYPE PREFIX ## _log10(TYPE x, bool ceil) \
@@ -1012,11 +962,13 @@ DECL_BIT_FETCH_RESET_BURST(uint8_t, uint8, 2)
 DECL_BIT_SET_BURST(uint8_t, uint8, 2)
 DECL_BIT_RESET_BURST(uint8_t, uint8, 2)
 
+/*
 DECL_BIT_TEST_ACQUIRE(uint8_t, uint8)
 DECL_ATOMIC_BIT_SET_RELEASE(uint8_t, uint8)
 DECL_ATOMIC_BIT_RESET_RELEASE(uint8_t, uint8)
 DECL_ATOMIC_BIT_TEST_SET(uint8_t, uint8)
 DECL_ATOMIC_BIT_TEST_RESET(uint8_t, uint8)
+*/
 
 DECL_BIT_TEST(size_t, size)
 DECL_BIT_TEST_SET(size_t, size)
