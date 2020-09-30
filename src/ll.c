@@ -25,7 +25,8 @@
     TYPE PREFIX ## _ ## SUFFIX(unsigned char *p_hi, TYPE x, TYPE y) \
     { \
         TYPE res; \
-        *p_hi = BACKEND(x, y, &res); \
+        unsigned char hi = BACKEND(x, y, &res); \
+        *p_hi = hi + BACKEND(res, *p_hi, &res); \
         return res; \
     }
 
@@ -250,6 +251,24 @@
         return (TYPE) pcnt((OP_TYPE) x) + (TYPE) pcnt((OP_TYPE) (x >> bitsof(OP_TYPE))); \
     }
 
+#define DECL_ATOMIC_LOAD_SSE(TYPE) \
+    TYPE PREFIX ## _atomic_load_acquire(TYPE volatile *x) \
+    { \
+        _Static_assert(2 * sizeof(TYPE) == sizeof(__m128i), ""); \
+        _Static_assert(sizeof(TYPE) == sizeof(long long), ""); \
+        volatile unsigned long long res; /* Do not remove 'volatile'! */ \
+        _mm_storeu_si64((void *) &res, _mm_loadu_si64((__m128i *) x)); \
+        return res; \
+    }
+
+#define DECL_ATOMIC_STORE_SSE(TYPE) \
+    void PREFIX ## _atomic_store_release(volatile unsigned long long *x, unsigned long long y) \
+    { \
+        _Static_assert(2 * sizeof(TYPE) == sizeof(__m128i), ""); \
+        _Static_assert(sizeof(TYPE) == sizeof(long long), ""); \
+        _mm_storeu_si64((void *) x, _mm_set_epi64x(0, (long long) y)); \
+    }
+
 #define DECL_ATOMIC_OP_MSVC(TYPE, PREFIX, SUFFIX, BACKEND_TYPE, BACKEND) \
     TYPE PREFIX ## _atomic_ ## SUFFIX(TYPE volatile *dst, TYPE arg) \
     { \
@@ -282,7 +301,7 @@
 #define DECL_ATOMIC_COMPARE_EXCHANGE_SYNC(TYPE, PREFIX) \
     bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
     { \
-        TYPE cmp = *p_cmp; \
+        TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not join these lines! */ \
         TYPE res = __sync_val_compare_and_swap(dst, cmp, xchg); \
         if (res == cmp) return 1; \
         *p_cmp = res; \
@@ -300,19 +319,35 @@
     bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
     { \
         _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
-        TYPE cmp = *p_cmp; \
+        TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not join these lines! */ \
         TYPE res = (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) xchg, (BACKEND_TYPE) cmp); \
         if (res == cmp) return 1; \
         *p_cmp = res; \
         return 0; \
     }
 
-#define DECL_ATOMIC_OP_WIDE(TYPE, PREFIX, SUFFIX, COND, FUN) \
+#define DECL_ATOMIC_OP_WIDE(TYPE, PREFIX, SUFFIX, OP, ...) \
     TYPE PREFIX ## _atomic_ ## SUFFIX(TYPE volatile *mem, TYPE val) \
     { \
         TYPE probe = *mem; \
-        while (COND(probe) && !atomic_compare_exchange(mem, &probe, (TYPE) FUN(probe, val))) probe = *mem; \
+        while (!atomic_compare_exchange(mem, &probe, (TYPE) OP(probe __VA_ARGS__ val))) probe = *mem; \
         return probe; \
+    }
+
+#define DECL_ATOMIC_ADD_SAT(TYPE, PREFIX) \
+    TYPE PREFIX ## _atomic_add_sat(TYPE volatile *mem, TYPE val) \
+    { \
+        TYPE tmp = atomic_load_acquire(mem); \
+        while (tmp < umax(tmp) && !atomic_compare_exchange(mem, &tmp, add_sat(tmp, val))) tmp = atomic_load_acquire(mem); \
+        return tmp; \
+    }
+
+#define DECL_ATOMIC_SUB_SAT(TYPE, PREFIX) \
+    TYPE PREFIX ## _atomic_sub_sat(TYPE volatile *mem, TYPE val) \
+    { \
+        TYPE tmp = atomic_load_acquire(mem); \
+        while (tmp && !atomic_compare_exchange(mem, &tmp, sub_sat(tmp, val))) tmp = atomic_load_acquire(mem); \
+        return tmp; \
     }
 
 #define DECL2(SUFFIX, ...) \
@@ -546,23 +581,11 @@ IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, and, long long, _
 
 
 // Atomic saturated add
-#define COND(P) ((P) < umax(P))
-#define FUN(P, V) (add_sat((P), (V)))
-
-DECL_ATOMIC_OP_WIDE(unsigned long, ulong, add_sat, COND, FUN)
-
-#undef FUN
-#undef COND
-
+DECL2(ATOMIC_ADD_SAT, )
 
 // Atomic saturated subtract
-#define COND(P) ((P))
-#define FUN(P, V) (sub_sat((P), (V)))
+DECL2(ATOMIC_SUB_SAT, )
 
-DECL_ATOMIC_OP_WIDE(unsigned long, ulong, sub_sat, COND, FUN)
-
-#undef FUN
-#undef COND
 
 #if 0
 
@@ -750,24 +773,24 @@ size_t m128i_byte_scan_forward(__m128i a)
 
 void spinlock_acquire(spinlock *spinlock)
 {
-    while (!atomic_compare_exchange_acquire(spinlock, &(spinlock_base) { 0 }, 1)) while (load_acquire(spinlock)) _mm_pause();
+    while (!atomic_compare_exchange_acquire(spinlock, &(spinlock_base) { 0 }, 1)) while (atomic_load_acquire(spinlock)) _mm_pause();
 }
 
 GPUSH GWRN(implicit-fallthrough)
 void *double_lock_execute(spinlock *spinlock, double_lock_callback init, double_lock_callback comm, void *init_args, void *comm_args)
 {
     void *res = NULL;
-    switch (load_acquire(spinlock))
+    switch (atomic_load_acquire(spinlock))
     {
     case 0:
         if (atomic_compare_exchange_acquire(spinlock, &(spinlock_base) { 0 }, 1)) // Strong CAS required here!
         {
             if (init) res = init(init_args);
-            store_release(spinlock, 2);
+            atomic_store_release(spinlock, 2);
             break;
         }
     case 1: 
-        while (load_acquire(spinlock) != 2) _mm_pause();
+        while (atomic_load_acquire(spinlock) != 2) _mm_pause();
     case 2:
         if (comm) res = comm(comm_args);
     }
@@ -853,7 +876,7 @@ int flt64_sign(double x)
 #define DECL_BIT_TEST_ACQUIRE(TYPE, PREFIX) \
     bool PREFIX ## _bit_test_acquire(volatile void *arr, size_t bit) \
     { \
-        return load_acquire((volatile TYPE *) arr + bit / bitsof(TYPE)) & ((TYPE) 1 << bit % bitsof(TYPE)); \
+        return atomic_load_acquire((volatile TYPE *) arr + bit / bitsof(TYPE)) & ((TYPE) 1 << bit % bitsof(TYPE)); \
     }
 
 #define DECL_BIT_TEST_SET(TYPE, PREFIX) \
@@ -975,3 +998,6 @@ DECL_BIT_TEST_SET(size_t, size)
 DECL_BIT_TEST_RESET(size_t, size)
 DECL_BIT_SET(size_t, size)
 DECL_BIT_RESET(size_t, size)
+
+DECL_ATOMIC_LOAD_SSE(unsigned long long)
+DECL_ATOMIC_STORE_SSE(unsigned long long)

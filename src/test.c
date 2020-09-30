@@ -108,7 +108,7 @@ static unsigned test_thread(void *Indl, void *Context, void *Tls)
     }
     if (context->groupl[w].dispose) context->groupl[w].dispose(storage->data);
     free(storage);
-    size_interlocked_add_sat((volatile void *[]) { &context->fail, &context->succ }[res], 1);
+    interlocked_add_sat((volatile size_t *[]) { &context->fail, &context->succ }[res], 1);
     return res;
 }
 
@@ -120,7 +120,7 @@ static unsigned group_thread(void *Indl, void *Context, void *Tls)
     struct test_tls *tls = Tls;
     size_t cnt = 1;
     for (size_t i = 0; context->groupl[w].generator[y].callback(NULL, &i, &tls->log), i; cnt++);
-    size_interlocked_add_sat(&context->tot, cnt);
+    interlocked_add_sat(&context->tot, cnt);
     return loop_mt(tls->base.pool, test_thread, (struct task_cond) { 0 }, (struct task_aggr) { 0 }, Context, ARG(size_t, 1, 1, 1, cnt), (size_t []) { w, x, y, 0 }, 0, &tls->log);
 }
 
@@ -134,9 +134,9 @@ bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct
     bool succ = 0;
     struct test_thread_context context;
     context.groupl = groupl;
-    size_store_release(&context.succ, 0);
-    size_store_release(&context.fail, 0);
-    size_store_release(&context.tot, 0);
+    atomic_store_release(&context.succ, 0);
+    atomic_store_release(&context.fail, 0);
+    atomic_store_release(&context.tot, 0);
     if (ind == thread_cnt)
     {
         size_t i = 0;
@@ -145,8 +145,8 @@ bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct
         succ = i == cnt;
         uint64_t start = get_time();
         thread_pool_schedule(pool);
-        size_t fail = size_load_acquire(&context.fail);
-        log_message_fmt(log, CODE_METRIC, fail ? MESSAGE_ERROR : MESSAGE_INFO, "Execution of %~uz test(s) in %~uz thread(s) took %~T. Succeeded: %~uz, failed: %~uz.\n", size_load_acquire(&context.tot), thread_cnt, start, get_time(), size_load_acquire(&context.succ), fail);
+        size_t fail = size_atomic_load_acquire(&context.fail);
+        log_message_fmt(log, CODE_METRIC, fail ? MESSAGE_ERROR : MESSAGE_INFO, "Execution of %~uz test(s) in %~uz thread(s) took %~T. Succeeded: %~uz, failed: %~uz.\n", size_atomic_load_acquire(&context.tot), thread_cnt, start, get_time(), size_atomic_load_acquire(&context.succ), fail);
         succ = !fail;
     }
     while (ind--) log_mirror_close(&((struct test_tls *) thread_pool_fetch_tls(pool, ind))->log);

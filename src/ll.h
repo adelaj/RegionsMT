@@ -371,12 +371,12 @@ unsigned long long ullong_pcnt(unsigned long long);
     unsigned long long: ullong_pcnt)(x))
 
 // Load with acquire semantics
-#define load_acquire(SRC) \
+#define atomic_load_acquire(SRC) \
     IF_GCC_LLVM((__atomic_load_n((SRC), __ATOMIC_ACQUIRE))) \
     IF_MSVC(VOLAT_SELECT((SRC), *(SRC)))
 
 // Store with release semantics
-#define store_release(DST, VAL) \
+#define atomic_store_release(DST, VAL) \
     IF_GCC_LLVM((__atomic_store_n((DST), (VAL), __ATOMIC_RELEASE))) \
     IF_MSVC(VOLAT_SELECT((DST), *(DST) = (VAL)))
 
@@ -514,7 +514,7 @@ size_t m128i_byte_scan_forward(__m128i a);
 
 #define SPINLOCK_INIT 0
 void spinlock_acquire(spinlock *);
-#define spinlock_release(SPINLOCK) store_release((SPINLOCK), 0); 
+#define spinlock_release(SPINLOCK) atomic_store_release((SPINLOCK), 0); 
 
 typedef void *(*double_lock_callback)(void *);
 void *double_lock_execute(spinlock *, double_lock_callback, double_lock_callback, void *, void *);
