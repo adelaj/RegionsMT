@@ -9,6 +9,13 @@
 
 #include <immintrin.h>
 
+enum atomic_mo {
+    ATOMIC_RELAXED IF_GCC_LLVM(= __ATOMIC_RELAXED),
+    ATOMIC_ACQUIRE IF_GCC_LLVM(= __ATOMIC_ACQUIRE),
+    ATOMIC_RELEASE IF_GCC_LLVM(= __ATOMIC_RELEASE),
+    ATOMIC_ACQ_REL IF_GCC_LLVM(= __ATOMIC_ACQ_REL),
+};
+
 typedef unsigned spinlock_base;
 typedef volatile spinlock_base spinlock;
 
@@ -59,22 +66,6 @@ _Static_assert(sizeof(Dsize_t) == 2 * sizeof(size_t), "");
     unsigned: UINT_MAX, \
     unsigned long: ULONG_MAX, \
     unsigned long long: ULLONG_MAX))
-
-// Warning! Acquire/release semantics on MSVC are imposed by volatility 
-// '/volatile:ms' compiler option should be enabled!
-#define VOLAT_SELECT(PTR, ...) (_Generic((PTR), \
-    volatile bool *: (__VA_ARGS__), \
-    volatile char *: (__VA_ARGS__), \
-    volatile short *: (__VA_ARGS__), \
-    volatile int *: (__VA_ARGS__), \
-    volatile long *: (__VA_ARGS__), \
-    volatile long long *: (__VA_ARGS__), \
-    volatile unsigned char *: (__VA_ARGS__), \
-    volatile unsigned short *: (__VA_ARGS__), \
-    volatile unsigned *: (__VA_ARGS__), \
-    volatile unsigned long *: (__VA_ARGS__), \
-    volatile unsigned long long *: (__VA_ARGS__), \
-    void *volatile *: (__VA_ARGS__)))
 
 // Add
 unsigned char uchar_add(unsigned char *, unsigned char, unsigned char);
@@ -381,27 +372,30 @@ unsigned long long ullong_pcnt(unsigned long long);
     IF_MSVC(VOLAT_SELECT((DST), *(DST) = (VAL)))
 
 // Atomic compare and swap
-bool uchar_atomic_compare_exchange(volatile unsigned char *, unsigned char *, unsigned char);
-bool ushrt_atomic_compare_exchange(volatile unsigned short*, unsigned short *, unsigned short);
-bool uint_atomic_compare_exchange(volatile unsigned *, unsigned *, unsigned);
-bool ulong_atomic_compare_exchange(volatile unsigned long *, unsigned long *, unsigned long);
-bool ullong_atomic_compare_exchange(volatile unsigned long long *, unsigned long long *, unsigned long long);
-bool ptr_atomic_compare_exchange(void *volatile *, void **, void *);
-IF_X64(bool Uint128_atomic_compare_exchange(volatile Uint128_t *, Uint128_t *, Uint128_t);)
+bool uchar_atomic_cmp_xchg_mo(volatile unsigned char *, unsigned char *, unsigned char, bool, enum atomic_mo, enum atomic_mo);
+bool ushrt_atomic_cmp_xchg_mo(volatile unsigned short*, unsigned short *, unsigned short, bool, enum atomic_mo, enum atomic_mo);
+bool uint_atomic_cmp_xchg_mo(volatile unsigned *, unsigned *, unsigned, bool, enum atomic_mo, enum atomic_mo);
+bool ulong_atomic_cmp_xchg_mo(volatile unsigned long *, unsigned long *, unsigned long, bool, enum atomic_mo, enum atomic_mo);
+bool ullong_atomic_cmp_xchg_mo(volatile unsigned long long *, unsigned long long *, unsigned long long, bool, enum atomic_mo, enum atomic_mo);
+bool ptr_atomic_cmp_xchg_mo(void *volatile *, void **, void *, bool, enum atomic_mo, enum atomic_mo);
+IF_X64(bool Uint128_atomic_cmp_xchg_mo(volatile Uint128_t *, Uint128_t *, Uint128_t, bool, enum atomic_mo, enum atomic_mo);)
 
-#define atomic_compare_exchange(DST, P_CMP, XCHG) (_Generic((DST), \
-    volatile unsigned char *: uchar_atomic_compare_exchange, \
-    volatile unsigned short *: ushrt_atomic_compare_exchange, \
-    volatile unsigned *: uint_atomic_compare_exchange, \
-    volatile unsigned long *: ulong_atomic_compare_exchange, \
-    volatile unsigned long long *: ullong_atomic_compare_exchange,\
-    void *volatile *: ptr_atomic_compare_exchange \
-    IF_X64(, volatile Uint128_t *: Uint128_atomic_compare_exchange))((DST), (P_CMP), (XCHG)))
+#define atomic_cmp_xchg_mo(DST, P_CMP, XCHG, WEAK, MO_SUCC, MO_FAIL) (_Generic((DST), \
+    volatile unsigned char *: uchar_atomic_cmp_xchg_mo, \
+    volatile unsigned short *: ushrt_atomic_cmp_xchg_mo, \
+    volatile unsigned *: uint_atomic_cmp_xchg_mo, \
+    volatile unsigned long *: ulong_atomic_cmp_xchg_mo, \
+    volatile unsigned long long *: ullong_atomic_cmp_xchg_mo,\
+    void *volatile *: ptr_atomic_cmp_xchg_mo \
+    IF_X64(, volatile Uint128_t *: Uint128_atomic_cmp_xchg_mo))((DST), (P_CMP), (XCHG), (WEAK), (MO_SUCC), (MO_FAIL)))
+
+#define atomic_cmp_xchg(DST, P_CMP, XCHG, WEAK, MO_SUCC, MO_FAIL) \
+    (atomic_cmp_xchg_mo(DST, P_CMP, XCHG, 0, ATOMIC_ACQ_REL, ATOMIC_ACQUIRE))
 
 // Atomic compare and swap (acquire semantics only)
-#define atomic_compare_exchange_acquire(DST, P_CMP, XCHG) \
-    IF_GCC_LLVM((__atomic_compare_exchange_n((DST), (P_CMP), (XCHG), 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))) \
-    IF_MSVC((atomic_compare_exchange((DST), (P_CMP), (XCHG))))
+#define atomic_cmp_xchg_acquire(DST, P_CMP, XCHG) \
+    IF_GCC_LLVM((__atomic_cmp_xchg_n((DST), (P_CMP), (XCHG), 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))) \
+    IF_MSVC((atomic_cmp_xchg((DST), (P_CMP), (XCHG))))
 
 // Atomic AND
 IF_MSVC(
@@ -428,7 +422,7 @@ IF_X64(unsigned long long ullong_atomic_and(volatile unsigned long long *, unsig
 #   define atomic_or_release(DST, ARG) (__atomic_fetch_or((DST), (ARG), __ATOMIC_RELEASE))
 #   define atomic_add(DST, ARG) (__atomic_fetch_add((DST), (ARG), __ATOMIC_ACQ_REL))
 #   define atomic_sub(DST, ARG) (__atomic_fetch_sub((DST), (ARG), __ATOMIC_ACQ_REL))
-#   define atomic_exchange(DST, ARG) (__atomic_exchange_n((DST), (ARG), __ATOMIC_ACQ_REL))
+#   define atomic_xchg(DST, ARG) (__atomic_xchg_n((DST), (ARG), __ATOMIC_ACQ_REL))
 
 #elif defined _MSC_BUILD
 #   include <intrin.h>
@@ -451,12 +445,12 @@ unsigned uint_atomic_sub(volatile unsigned *, unsigned);
 unsigned long ulong_atomic_sub(volatile unsigned long *, unsigned long);
 unsigned long long ullong_atomic_sub(volatile unsigned long long *, unsigned long long);
 
-unsigned char uchar_atomic_exchange(volatile unsigned char *, unsigned char);
-unsigned short ushrt_atomic_exchange(volatile unsigned short *, unsigned short);
-unsigned uint_atomic_exchange(volatile unsigned *, unsigned);
-unsigned long ulong_atomic_exchange(volatile unsigned long *, unsigned long);
-void *ptr_atomic_exchange(void *volatile *, void *);
-unsigned long long ullong_atomic_exchange(volatile unsigned long long *, unsigned long long);
+unsigned char uchar_atomic_xchg(volatile unsigned char *, unsigned char);
+unsigned short ushrt_atomic_xchg(volatile unsigned short *, unsigned short);
+unsigned uint_atomic_xchg(volatile unsigned *, unsigned);
+unsigned long ulong_atomic_xchg(volatile unsigned long *, unsigned long);
+void *ptr_atomic_xchg(void *volatile *, void *);
+unsigned long long ullong_atomic_xchg(volatile unsigned long long *, unsigned long long);
 
 
 
@@ -486,13 +480,13 @@ unsigned long long ullong_atomic_exchange(volatile unsigned long long *, unsigne
         volatile unsigned long *: ulong_atomic_sub IF64(, \
         volatile unsigned long long *: ullong_atomic_sub))((DST), (ARG)))
 
-#   define atomic_exchange(DST, ARG) (_Generic((DST), \
-        volatile unsigned char *: uchar_atomic_exchange, \
-        volatile unsigned short *: ushrt_atomic_exchange, \
-        volatile unsigned *: uint_atomic_exchange, \
-        volatile unsigned long *: ulong_atomic_exchange IF64(, \
-        volatile unsigned long long *: ullong_atomic_exchange), \
-        void *volatile *: ptr_atomic_exchange)((DST), (ARG)))
+#   define atomic_xchg(DST, ARG) (_Generic((DST), \
+        volatile unsigned char *: uchar_atomic_xchg, \
+        volatile unsigned short *: ushrt_atomic_xchg, \
+        volatile unsigned *: uint_atomic_xchg, \
+        volatile unsigned long *: ulong_atomic_xchg IF64(, \
+        volatile unsigned long long *: ullong_atomic_xchg), \
+        void *volatile *: ptr_atomic_xchg)((DST), (ARG)))
 
 #endif
 

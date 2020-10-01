@@ -164,14 +164,14 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
     struct thread_pool *pool = ((struct tls_base *) arg->tls)->pool;
     for (;;)
     {
-        struct dispatched_task *dispatched_task = atomic_exchange(&arg->dispatched_task, NULL);
+        struct dispatched_task *dispatched_task = atomic_xchg(&arg->dispatched_task, NULL);
         if (!dispatched_task) // No task for the current thread
         {
             // At first, try to steal task from a different thread
             size_t cnt = thread_pool_get_count(pool);
             for (size_t i = 0; i < cnt; i++)
             {
-                dispatched_task = atomic_exchange(&((struct thread_arg *) persistent_array_fetch(&pool->arg, i, sizeof(struct thread_arg)))->dispatched_task, NULL);
+                dispatched_task = atomic_xchg(&((struct thread_arg *) persistent_array_fetch(&pool->arg, i, sizeof(struct thread_arg)))->dispatched_task, NULL);
                 if (dispatched_task) break;
             }
             // If still no task found, then go the sleep state
@@ -298,7 +298,7 @@ void thread_pool_schedule(struct thread_pool *pool)
             for (; ind < cnt; ind++)
             {
                 struct thread_arg *arg = persistent_array_fetch(&pool->arg, ind, sizeof(struct thread_arg));
-                if (!atomic_compare_exchange(&arg->dispatched_task, &(void *) { NULL }, dispatched_task)) continue;
+                if (!atomic_cmp_xchg(&arg->dispatched_task, &(void *) { NULL }, dispatched_task)) continue;
                 mutex_acquire(&arg->mutex);
                 uint8_bit_set(arg->bits, THREAD_BIT_QUERY_WAKE);
                 condition_signal(&arg->condition);

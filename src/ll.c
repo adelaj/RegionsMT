@@ -252,8 +252,9 @@
     }
 
 #define DECL_ATOMIC_LOAD_SSE(TYPE) \
-    TYPE PREFIX ## _atomic_load_acquire(TYPE volatile *x) \
+    TYPE PREFIX ## _atomic_load_mo(TYPE volatile *x, enum atomic_mo mo) \
     { \
+        (void) mo; \
         _Static_assert(2 * sizeof(TYPE) == sizeof(__m128i), ""); \
         _Static_assert(sizeof(TYPE) == sizeof(long long), ""); \
         volatile unsigned long long res; /* Do not remove 'volatile'! */ \
@@ -261,16 +262,17 @@
         return res; \
     }
 
-#define DECL_ATOMIC_STORE_SSE(TYPE) \
-    void PREFIX ## _atomic_store_release(volatile unsigned long long *x, unsigned long long y) \
+#define DECL_ATOMIC_STORE_SSE(TYPE, PREFIX) \
+    void PREFIX ## _atomic_store_mo(TYPE volatile *x, TYPE y, enum atomic_mo mo) \
     { \
+        (void) mo; \
         _Static_assert(2 * sizeof(TYPE) == sizeof(__m128i), ""); \
         _Static_assert(sizeof(TYPE) == sizeof(long long), ""); \
         _mm_storeu_si64((void *) x, _mm_set_epi64x(0, (long long) y)); \
     }
 
 #define DECL_ATOMIC_OP_MSVC(TYPE, PREFIX, SUFFIX, BACKEND_TYPE, BACKEND) \
-    TYPE PREFIX ## _atomic_ ## SUFFIX(TYPE volatile *dst, TYPE arg) \
+    TYPE PREFIX ## _atomic_fetch_ ## SUFFIX(TYPE volatile *dst, TYPE arg, ) \
     { \
         _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
         return (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) arg); \
@@ -289,18 +291,21 @@
         return (TYPE) atomic_add((TYPE volatile *) dst, 0 - arg); \
     }
 
-#define DECL_ATOMIC_COMPARE_EXCHANGE_GCC(TYPE, PREFIX) \
-    bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
+#define DECL_ATOMIC_CMP_XCHG_GCC(TYPE, PREFIX) \
+    bool PREFIX ## _atomic_cmp_xchg_mo(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail) \
     { \
-        return __atomic_compare_exchange_n((TYPE volatile *) dst, p_cmp, xchg, 0, __ATOMIC_ACQ_REL, __ATOMIC_ACQUIRE); \
+        return __atomic_compare_exchange_n((TYPE volatile *) dst, p_cmp, xchg, weak, mo_succ, mo_fail); \
     }
 
 // This should be used to force compiler to emit 'cmpxchg16b'/'cmpxchg8b' instuctions when:
 // 1) gcc is targeted to 'x86_64', even if '-mcx16' flag set (see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84522);
 // 2) clang is targeted to 'i386'.
-#define DECL_ATOMIC_COMPARE_EXCHANGE_SYNC(TYPE, PREFIX) \
-    bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
+#define DECL_ATOMIC_CMP_XCHG_SYNC(TYPE, PREFIX) \
+    bool PREFIX ## _atomic_cmp_xchg_mo(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail) \
     { \
+        (void) weak; \
+        (void) mo_succ; \
+        (void) mo_fail; \
         TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not join these lines! */ \
         TYPE res = __sync_val_compare_and_swap(dst, cmp, xchg); \
         if (res == cmp) return 1; \
@@ -308,16 +313,19 @@
         return 0; \
     }
 
-#define DECL_ATOMIC_COMPARE_EXCHANGE_COPY(TYPE, PREFIX, OP_TYPE) \
-    bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
+#define DECL_ATOMIC_CMP_XCHG_COPY(TYPE, PREFIX, OP_TYPE) \
+    bool PREFIX ## _atomic_cmp_xchg_mo(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail) \
     { \
         _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
-        return atomic_compare_exchange((OP_TYPE volatile *) dst, (OP_TYPE *) p_cmp, (OP_TYPE) xchg); \
+        return atomic_cmp_xchg_mo((OP_TYPE volatile *) dst, (OP_TYPE *) p_cmp, (OP_TYPE) xchg, weak, mo_succ, mo_fail); \
     }
 
-#define DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
-    bool PREFIX ## _atomic_compare_exchange(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg) \
+#define DECL_ATOMIC_CMP_XCHG_MSVC(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
+    bool PREFIX ## _atomic_cmp_xchg_mo(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail) \
     { \
+        (void) weak; \
+        (void) mo_succ; \
+        (void) mo_fail; \
         _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
         TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not join these lines! */ \
         TYPE res = (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) xchg, (BACKEND_TYPE) cmp); \
@@ -327,10 +335,10 @@
     }
 
 #define DECL_ATOMIC_OP_WIDE(TYPE, PREFIX, SUFFIX, OP, ...) \
-    TYPE PREFIX ## _atomic_ ## SUFFIX(TYPE volatile *mem, TYPE val) \
+    TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *mem, TYPE val) \
     { \
         TYPE probe = *mem; \
-        while (!atomic_compare_exchange(mem, &probe, (TYPE) OP(probe __VA_ARGS__ val))) probe = *mem; \
+        while (!atomic_cmp_xchg(mem, &probe, (TYPE) OP(probe __VA_ARGS__ val))) probe = *mem; \
         return probe; \
     }
 
@@ -338,7 +346,7 @@
     TYPE PREFIX ## _atomic_add_sat(TYPE volatile *mem, TYPE val) \
     { \
         TYPE tmp = atomic_load_acquire(mem); \
-        while (tmp < umax(tmp) && !atomic_compare_exchange(mem, &tmp, add_sat(tmp, val))) tmp = atomic_load_acquire(mem); \
+        while (tmp < umax(tmp) && !atomic_cmp_xchg(mem, &tmp, add_sat(tmp, val))) tmp = atomic_load_acquire(mem); \
         return tmp; \
     }
 
@@ -346,7 +354,7 @@
     TYPE PREFIX ## _atomic_sub_sat(TYPE volatile *mem, TYPE val) \
     { \
         TYPE tmp = atomic_load_acquire(mem); \
-        while (tmp && !atomic_compare_exchange(mem, &tmp, sub_sat(tmp, val))) tmp = atomic_load_acquire(mem); \
+        while (tmp && !atomic_cmp_xchg(mem, &tmp, sub_sat(tmp, val))) tmp = atomic_load_acquire(mem); \
         return tmp; \
     }
 
@@ -549,24 +557,24 @@ IF_MSVC(IF_X32(DECL_PCNT_WIDE(unsigned long long, ullong, unsigned)))
 IF_MSVC(IF_X64(DECL_1(unsigned long long, ullong, pcnt, __popcnt64)))
 
 // Atomic compare and swap
-IF_GCC_LLVM(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned char, uchar))
-IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(unsigned char, uchar, char, _InterlockedCompareExchange8))
-IF_GCC_LLVM(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned short, ushrt))
-IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(unsigned short, ushrt, short, _InterlockedCompareExchange16))
-IF_GCC_LLVM(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned, uint))
-IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_COPY(unsigned, uint, unsigned long))
-IF_GCC_LLVM(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned long, ulong))
-IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(unsigned long, ulong, long, _InterlockedCompareExchange))
-IF_GCC(IF_X32(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(unsigned long long, ullong)))
-IF_LLVM(IF_X32(DECL_ATOMIC_COMPARE_EXCHANGE_SYNC(unsigned long long, ullong)))
-IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(unsigned long long, ullong, long long, _InterlockedCompareExchange64))
-IF_GCC_LLVM(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(void *, ptr))
-IF_MSVC(DECL_ATOMIC_COMPARE_EXCHANGE_MSVC(void *, ptr, void *, _InterlockedCompareExchangePointer))
-IF_GCC(IF_X64(DECL_ATOMIC_COMPARE_EXCHANGE_SYNC(Uint128_t, Uint128)))
-IF_LLVM(IF_X64(DECL_ATOMIC_COMPARE_EXCHANGE_GCC(Uint128_t, Uint128)))
+IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(unsigned char, uchar))
+IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(unsigned char, uchar, char, _InterlockedCompareExchange8))
+IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(unsigned short, ushrt))
+IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(unsigned short, ushrt, short, _InterlockedCompareExchange16))
+IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(unsigned, uint))
+IF_MSVC(DECL_ATOMIC_CMP_XCHG_COPY(unsigned, uint, unsigned long))
+IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(unsigned long, ulong))
+IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(unsigned long, ulong, long, _InterlockedCompareExchange))
+IF_GCC(IF_X32(DECL_ATOMIC_CMP_XCHG_GCC(unsigned long long, ullong)))
+IF_LLVM(IF_X32(DECL_ATOMIC_CMP_XCHG_SYNC(unsigned long long, ullong)))
+IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(unsigned long long, ullong, long long, _InterlockedCompareExchange64))
+IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(void *, ptr))
+IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(void *, ptr, void *, _InterlockedCompareExchangePointer))
+IF_GCC(IF_X64(DECL_ATOMIC_CMP_XCHG_SYNC(Uint128_t, Uint128)))
+IF_LLVM(IF_X64(DECL_ATOMIC_CMP_XCHG_GCC(Uint128_t, Uint128)))
 
 IF_MSVC(IF_X64(
-bool Uint128_atomic_compare_exchange(volatile Uint128_t *dst, Uint128_t *p_cmp, Uint128_t xchg)
+bool Uint128_atomic_cmp_xchg(volatile Uint128_t *dst, Uint128_t *p_cmp, Uint128_t xchg)
 {
     _Static_assert(sizeof(dst->qw) == 2 * sizeof(long long), "");
     return _InterlockedCompareExchange128((volatile long long *) dst->qw, UINT128_HI(xchg), UINT128_LO(xchg), (long long *) p_cmp->qw);
@@ -623,10 +631,10 @@ DECL_ATOMIC_SUB(unsigned long, ulong)
 DECL_ATOMIC_OP(unsigned char, uchar, exchange, char, _InterlockedExchange8)
 DECL_ATOMIC_OP(unsigned short, ushrt, exchange, short, _InterlockedExchange16)
 
-unsigned uint_atomic_exchange(volatile unsigned *dst, unsigned arg) 
+unsigned uint_atomic_xchg(volatile unsigned *dst, unsigned arg) 
 { 
     IS_UINT_EQ_ULONG;
-    return (unsigned) atomic_exchange((volatile unsigned long *) dst, (unsigned long) arg);
+    return (unsigned) atomic_xchg((volatile unsigned long *) dst, (unsigned long) arg);
 }
 
 DECL_ATOMIC_OP(unsigned long, ulong, exchange, long, _InterlockedExchange)
@@ -773,7 +781,7 @@ size_t m128i_byte_scan_forward(__m128i a)
 
 void spinlock_acquire(spinlock *spinlock)
 {
-    while (!atomic_compare_exchange_acquire(spinlock, &(spinlock_base) { 0 }, 1)) while (atomic_load_acquire(spinlock)) _mm_pause();
+    while (!atomic_cmp_xchg_acquire(spinlock, &(spinlock_base) { 0 }, 1)) while (atomic_load_acquire(spinlock)) _mm_pause();
 }
 
 GPUSH GWRN(implicit-fallthrough)
@@ -783,7 +791,7 @@ void *double_lock_execute(spinlock *spinlock, double_lock_callback init, double_
     switch (atomic_load_acquire(spinlock))
     {
     case 0:
-        if (atomic_compare_exchange_acquire(spinlock, &(spinlock_base) { 0 }, 1)) // Strong CAS required here!
+        if (atomic_cmp_xchg_acquire(spinlock, &(spinlock_base) { 0 }, 1)) // Strong CAS required here!
         {
             if (init) res = init(init_args);
             atomic_store_release(spinlock, 2);
