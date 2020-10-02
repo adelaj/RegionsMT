@@ -19,11 +19,14 @@ enum atomic_mo {
 typedef unsigned spinlock_base;
 typedef volatile spinlock_base spinlock;
 
-IF_GCC_LLVM(IF_X64(GPUSH GWRN(pedantic) typedef unsigned __int128 Uint128_t; GPOP))
+GPUSH GWRN(pedantic)
+IF_GCC_LLVM(IF_X64(typedef unsigned __int128 Uint128_t;))
+GPOP
 IF_MSVC_X32(typedef struct { uint64_t qw[2]; } Uint128_t;)
 IF_X64(typedef Uint128_t Dsize_t;)
 IF_X32(typedef uint64_t Dsize_t;)
 
+_Static_assert(sizeof(Uint128_t) == 2 * sizeof(uint64_t), "");
 _Static_assert(sizeof(Dsize_t) == 2 * sizeof(size_t), "");
 
 #define UINT128C(LO, HI) \
@@ -361,15 +364,43 @@ unsigned long long ullong_pcnt(unsigned long long);
     unsigned long: ulong_pcnt, \
     unsigned long long: ullong_pcnt)(x))
 
-// Load with acquire semantics
-#define atomic_load_acquire(SRC) \
-    IF_GCC_LLVM((__atomic_load_n((SRC), __ATOMIC_ACQUIRE))) \
-    IF_MSVC(VOLAT_SELECT((SRC), *(SRC)))
+// Atomic load
+bool bool_atomic_load_mo(volatile bool *, enum atomic_mo);
+unsigned char uchar_atomic_load_mo(volatile unsigned char *, enum atomic_mo);
+unsigned short ushrt_atomic_load_mo(volatile unsigned short *, enum atomic_mo);
+unsigned uint_atomic_load_mo(volatile unsigned *, enum atomic_mo);
+unsigned long ulong_atomic_load_mo(volatile unsigned long *, enum atomic_mo);
+unsigned long long ullong_atomic_load_mo(volatile unsigned long long *, enum atomic_mo);
 
-// Store with release semantics
-#define atomic_store_release(DST, VAL) \
-    IF_GCC_LLVM((__atomic_store_n((DST), (VAL), __ATOMIC_RELEASE))) \
-    IF_MSVC(VOLAT_SELECT((DST), *(DST) = (VAL)))
+#define atomic_load_mo(SRC, MO) (_Generic((SRC), \
+    volatile bool *: bool_atomic_load_mo, \
+    volatile unsigned char *: uchar_atomic_load_mo, \
+    volatile unsigned short *: ushrt_atomic_load_mo, \
+    volatile unsigned *: uint_atomic_load_mo, \
+    volatile unsigned long *: ulong_atomic_load_mo, \
+    volatile unsigned long long *: ullong_atomic_load_mo)((SRC), (MO)))
+
+#define atomic_load(SRC) \
+    (atomic_load_mo((SRC), ATOMIC_ACQUIRE))
+
+// Atomic store
+void bool_atomic_store_mo(volatile bool *, bool, enum atomic_mo);
+void uchar_atomic_store_mo(volatile unsigned char *, unsigned char, enum atomic_mo);
+void ushrt_atomic_store_mo(volatile unsigned short *, unsigned short, enum atomic_mo);
+void uint_atomic_store_mo(volatile unsigned *, unsigned, enum atomic_mo);
+void ulong_atomic_store_mo(volatile unsigned long *, unsigned long, enum atomic_mo);
+void ullong_atomic_store_mo(volatile unsigned long long *, unsigned long long, enum atomic_mo);
+
+#define atomic_store_mo(DST, VAL, MO) (_Generic((DST), \
+    volatile bool *: bool_atomic_store_mo, \
+    volatile unsigned char *: uchar_atomic_store_mo, \
+    volatile unsigned short *: ushrt_atomic_store_mo, \
+    volatile unsigned *: uint_atomic_store_mo, \
+    volatile unsigned long *: ulong_atomic_store_mo, \
+    volatile unsigned long long *: ullong_atomic_store_mo)((DST), (VAL), (MO)))
+
+#define atomic_store(DST, VAL) \
+    (atomic_store_mo((DST), (VAL), ATOMIC_RELEASE))
 
 // Atomic compare and swap
 bool uchar_atomic_cmp_xchg_mo(volatile unsigned char *, unsigned char *, unsigned char, bool, enum atomic_mo, enum atomic_mo);
@@ -389,107 +420,150 @@ IF_X64(bool Uint128_atomic_cmp_xchg_mo(volatile Uint128_t *, Uint128_t *, Uint12
     void *volatile *: ptr_atomic_cmp_xchg_mo \
     IF_X64(, volatile Uint128_t *: Uint128_atomic_cmp_xchg_mo))((DST), (P_CMP), (XCHG), (WEAK), (MO_SUCC), (MO_FAIL)))
 
-#define atomic_cmp_xchg(DST, P_CMP, XCHG, WEAK, MO_SUCC, MO_FAIL) \
-    (atomic_cmp_xchg_mo(DST, P_CMP, XCHG, 0, ATOMIC_ACQ_REL, ATOMIC_ACQUIRE))
+#define atomic_cmp_xchg(DST, P_CMP, XCHG) \
+    (atomic_cmp_xchg_mo((DST), (P_CMP), (XCHG), 0, ATOMIC_ACQ_REL, ATOMIC_ACQUIRE))
 
-// Atomic compare and swap (acquire semantics only)
-#define atomic_cmp_xchg_acquire(DST, P_CMP, XCHG) \
-    IF_GCC_LLVM((__atomic_cmp_xchg_n((DST), (P_CMP), (XCHG), 0, __ATOMIC_ACQUIRE, __ATOMIC_RELAXED))) \
-    IF_MSVC((atomic_cmp_xchg((DST), (P_CMP), (XCHG))))
+// Atomic fetch-AND
+unsigned char uchar_atomic_fetch_and_mo(volatile unsigned char *, unsigned char, enum atomic_mo);
+unsigned short ushrt_atomic_fetch_and_mo(volatile unsigned short *, unsigned short, enum atomic_mo);
+unsigned uint_atomic_fetch_and_mo(volatile unsigned *, unsigned, enum atomic_mo);
+unsigned long ulong_atomic_fetch_and_mo(volatile unsigned long *, unsigned long, enum atomic_mo);
+unsigned long long ullong_atomic_fetch_and_mo(volatile unsigned long long *, unsigned long long, enum atomic_mo);
 
-// Atomic AND
-IF_MSVC(
-unsigned char uchar_atomic_and(volatile unsigned char *, unsigned char);
-unsigned short ushrt_atomic_and(volatile unsigned short *, unsigned short);
-unsigned uint_atomic_and(volatile unsigned *, unsigned);
-unsigned long ulong_atomic_and(volatile unsigned long *, unsigned long);
-IF_X64(unsigned long long ullong_atomic_and(volatile unsigned long long *, unsigned long long);))
+#define atomic_fetch_and_mo(DST, ARG, MO) (_Generic((DST), \
+    volatile unsigned char *: uchar_atomic_fetch_and_mo, \
+    volatile unsigned short *: ushrt_atomic_fetch_and_mo, \
+    volatile unsigned *: uint_atomic_fetch_and_mo, \
+    volatile unsigned long *: ulong_atomic_fetch_and_mo, \
+    volatile unsigned long long *: ullong_atomic_fetch_and_mo)((DST), (ARG), (MO)))
 
-#define atomic_and(DST, ARG) \
-    IF_GCC_LLVM((__atomic_fetch_and((DST), (ARG), __ATOMIC_ACQ_REL))) \
-    IF_MSVC((_Generic((DST), \
-    volatile unsigned char *: uchar_atomic_and, \
-    volatile unsigned short *: ushrt_atomic_and, \
-    volatile unsigned *: uint_atomic_and, \
-    volatile unsigned long *: ulong_atomic_and \
-    IF_X64(, volatile unsigned long long *: ullong_atomic_and))((DST), (ARG))))
+#define atomic_fetch_and(DST, ARG) \
+    (atomic_fetch_and_mo((DST), (ARG), ATOMIC_ACQ_REL))
 
-#if defined __GNUC__ || defined __clang__
+// Atomic fetch-OR
+unsigned char uchar_atomic_fetch_or_mo(volatile unsigned char *, unsigned char, enum atomic_mo);
+unsigned short ushrt_atomic_fetch_or_mo(volatile unsigned short *, unsigned short, enum atomic_mo);
+unsigned uint_atomic_fetch_or_mo(volatile unsigned *, unsigned, enum atomic_mo);
+unsigned long ulong_atomic_fetch_or_mo(volatile unsigned long *, unsigned long, enum atomic_mo);
+unsigned long long ullong_atomic_fetch_or_mo(volatile unsigned long long *, unsigned long long, enum atomic_mo);
 
-#   define atomic_and(DST, ARG) 
-#   define atomic_and_release(DST, ARG) (__atomic_fetch_and((DST), (ARG), __ATOMIC_RELEASE))
-#   define atomic_or(DST, ARG) (__atomic_fetch_or((DST), (ARG), __ATOMIC_ACQ_REL))
-#   define atomic_or_release(DST, ARG) (__atomic_fetch_or((DST), (ARG), __ATOMIC_RELEASE))
-#   define atomic_add(DST, ARG) (__atomic_fetch_add((DST), (ARG), __ATOMIC_ACQ_REL))
-#   define atomic_sub(DST, ARG) (__atomic_fetch_sub((DST), (ARG), __ATOMIC_ACQ_REL))
-#   define atomic_xchg(DST, ARG) (__atomic_xchg_n((DST), (ARG), __ATOMIC_ACQ_REL))
+#define atomic_fetch_or_mo(DST, ARG, MO) (_Generic((DST), \
+    volatile unsigned char *: uchar_atomic_fetch_or_mo, \
+    volatile unsigned short *: ushrt_atomic_fetch_or_mo, \
+    volatile unsigned *: uint_atomic_fetch_or_mo, \
+    volatile unsigned long *: ulong_atomic_fetch_or_mo, \
+    volatile unsigned long long *: ullong_atomic_fetch_or_mo)((DST), (ARG), (MO)))
 
-#elif defined _MSC_BUILD
-#   include <intrin.h>
+#define atomic_fetch_or(DST, ARG) \
+    (atomic_fetch_or_mo((DST), (ARG), ATOMIC_ACQ_REL))
 
-unsigned char uchar_atomic_or(volatile unsigned char *, unsigned char);
-unsigned short ushrt_atomic_or(volatile unsigned short *, unsigned short);
-unsigned uint_atomic_or(volatile unsigned *, unsigned);
-unsigned long ulong_atomic_or(volatile unsigned long *, unsigned long);
-unsigned long long ullong_atomic_or(volatile unsigned long long *, unsigned long long);
+// Atomic fetch-add
+unsigned char uchar_atomic_fetch_add_mo(volatile unsigned char *, unsigned char, enum atomic_mo);
+unsigned short ushrt_atomic_fetch_add_mo(volatile unsigned short *, unsigned short, enum atomic_mo);
+unsigned uint_atomic_fetch_add_mo(volatile unsigned *, unsigned, enum atomic_mo);
+unsigned long ulong_atomic_fetch_add_mo(volatile unsigned long *, unsigned long, enum atomic_mo);
+unsigned long long ullong_atomic_fetch_add_mo(volatile unsigned long long *, unsigned long long, enum atomic_mo);
 
-unsigned char uchar_atomic_add(volatile unsigned char *, unsigned char);
-unsigned short ushrt_atomic_add(volatile unsigned short *, unsigned short);
-unsigned uint_atomic_add(volatile unsigned *, unsigned);
-unsigned long ulong_atomic_add(volatile unsigned long *, unsigned long);
-unsigned long long ullong_atomic_add(volatile unsigned long long *, unsigned long long);
+#define atomic_fetch_add_mo(DST, ARG, MO) (_Generic((DST), \
+    volatile unsigned char *: uchar_atomic_fetch_add_mo, \
+    volatile unsigned short *: ushrt_atomic_fetch_add_mo, \
+    volatile unsigned *: uint_atomic_fetch_add_mo, \
+    volatile unsigned long *: ulong_atomic_fetch_add_mo, \
+    volatile unsigned long long *: ullong_atomic_fetch_add_mo)((DST), (ARG), (MO)))
 
-unsigned char uchar_atomic_sub(volatile unsigned char *, unsigned char);
-unsigned short ushrt_atomic_sub(volatile unsigned short *, unsigned short);
-unsigned uint_atomic_sub(volatile unsigned *, unsigned);
-unsigned long ulong_atomic_sub(volatile unsigned long *, unsigned long);
-unsigned long long ullong_atomic_sub(volatile unsigned long long *, unsigned long long);
+#define atomic_fetch_add(DST, ARG) \
+    (atomic_fetch_add_mo((DST), (ARG), ATOMIC_ACQ_REL))
 
-unsigned char uchar_atomic_xchg(volatile unsigned char *, unsigned char);
-unsigned short ushrt_atomic_xchg(volatile unsigned short *, unsigned short);
-unsigned uint_atomic_xchg(volatile unsigned *, unsigned);
-unsigned long ulong_atomic_xchg(volatile unsigned long *, unsigned long);
-void *ptr_atomic_xchg(void *volatile *, void *);
-unsigned long long ullong_atomic_xchg(volatile unsigned long long *, unsigned long long);
+// Atomic fetch-subtract
+unsigned char uchar_atomic_fetch_sub_mo(volatile unsigned char *, unsigned char, enum atomic_mo);
+unsigned short ushrt_atomic_fetch_sub_mo(volatile unsigned short *, unsigned short, enum atomic_mo);
+unsigned uint_atomic_fetch_sub_mo(volatile unsigned *, unsigned, enum atomic_mo);
+unsigned long ulong_atomic_fetch_sub_mo(volatile unsigned long *, unsigned long, enum atomic_mo);
+unsigned long long ullong_atomic_fetch_sub_mo(volatile unsigned long long *, unsigned long long, enum atomic_mo);
 
+#define atomic_fetch_sub_mo(DST, ARG, MO) (_Generic((DST), \
+    volatile unsigned char *: uchar_atomic_fetch_sub_mo, \
+    volatile unsigned short *: ushrt_atomic_fetch_sub_mo, \
+    volatile unsigned *: uint_atomic_fetch_sub_mo, \
+    volatile unsigned long *: ulong_atomic_fetch_sub_mo, \
+    volatile unsigned long long *: ullong_atomic_fetch_sub_mo)((DST), (ARG), (MO)))
 
+#define atomic_fetch_sub(DST, ARG) \
+    (atomic_fetch_sub_mo((DST), (ARG), ATOMIC_ACQ_REL))
 
+// Atomic exchange
+unsigned char uchar_atomic_xchg_mo(volatile unsigned char *, unsigned char, enum atomic_mo);
+unsigned short ushrt_atomic_xchg_mo(volatile unsigned short *, unsigned short, enum atomic_mo);
+unsigned uint_atomic_xchg_mo(volatile unsigned *, unsigned, enum atomic_mo);
+unsigned long ulong_atomic_xchg_mo(volatile unsigned long *, unsigned long, enum atomic_mo);
+unsigned long long ullong_atomic_xchg_mo(volatile unsigned long long *, unsigned long long, enum atomic_mo);
+void *ptr_atomic_xchg_mo(void *volatile *, void *, enum atomic_mo);
 
-#   define atomic_and_release(DST, ARG) (atomic_and(DST, ARG))
+#define atomic_xchg_mo(DST, ARG, MO) (_Generic((DST), \
+    volatile unsigned char *: uchar_atomic_xchg_mo, \
+    volatile unsigned short *: ushrt_atomic_xchg_mo, \
+    volatile unsigned *: uint_atomic_xchg_mo, \
+    volatile unsigned long *: ulong_atomic_xchg_mo, \
+    volatile unsigned long long *: ullong_atomic_xchg_mo, \
+    void *volatile *: ptr_atomic_xchg_mo)((DST), (ARG), (MO)))
 
-#   define atomic_or(DST, ARG) (_Generic((DST), \
-        volatile unsigned char *: uchar_atomic_or, \
-        volatile unsigned short *: ushrt_atomic_or, \
-        volatile unsigned *: uint_atomic_or, \
-        volatile unsigned long *: ulong_atomic_or IF64(, \
-        volatile unsigned long long *: ullong_atomic_or))((DST), (ARG)))
+#define atomic_xchg(DST, ARG) \
+    (atomic_xchg_mo((DST), (ARG), ATOMIC_ACQ_REL))
 
-#   define atomic_or_release(DST, ARG) (atomic_or(DST, ARG))
+// Atomic fetch-add saturated
+unsigned char uchar_atomic_fetch_add_sat_mo(volatile unsigned char *, unsigned char, enum atomic_mo);
+unsigned short ushrt_atomic_fetch_add_sat_mo(volatile unsigned short *, unsigned short, enum atomic_mo);
+unsigned uint_atomic_fetch_add_sat_mo(volatile unsigned *, unsigned, enum atomic_mo);
+unsigned long ulong_atomic_fetch_add_sat_mo(volatile unsigned long *, unsigned long, enum atomic_mo);
+unsigned long long ullong_atomic_fetch_add_sat_mo(volatile unsigned long long *, unsigned long long, enum atomic_mo);
 
-#   define atomic_add(DST, ARG) (_Generic((DST), \
-        volatile unsigned char *: uchar_atomic_add, \
-        volatile unsigned short *: ushrt_atomic_add, \
-        volatile unsigned *: uint_atomic_add, \
-        volatile unsigned long *: ulong_atomic_add IF64(, \
-        volatile unsigned long long *: ullong_atomic_add))((DST), (ARG)))
+#define atomic_fetch_add_sat_mo(DST, ARG, MO) (_Generic((DST), \
+    volatile unsigned char *: uchar_atomic_fetch_add_sat_mo, \
+    volatile unsigned short *: ushrt_atomic_fetch_add_sat_mo, \
+    volatile unsigned *: uint_atomic_fetch_add_sat_mo, \
+    volatile unsigned long *: ulong_atomic_fetch_add_sat_mo, \
+    volatile unsigned long long *: ullong_atomic_fetch_add_sat_mo)((DST), (ARG), (MO)))
 
-#   define atomic_sub(DST, ARG) (_Generic((DST), \
-        volatile unsigned char *: uchar_atomic_sub, \
-        volatile unsigned short *: ushrt_atomic_sub, \
-        volatile unsigned *: uint_atomic_sub, \
-        volatile unsigned long *: ulong_atomic_sub IF64(, \
-        volatile unsigned long long *: ullong_atomic_sub))((DST), (ARG)))
+#define atomic_fetch_add_sat(DST, ARG) \
+    (atomic_fetch_add_sat_mo((DST), (ARG), ATOMIC_ACQ_REL))
 
-#   define atomic_xchg(DST, ARG) (_Generic((DST), \
-        volatile unsigned char *: uchar_atomic_xchg, \
-        volatile unsigned short *: ushrt_atomic_xchg, \
-        volatile unsigned *: uint_atomic_xchg, \
-        volatile unsigned long *: ulong_atomic_xchg IF64(, \
-        volatile unsigned long long *: ullong_atomic_xchg), \
-        void *volatile *: ptr_atomic_xchg)((DST), (ARG)))
+// Atomic fetch-add subtract
+unsigned char uchar_atomic_fetch_sub_sat_mo(volatile unsigned char *, unsigned char, enum atomic_mo);
+unsigned short ushrt_atomic_fetch_sub_sat_mo(volatile unsigned short *, unsigned short, enum atomic_mo);
+unsigned uint_atomic_fetch_sub_sat_mo(volatile unsigned *, unsigned, enum atomic_mo);
+unsigned long ulong_atomic_fetch_sub_sat_mo(volatile unsigned long *, unsigned long, enum atomic_mo);
+unsigned long long ullong_atomic_fetch_sub_sat_mo(volatile unsigned long long *, unsigned long long, enum atomic_mo);
 
-#endif
+#define atomic_fetch_sub_sat_mo(DST, ARG, MO) (_Generic((DST), \
+    volatile unsigned char *: uchar_atomic_fetch_sub_sat_mo, \
+    volatile unsigned short *: ushrt_atomic_fetch_sub_sat_mo, \
+    volatile unsigned *: uint_atomic_fetch_sub_sat_mo, \
+    volatile unsigned long *: ulong_atomic_fetch_sub_sat_mo, \
+    volatile unsigned long long *: ullong_atomic_fetch_sub_sat_mo)((DST), (ARG), (MO)))
 
+#define atomic_fetch_sub_sat(DST, ARG) \
+    (atomic_fetch_sub_sat_mo((DST), (ARG), ATOMIC_ACQ_REL))
+
+// Hash functions
+unsigned uint_hash(unsigned);
+unsigned long ulong_hash(unsigned long);
+unsigned long long ullong_hash(unsigned long long);
+
+#define hash(X) (_Generic((X), \
+    unsigned: uint_hash, \
+    unsigned long: ulong_hash, \
+    unsigned long long: ullong_hash)(X))
+
+unsigned uint_hash_inv(unsigned);
+unsigned long ulong_hash_inv(unsigned long);
+unsigned long long ullong_hash_inv(unsigned long long);
+
+#define hash_inv(X) (_Generic((X), \
+    unsigned: uint_hash_inv, \
+    unsigned long: ulong_hash_inv, \
+    unsigned long long: ullong_hash_inv)(X))
+
+// Various macros
 #define atomic_inc(DST) (atomic_add((DST), 1))
 #define atomic_dec(DST) (atomic_sub((DST), 1))
 #define ulog2(X, CEIL) (bsr(X) + ((CEIL) && (X) && ((X) & ((X) - 1))))
@@ -497,10 +571,7 @@ unsigned long long ullong_atomic_xchg(volatile unsigned long long *, unsigned lo
 uint32_t uint32_log10(uint32_t, bool);
 uint64_t uint64_log10(uint64_t, bool);
 
-uint32_t uint32_hash(uint32_t);
-uint32_t uint32_hash_inv(uint32_t);
-uint64_t uint64_hash(uint64_t);
-uint64_t uint64_hash_inv(uint64_t);
+
 size_t size_hash(size_t);
 size_t size_hash_inv(size_t);
 
@@ -508,7 +579,7 @@ size_t m128i_byte_scan_forward(__m128i a);
 
 #define SPINLOCK_INIT 0
 void spinlock_acquire(spinlock *);
-#define spinlock_release(SPINLOCK) atomic_store_release((SPINLOCK), 0); 
+#define spinlock_release(SPINLOCK) atomic_store((SPINLOCK), 0); 
 
 typedef void *(*double_lock_callback)(void *);
 void *double_lock_execute(spinlock *, double_lock_callback, double_lock_callback, void *, void *);

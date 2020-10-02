@@ -4,8 +4,9 @@
 #include <limits.h>
 #include <errno.h>
 
-#   define IS_UINT_EQ_ULONG \
-        _Static_assert(sizeof(unsigned) == sizeof(unsigned long), "")
+#if _MSC_BUILD
+#   include <intrin.h>
+#endif
 
 #define DECL_1(TYPE, PREFIX, SUFFIX, BACKEND) \
     TYPE PREFIX ## _ ## SUFFIX(TYPE x) \
@@ -16,7 +17,7 @@
 #define DECL_1_COPY(TYPE, PREFIX, SUFFIX, OP_TYPE) \
     TYPE PREFIX ## _ ## SUFFIX(TYPE x) \
     { \
-        _Static_assert(sizeof(OP_TYPE) >= sizeof(TYPE), ""); \
+        _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
         return (TYPE) SUFFIX((OP_TYPE) x); \
     }
 
@@ -251,44 +252,71 @@
         return (TYPE) pcnt((OP_TYPE) x) + (TYPE) pcnt((OP_TYPE) (x >> bitsof(OP_TYPE))); \
     }
 
-#define DECL_ATOMIC_LOAD_SSE(TYPE) \
-    TYPE PREFIX ## _atomic_load_mo(TYPE volatile *x, enum atomic_mo mo) \
+#define DECL_ATOMIC_LOAD_GCC(TYPE, PREFIX) \
+    TYPE PREFIX ## _atomic_load_mo(TYPE volatile *src, enum atomic_mo mo) \
+    { \
+        return __atomic_load_n(src, mo); \
+    }
+    
+#define DECL_ATOMIC_LOAD_MSVC(TYPE, PREFIX) \
+    TYPE PREFIX ## _atomic_load_mo(TYPE volatile *src, enum atomic_mo mo) \
+    { \
+        (void) mo; \
+        return *src; \
+    }
+
+#define DECL_ATOMIC_LOAD_SSE(TYPE, PREFIX) \
+    TYPE PREFIX ## _atomic_load_mo(TYPE volatile *src, enum atomic_mo mo) \
     { \
         (void) mo; \
         _Static_assert(2 * sizeof(TYPE) == sizeof(__m128i), ""); \
         _Static_assert(sizeof(TYPE) == sizeof(long long), ""); \
         volatile unsigned long long res; /* Do not remove 'volatile'! */ \
-        _mm_storeu_si64((void *) &res, _mm_loadu_si64((__m128i *) x)); \
+        _mm_storeu_si64((void *) &res, _mm_loadu_si64((__m128i *) src)); \
         return res; \
     }
 
+#define DECL_ATOMIC_STORE_GCC(TYPE, PREFIX) \
+    void PREFIX ## _atomic_store_mo(TYPE volatile *src, TYPE val, enum atomic_mo mo) \
+    { \
+        __atomic_store_n(src, val, mo); \
+    }
+
+#define DECL_ATOMIC_STORE_MSVC(TYPE, PREFIX) \
+    void PREFIX ## _atomic_store_mo(TYPE volatile *src, TYPE val, enum atomic_mo mo) \
+    { \
+        (void) mo; \
+        *src = val; \
+    }
+
 #define DECL_ATOMIC_STORE_SSE(TYPE, PREFIX) \
-    void PREFIX ## _atomic_store_mo(TYPE volatile *x, TYPE y, enum atomic_mo mo) \
+    void PREFIX ## _atomic_store_mo(TYPE volatile *src, TYPE val, enum atomic_mo mo) \
     { \
         (void) mo; \
         _Static_assert(2 * sizeof(TYPE) == sizeof(__m128i), ""); \
         _Static_assert(sizeof(TYPE) == sizeof(long long), ""); \
-        _mm_storeu_si64((void *) x, _mm_set_epi64x(0, (long long) y)); \
+        _mm_storeu_si64((void *) src, _mm_set_epi64x(0, (long long) val)); \
     }
 
 #define DECL_ATOMIC_OP_MSVC(TYPE, PREFIX, SUFFIX, BACKEND_TYPE, BACKEND) \
-    TYPE PREFIX ## _atomic_fetch_ ## SUFFIX(TYPE volatile *dst, TYPE arg, ) \
+    TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *dst, TYPE arg, enum atomic_mo mo) \
     { \
+        (void) mo; \
         _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
         return (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) arg); \
     }
 
 #define DECL_ATOMIC_OP_COPY(TYPE, PREFIX, SUFFIX, OP_TYPE) \
-    TYPE PREFIX ## _atomic_ ## SUFFIX(TYPE volatile *dst, TYPE arg) \
+    TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *dst, TYPE arg, enum atomic_mo mo) \
     { \
         _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
-        return (TYPE) atomic_ ## SUFFIX((OP_TYPE volatile *) dst, (OP_TYPE) arg); \
+        return (TYPE) atomic_ ## SUFFIX ## _mo((OP_TYPE volatile *) dst, (OP_TYPE) arg, mo); \
     }
 
-#define DECL_ATOMIC_SUB_MSVC(TYPE, PREFIX) \
-    TYPE PREFIX ## _atomic_sub(TYPE volatile *dst, TYPE arg) \
+#define DECL_ATOMIC_FETCH_SUB_MSVC(TYPE, PREFIX) \
+    TYPE PREFIX ## _atomic_fetch_sub_mo(TYPE volatile *dst, TYPE arg, enum atomic_mo mo) \
     { \
-        return (TYPE) atomic_add((TYPE volatile *) dst, 0 - arg); \
+        return (TYPE) atomic_fetch_add_mo(dst, 0 - arg, mo); \
     }
 
 #define DECL_ATOMIC_CMP_XCHG_GCC(TYPE, PREFIX) \
@@ -334,28 +362,37 @@
         return 0; \
     }
 
-#define DECL_ATOMIC_OP_WIDE(TYPE, PREFIX, SUFFIX, OP, ...) \
-    TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *mem, TYPE val) \
+#define DECL_ATOMIC_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
+    TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *dst, TYPE arg, enum atomic_mo mo) \
     { \
-        TYPE probe = *mem; \
+        return BACKEND(dst, arg, mo); \
+    }
+
+#define DECL_ATOMIC_OP_WIDE(TYPE, PREFIX, SUFFIX, OP, ...) \
+    TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *mem, TYPE val, enum atomic_mo mo) \
+    { \
+        (void) mo; /* Only 'ATOMIC_ACQ_REL' memory order is supported! */ \
+        TYPE probe = *mem; /* Warning! Non-atomic load is legitimate here! */ \
         while (!atomic_cmp_xchg(mem, &probe, (TYPE) OP(probe __VA_ARGS__ val))) probe = *mem; \
         return probe; \
     }
 
-#define DECL_ATOMIC_ADD_SAT(TYPE, PREFIX) \
-    TYPE PREFIX ## _atomic_add_sat(TYPE volatile *mem, TYPE val) \
+#define DECL_ATOMIC_FETCH_ADD_SAT(TYPE, PREFIX) \
+    TYPE PREFIX ## _atomic_fetch_add_sat_mo(TYPE volatile *mem, TYPE val, enum atomic_mo mo) \
     { \
-        TYPE tmp = atomic_load_acquire(mem); \
-        while (tmp < umax(tmp) && !atomic_cmp_xchg(mem, &tmp, add_sat(tmp, val))) tmp = atomic_load_acquire(mem); \
-        return tmp; \
+        (void) mo; /* Only 'ATOMIC_ACQ_REL' memory order is supported! */ \
+        TYPE probe = atomic_load(mem); \
+        while (probe < umax(probe) && !atomic_cmp_xchg(mem, &probe, add_sat(probe, val))) probe = atomic_load(mem); \
+        return probe; \
     }
 
-#define DECL_ATOMIC_SUB_SAT(TYPE, PREFIX) \
-    TYPE PREFIX ## _atomic_sub_sat(TYPE volatile *mem, TYPE val) \
+#define DECL_ATOMIC_FETCH_SUB_SAT(TYPE, PREFIX) \
+    TYPE PREFIX ## _atomic_fetch_sub_sat(TYPE volatile *mem, TYPE val, enum atomic_mo mo) \
     { \
-        TYPE tmp = atomic_load_acquire(mem); \
-        while (tmp && !atomic_cmp_xchg(mem, &tmp, sub_sat(tmp, val))) tmp = atomic_load_acquire(mem); \
-        return tmp; \
+        (void) mo; /* Only 'ATOMIC_ACQ_REL' memory order is supported! */ \
+        TYPE probe = atomic_load(mem); \
+        while (probe && !atomic_cmp_xchg(mem, &probe, sub_sat(probe, val))) probe = atomic_load(mem); \
+        return probe; \
     }
 
 #define DECL2(SUFFIX, ...) \
@@ -556,6 +593,36 @@ IF_GCC_LLVM(DECL_1(unsigned long long, ullong, pcnt, __builtin_popcountll))
 IF_MSVC(IF_X32(DECL_PCNT_WIDE(unsigned long long, ullong, unsigned)))
 IF_MSVC(IF_X64(DECL_1(unsigned long long, ullong, pcnt, __popcnt64)))
 
+// Atomic load
+IF_GCC_LLVM(DECL_ATOMIC_LOAD_GCC(bool, bool))
+IF_MSVC(DECL_ATOMIC_LOAD_MSVC(bool, bool))
+IF_GCC_LLVM(DECL_ATOMIC_LOAD_GCC(unsigned char, uchar))
+IF_MSVC(DECL_ATOMIC_LOAD_MSVC(unsigned char, uchar))
+IF_GCC_LLVM(DECL_ATOMIC_LOAD_GCC(unsigned short, ushrt))
+IF_MSVC(DECL_ATOMIC_LOAD_MSVC(unsigned short, ushrt))
+IF_GCC_LLVM(DECL_ATOMIC_LOAD_GCC(unsigned, uint))
+IF_MSVC(DECL_ATOMIC_LOAD_MSVC(unsigned, uint))
+IF_GCC_LLVM(DECL_ATOMIC_LOAD_GCC(unsigned long, ulong))
+IF_MSVC(DECL_ATOMIC_LOAD_MSVC(unsigned long, ulong))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_LOAD_SSE(unsigned long long, ullong)))
+IF_GCC_LLVM(IF_X64(DECL_ATOMIC_LOAD_GCC(unsigned long long, ullong)))
+IF_MSVC(IF_X64(DECL_ATOMIC_LOAD_MSVC(unsigned long long, ullong)))
+
+// Atomic store
+IF_GCC_LLVM(DECL_ATOMIC_STORE_GCC(bool, bool))
+IF_MSVC(DECL_ATOMIC_STORE_MSVC(bool, bool))
+IF_GCC_LLVM(DECL_ATOMIC_STORE_GCC(unsigned char, uchar))
+IF_MSVC(DECL_ATOMIC_STORE_MSVC(unsigned char, uchar))
+IF_GCC_LLVM(DECL_ATOMIC_STORE_GCC(unsigned short, ushrt))
+IF_MSVC(DECL_ATOMIC_STORE_MSVC(unsigned short, ushrt))
+IF_GCC_LLVM(DECL_ATOMIC_STORE_GCC(unsigned, uint))
+IF_MSVC(DECL_ATOMIC_STORE_MSVC(unsigned, uint))
+IF_GCC_LLVM(DECL_ATOMIC_STORE_GCC(unsigned long, ulong))
+IF_MSVC(DECL_ATOMIC_STORE_MSVC(unsigned long, ulong))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_STORE_SSE(unsigned long long, ullong)))
+IF_GCC_LLVM(IF_X64(DECL_ATOMIC_STORE_GCC(unsigned long long, ullong)))
+IF_MSVC(IF_X64(DECL_ATOMIC_STORE_MSVC(unsigned long long, ullong)))
+
 // Atomic compare and swap
 IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(unsigned char, uchar))
 IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(unsigned char, uchar, char, _InterlockedCompareExchange8))
@@ -574,95 +641,142 @@ IF_GCC(IF_X64(DECL_ATOMIC_CMP_XCHG_SYNC(Uint128_t, Uint128)))
 IF_LLVM(IF_X64(DECL_ATOMIC_CMP_XCHG_GCC(Uint128_t, Uint128)))
 
 IF_MSVC(IF_X64(
-bool Uint128_atomic_cmp_xchg(volatile Uint128_t *dst, Uint128_t *p_cmp, Uint128_t xchg)
+bool Uint128_atomic_cmp_xchg_mo(volatile Uint128_t *dst, Uint128_t *p_cmp, Uint128_t xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail)
 {
+    (void) weak;
+    (void) mo_succ;
+    (void) mo_fail;
     _Static_assert(sizeof(dst->qw) == 2 * sizeof(long long), "");
     return _InterlockedCompareExchange128((volatile long long *) dst->qw, UINT128_HI(xchg), UINT128_LO(xchg), (long long *) p_cmp->qw);
 }))
 
-// Atomic AND (MSVC)
-IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, and, char, _InterlockedAnd8))
-IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, and, short, _InterlockedAnd16))
-IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uintm, and, unsigned long))
-IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, and, long, _InterlockedAnd))
-IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, and, long long, _InterlockedAnd64)))
+// Atomic fetch AND
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_and, __atomic_fetch_and))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, fetch_and, char, _InterlockedAnd8))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_and, __atomic_fetch_and))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, fetch_and, short, _InterlockedAnd16))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_and, __atomic_fetch_and))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_and, unsigned long))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_and, __atomic_fetch_and))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_and, long, _InterlockedAnd))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_and, , &)))
+IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_and, __atomic_fetch_and)))
+IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_and, long long, _InterlockedAnd64)))
 
+// Atomic fetch OR
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_or, __atomic_fetch_or))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, fetch_or, char, _InterlockedOr8))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_or, __atomic_fetch_or))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, fetch_or, short, _InterlockedOr16))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_or, __atomic_fetch_or))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_or, unsigned long))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_or, __atomic_fetch_or))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_or, long, _InterlockedOr))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_or, , |)))
+IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_or, __atomic_fetch_or)))
+IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_or, long long, _InterlockedOr64)))
 
-// Atomic saturated add
-DECL2(ATOMIC_ADD_SAT, )
+// Atomic fetch add
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_add, __atomic_fetch_add))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, fetch_add, char, _InterlockedExchangeAdd8))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_add, __atomic_fetch_add))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, fetch_add, short, _InterlockedExchangeAdd16))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_add, __atomic_fetch_add))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_add, unsigned long))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_add, __atomic_fetch_add))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_add, long, _InterlockedExchangeAdd))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_add, , +)))
+IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_add, __atomic_fetch_add)))
+IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_add, long long, _InterlockedExchangeAdd64)))
 
-// Atomic saturated subtract
-DECL2(ATOMIC_SUB_SAT, )
+// Atomic fetch subtract
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_sub, __atomic_fetch_sub))
+IF_MSVC(DECL_ATOMIC_FETCH_SUB_MSVC(unsigned char, uchar))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_sub, __atomic_fetch_sub))
+IF_MSVC(DECL_ATOMIC_FETCH_SUB_MSVC(unsigned short, ushrt))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_sub, __atomic_fetch_sub))
+IF_MSVC(DECL_ATOMIC_FETCH_SUB_MSVC(unsigned, uint))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_sub, __atomic_fetch_sub))
+IF_MSVC(DECL_ATOMIC_FETCH_SUB_MSVC(unsigned long, ulong))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_sub, , -)))
+IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_sub, __atomic_fetch_sub)))
+IF_MSVC(IF_X64(DECL_ATOMIC_FETCH_SUB_MSVC(unsigned long long, ullong)))
 
+// Atomic exchange
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, xchg, __atomic_exchange_n))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, xchg, char, _InterlockedExchange8))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, xchg, __atomic_exchange_n))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, xchg, short, _InterlockedExchangeAdd16))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, xchg, __atomic_exchange_n))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, xchg, unsigned long))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, xchg, __atomic_exchange_n))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, xchg, long, _InterlockedExchange))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, xchg, , , )))
+IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, xchg, __atomic_exchange_n)))
+IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, xchg, long long, _InterlockedExchange64)))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(void *, ptr, xchg, __atomic_exchange_n))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(void *, ptr, xchg, void *, _InterlockedExchangePointer))
 
-#if 0
+// Atomic fetch-add saturated
+DECL2(ATOMIC_FETCH_ADD_SAT, )
 
-// Atomic OR (MSVC)
-DECL_ATOMIC_OP(unsigned char, uchar, or, char, _InterlockedOr8)
-DECL_ATOMIC_OP(unsigned short, ushrt, or , short, _InterlockedOr16)
+// Atomic fetch-add subtract
+DECL2(ATOMIC_FETCH_SUB_SAT, )
 
-unsigned uint_atomic_or(volatile unsigned *dst, unsigned arg)
-{ 
-    IS_UINT_EQ_ULONG;
-    return (unsigned) atomic_or((volatile unsigned long *) dst, (unsigned long) arg);
+// Hash functions
+unsigned uint_hash(unsigned x)
+{
+    _Static_assert(sizeof(x) == sizeof(uint32_t), "");
+    // Copy-pasted from https://github.com/skeeto/hash-prospector
+    x ^= x >> 16;
+    x *= 0x7feb352du;
+    x ^= x >> 15;
+    x *= 0x846ca68bu;
+    x ^= x >> 16;
+    return x;
 }
 
-DECL_ATOMIC_OP(unsigned long, ulong, or, long, _InterlockedOr)
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_1_COPY(unsigned long, ulong, hash, unsigned)))
+IF_GCC_LLVM(IF_X64(DECL_1_COPY(unsigned long, ulong, hash, unsigned long long)))
 
-// Atomic add (MSVC)
-DECL_ATOMIC_OP(unsigned char, uchar, add, char, _InterlockedExchangeAdd8)
-DECL_ATOMIC_OP(unsigned short, ushrt, add, short, _InterlockedExchangeAdd16)
-
-unsigned uint_atomic_add(volatile unsigned *dst, unsigned arg) 
-{ 
-    IS_UINT_EQ_ULONG;
-    return (unsigned) atomic_add((volatile unsigned long *) dst, (unsigned long) arg); 
+unsigned long long ullong_hash(unsigned long long x)
+{
+    _Static_assert(sizeof(x) == sizeof(uint64_t), "");
+    // Copy-pasted from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
+    x ^= x >> 30;
+    x *= 0xbf58476d1ce4e5b9ull;
+    x ^= x >> 27;
+    x *= 0x94d049bb133111ebull;
+    x ^= x >> 31;
+    return x;
 }
 
-DECL_ATOMIC_OP(unsigned long, ulong, add, long, _InterlockedExchangeAdd)
-
-// Atomic subtract (MSVC)
-DECL_ATOMIC_SUB(unsigned char, uchar)
-DECL_ATOMIC_SUB(unsigned short, ushrt)
-DECL_ATOMIC_SUB(unsigned, uint)
-DECL_ATOMIC_SUB(unsigned long, ulong)
-
-// Atomic exchange (MSVC)
-DECL_ATOMIC_OP(unsigned char, uchar, exchange, char, _InterlockedExchange8)
-DECL_ATOMIC_OP(unsigned short, ushrt, exchange, short, _InterlockedExchange16)
-
-unsigned uint_atomic_xchg(volatile unsigned *dst, unsigned arg) 
-{ 
-    IS_UINT_EQ_ULONG;
-    return (unsigned) atomic_xchg((volatile unsigned long *) dst, (unsigned long) arg);
+unsigned uint_hash_inv(unsigned x)
+{
+    _Static_assert(sizeof(x) == sizeof(uint32_t), "");
+    x ^= x >> 16;
+    x *= 0x43021123u;
+    x ^= x >> 15 ^ x >> 30;
+    x *= 0x1d69e2a5u;
+    x ^= x >> 16;
+    return x;
 }
 
-DECL_ATOMIC_OP(unsigned long, ulong, exchange, long, _InterlockedExchange)
-DECL_ATOMIC_OP(void *, ptr, exchange, void *, _InterlockedExchangePointer)
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_1_COPY(unsigned long, ulong, hash_inv, unsigned)))
+IF_GCC_LLVM(IF_X64(DECL_1_COPY(unsigned long, ulong, hash_inv, unsigned long long)))
 
-#   ifdef _M_IX86
+unsigned long long ullong_hash_inv(unsigned long long x)
+{
+    _Static_assert(sizeof(x) == sizeof(uint64_t), "");
+    x ^= x >> 31 ^ x >> 62;
+    x *= 0x319642b2d24d8ec3ull;
+    x ^= x >> 27 ^ x >> 54;
+    x *= 0x96de1b173f119089ull;
+    x ^= x >> 30 ^ x >> 60;
+    return x;
+}
 
-#   elif defined _M_X64
-
-// Atomic compare and swap (MSVC, 64 bit)
-
-// Atomic AND (MSVC, 64 bit)
-
-
-// Atomic OR (MSVC, 64 bit)
-DECL_ATOMIC_OP(unsigned long long, ullong, or, long long, _InterlockedOr64)
-
-// Atomic add (MSVC, 64 bit)
-DECL_ATOMIC_OP(unsigned long long, ullong, add, long long, _InterlockedExchangeAdd64)
-
-// Atomic subtract (MSVC, 64 bit)
-DECL_ATOMIC_SUB(unsigned long long, ullong)
-
-// Atomic exchange (MSVC, 64 bit)
-DECL_ATOMIC_OP(unsigned long long, ullong, exchange, long long, _InterlockedExchange64)
-
-#   endif
-#endif 
+////
 
 #define DECL_UINT_LOG10(TYPE, PREFIX, MAX, ...) \
     TYPE PREFIX ## _log10(TYPE x, bool ceil) \
@@ -688,75 +802,13 @@ DECL_UINT_LOG10(uint16_t, uint16, UINT16_MAX, TEN5(u))
 DECL_UINT_LOG10(uint32_t, uint32, UINT32_MAX, TEN10(u))
 DECL_UINT_LOG10(uint64_t, uint64, UINT64_MAX, TEN20(u))
 
-// Copy-pasted from https://github.com/skeeto/hash-prospector
-uint32_t uint32_hash(uint32_t x)
-{
-    x ^= x >> 16;
-    x *= UINT32_C(0x7feb352d);
-    x ^= x >> 15;
-    x *= UINT32_C(0x846ca68b);
-    x ^= x >> 16;
-    return x;
-}
-
-uint32_t uint32_hash_inv(uint32_t x)
-{
-    x ^= x >> 16;
-    x *= UINT32_C(0x43021123);
-    x ^= x >> 15 ^ x >> 30;
-    x *= UINT32_C(0x1d69e2a5);
-    x ^= x >> 16;
-    return x;
-}
-
-// Copy-pasted from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
-uint64_t uint64_hash(uint64_t x) 
-{
-    x ^= x >> 30;
-    x *= UINT64_C(0xbf58476d1ce4e5b9);
-    x ^= x >> 27;
-    x *= UINT64_C(0x94d049bb133111eb);
-    x ^= x >> 31;
-    return x;
-}
-
-uint64_t uint64_hash_inv(uint64_t x)
-{
-    x ^= x >> 31 ^ x >> 62;
-    x *= UINT64_C(0x319642b2d24d8ec3);
-    x ^= x >> 27 ^ x >> 54;
-    x *= UINT64_C(0x96de1b173f119089);
-    x ^= x >> 30 ^ x >> 60;
-    return x;
-}
-
 #if defined _M_X64 || defined __x86_64__
 
 DECL_UINT_LOG10(size_t, size, SIZE_MAX, TEN20(u))
 
-size_t size_hash(size_t x)
-{
-    return (size_t) uint64_hash((uint64_t) x);
-}
-
-size_t size_hash_inv(size_t x)
-{
-    return (size_t) uint64_hash_inv((uint64_t) x);
-}
-
 #elif defined _M_IX86 || defined __i386__
 
 DECL_UINT_LOG10(size_t, size, SIZE_MAX, TEN10(u))
-
-size_t size_hash(size_t x)
-{
-    return (size_t) uint32_hash((uint32_t) x);
-}
-
-size_t size_hash_inv(size_t x)
-{
-    return (size_t) uint32_hash_inv((uint32_t) x);
-}
 
 #endif
 
@@ -781,24 +833,25 @@ size_t m128i_byte_scan_forward(__m128i a)
 
 void spinlock_acquire(spinlock *spinlock)
 {
-    while (!atomic_cmp_xchg_acquire(spinlock, &(spinlock_base) { 0 }, 1)) while (atomic_load_acquire(spinlock)) _mm_pause();
+    while (!atomic_cmp_xchg_mo(spinlock, &(spinlock_base) { 0 }, 1, 1, ATOMIC_ACQUIRE, ATOMIC_RELAXED)) // Weak CAS is sufficient 
+        while (atomic_load_mo(spinlock, ATOMIC_ACQUIRE)) _mm_pause();
 }
 
 GPUSH GWRN(implicit-fallthrough)
 void *double_lock_execute(spinlock *spinlock, double_lock_callback init, double_lock_callback comm, void *init_args, void *comm_args)
 {
     void *res = NULL;
-    switch (atomic_load_acquire(spinlock))
+    switch (atomic_load(spinlock))
     {
     case 0:
-        if (atomic_cmp_xchg_acquire(spinlock, &(spinlock_base) { 0 }, 1)) // Strong CAS required here!
+        if (atomic_cmp_xchg_mo(spinlock, &(spinlock_base) { 0 }, 1, 0, ATOMIC_ACQUIRE, ATOMIC_RELAXED)) // Strong CAS required here!
         {
             if (init) res = init(init_args);
-            atomic_store_release(spinlock, 2);
+            atomic_store(spinlock, 2);
             break;
         }
     case 1: 
-        while (atomic_load_acquire(spinlock) != 2) _mm_pause();
+        while (atomic_load(spinlock) != 2) _mm_pause();
     case 2:
         if (comm) res = comm(comm_args);
     }
@@ -884,7 +937,7 @@ int flt64_sign(double x)
 #define DECL_BIT_TEST_ACQUIRE(TYPE, PREFIX) \
     bool PREFIX ## _bit_test_acquire(volatile void *arr, size_t bit) \
     { \
-        return atomic_load_acquire((volatile TYPE *) arr + bit / bitsof(TYPE)) & ((TYPE) 1 << bit % bitsof(TYPE)); \
+        return atomic_load_mo((volatile TYPE *) arr + bit / bitsof(TYPE)) & ((TYPE) 1 << bit % bitsof(TYPE), ATOMIC_ACQUIRE); \
     }
 
 #define DECL_BIT_TEST_SET(TYPE, PREFIX) \
@@ -930,7 +983,7 @@ int flt64_sign(double x)
 #define DECL_ATOMIC_BIT_SET_RELEASE(TYPE, PREFIX) \
     void PREFIX ## _atomic_bit_set_release(volatile void *arr, size_t bit) \
     { \
-        atomic_or_release((volatile TYPE *) arr + bit / bitsof(TYPE), (TYPE) 1 << bit % bitsof(TYPE)); \
+        atomic_fetch_or_mo((volatile TYPE *) arr + bit / bitsof(TYPE), (TYPE) 1 << bit % bitsof(TYPE), ATOMIC_RELEASE); \
     }
 
 #define DECL_BIT_RESET(TYPE, PREFIX) \
@@ -942,7 +995,7 @@ int flt64_sign(double x)
 #define DECL_ATOMIC_BIT_RESET_RELEASE(TYPE, PREFIX) \
     void PREFIX ## _atomic_bit_reset_release(volatile void *arr, size_t bit) \
     { \
-        atomic_and_release((volatile TYPE *) arr + bit / bitsof(TYPE), ~((TYPE) 1 << bit % bitsof(TYPE))); \
+        atomic_fetch_and_mo((volatile TYPE *) arr + bit / bitsof(TYPE), ~((TYPE) 1 << bit % bitsof(TYPE)), ATOMIC_RELEASE); \
     }
 
 #define DECL_BIT_FETCH_BURST(TYPE, PREFIX, STRIDE) \
@@ -1006,6 +1059,3 @@ DECL_BIT_TEST_SET(size_t, size)
 DECL_BIT_TEST_RESET(size_t, size)
 DECL_BIT_SET(size_t, size)
 DECL_BIT_RESET(size_t, size)
-
-DECL_ATOMIC_LOAD_SSE(unsigned long long)
-DECL_ATOMIC_STORE_SSE(unsigned long long)

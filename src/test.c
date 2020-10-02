@@ -134,9 +134,9 @@ bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct
     bool succ = 0;
     struct test_thread_context context;
     context.groupl = groupl;
-    atomic_store_release(&context.succ, 0);
-    atomic_store_release(&context.fail, 0);
-    atomic_store_release(&context.tot, 0);
+    atomic_store(&context.succ, 0);
+    atomic_store(&context.fail, 0);
+    atomic_store(&context.tot, 0);
     if (ind == thread_cnt)
     {
         size_t i = 0;
@@ -145,8 +145,8 @@ bool test(const struct test_group *groupl, size_t cnt, size_t thread_cnt, struct
         succ = i == cnt;
         uint64_t start = get_time();
         thread_pool_schedule(pool);
-        size_t fail = size_atomic_load_acquire(&context.fail);
-        log_message_fmt(log, CODE_METRIC, fail ? MESSAGE_ERROR : MESSAGE_INFO, "Execution of %~uz test(s) in %~uz thread(s) took %~T. Succeeded: %~uz, failed: %~uz.\n", size_atomic_load_acquire(&context.tot), thread_cnt, start, get_time(), size_atomic_load_acquire(&context.succ), fail);
+        size_t fail = size_atomic_load(&context.fail);
+        log_message_fmt(log, CODE_METRIC, fail ? MESSAGE_ERROR : MESSAGE_INFO, "Execution of %~uz test(s) in %~uz thread(s) took %~T. Succeeded: %~uz, failed: %~uz.\n", size_atomic_load(&context.tot), thread_cnt, start, get_time(), size_atomic_load(&context.succ), fail);
         succ = !fail;
     }
     while (ind--) log_mirror_close(&((struct test_tls *) thread_pool_fetch_tls(pool, ind))->log);
