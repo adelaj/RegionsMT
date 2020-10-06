@@ -550,7 +550,15 @@ static int Main(int argc, char **argv)
     return succ ? EXIT_SUCCESS : EXIT_FAILURE;
 }
 
-#if _WIN32
+#if TEST(IFN_WIN)
+
+int main(int argc, char **argv)
+{
+    return Main(argc, argv);
+}
+
+#else
+
 #   include <windows.h>
 
 // Determining total buffer length (with null-terminators) and performing error checking
@@ -656,7 +664,7 @@ static int Wmain(int argc, wchar_t **wargv)
     return main_res;
 }
 
-#   ifdef __MINGW32__
+#   if TEST(IF_MINGW)
 #   include <shellapi.h>
 
 int main()
@@ -677,12 +685,5 @@ int wmain(int argc, wchar_t **wargv)
 }
 
 #   endif
-
-#else
-
-int main(int argc, char **argv)
-{
-    return Main(argc, argv);
-}
 
 #endif

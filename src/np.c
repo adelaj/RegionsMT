@@ -6,34 +6,27 @@
 #include <string.h>
 #include <immintrin.h>
 
-#if defined _WIN32 && (defined _MSC_BUILD || defined __MINGW32__)
+#if TEST(IF_UNIX_APPLE)
+
+#   include <stdlib.h>
+#   include <strings.h>
+#   include <unistd.h>
+#   include <fcntl.h>
+#   include <sys/types.h>
+#   include <sys/stat.h>
+#   include <sys/time.h>
+
+#elif TEST(IF_WIN)
 
 #   include <windows.h>
 #   include <wchar.h>
 #   include <io.h>
 #   include <sys/stat.h>
 
-void *Aligned_malloc(size_t al, size_t sz)
-{
-    return _aligned_malloc(sz, al);
-}
-
-void *Aligned_realloc(void *ptr, size_t al, size_t sz)
-{
-    if (sz) return _aligned_realloc(ptr, sz, al);
-    Aligned_free(ptr);
-    return NULL;
-}
-
-void *Aligned_calloc(size_t al, size_t cnt, size_t sz)
-{
-    return sz ? _aligned_recalloc(NULL, cnt, sz, al) : NULL;
-}
-
-void Aligned_free(void *ptr)
-{
-    _aligned_free(ptr);
-}
+#   define WSTR_CMP(WSTR, LEN, CMP) \
+        ((LEN) >= (countof(CMP) - 1) && \
+        !wcsncmp((WSTR), (CMP), (countof(CMP) - 1)) && \
+        (WSTR += (countof(CMP) - 1), LEN -= (countof(CMP) - 1), 1))
 
 static bool utf8_str_to_wstr(const char *restrict str, wchar_t **p_wstr, size_t *p_wlen)
 {
@@ -44,9 +37,7 @@ static bool utf8_str_to_wstr(const char *restrict str, wchar_t **p_wstr, size_t 
     {
         if (!utf8_decode(ch, &val, NULL, &ulen, &context)) return 0;
         if (context) continue;
-        size_t car;
-        wcnt = add(&car, wcnt, utf16_len(val));
-        if (car) return 0;
+        if (!test_add(&wcnt, wcnt, utf16_len(val))) return 0;
     }
     if (context) return 0;
     wchar_t *wstr;
@@ -66,7 +57,78 @@ static bool utf8_str_to_wstr(const char *restrict str, wchar_t **p_wstr, size_t 
     return 1;
 }
 
-FILE *Fopen(const char *path, const char *mode)
+#endif
+
+#define IO_POSIX(X) IF_UNIX_APPLE(X) IF_WIN(_ ## X)
+#define IO_UNLOCKED(X) IF_UNIX(X ## _unlocked) IF_APPLE(X) IF_WIN(_ ## X ## _nolock) 
+#define IO_FSTAT(X) IF_UNIX_APPLE(X) IF_WIN(_ ## X ## 64) 
+
+void *Realloc(void *ptr, size_t sz)
+{
+    if (sz) return realloc(ptr, sz);
+    free(ptr);
+    return NULL;
+}
+
+IF_UNIX_APPLE(void *Aligned_malloc(size_t al, size_t sz)
+{
+    void *res;
+    int code = posix_memalign(&res, al, sz);
+    if (code) errno = code;
+    return res;
+})
+
+IF_WIN(void *Aligned_malloc(size_t al, size_t sz)
+{
+    return _aligned_malloc(sz, al);
+})
+
+IF_UNIX_APPLE(void *Aligned_realloc(void *ptr, size_t al, size_t sz)
+{
+    (void) ptr;
+    (void) al;
+    if (sz) errno = ENOSYS; // Function not implemented
+    else Aligned_free(ptr);
+    return NULL;
+})
+
+IF_WIN(void *Aligned_realloc(void *ptr, size_t al, size_t sz)
+{
+    if (sz) return _aligned_realloc(ptr, sz, al);
+    Aligned_free(ptr);
+    return NULL;
+})
+
+IF_UNIX_APPLE(void *Aligned_calloc(size_t al, size_t cnt, size_t sz)
+{
+    if (!test_mul(&sz, cnt, sz)) return errno = ENOMEM, NULL;
+    void *res = Aligned_malloc(al, sz);
+    if (!res) return NULL;
+    memset(res, 0, sz);
+    return res;
+})
+
+IF_WIN(void *Aligned_calloc(size_t al, size_t cnt, size_t sz)
+{
+    return sz ? _aligned_recalloc(NULL, cnt, sz, al) : NULL;
+})
+
+IF_UNIX_APPLE(void Aligned_free(void *ptr)
+{
+    free(ptr);
+})
+
+IF_WIN(void Aligned_free(void *ptr)
+{
+    _aligned_free(ptr);
+})
+
+IF_UNIX_APPLE(FILE *Fopen(const char *path, const char *mode)
+{
+    return fopen(path, mode);
+})
+
+IF_WIN(FILE *Fopen(const char *path, const char *mode)
 {
     FILE *f = NULL;
     wchar_t *wpath = NULL, *wmode = NULL;
@@ -75,47 +137,53 @@ FILE *Fopen(const char *path, const char *mode)
     free(wpath);
     free(wmode);
     return f;
-}
+})
 
 FILE *Fdup(FILE *f, const char *mode)
 {
-    int fd = _dup(_fileno(f));
+    int fd = IO_POSIX(dup)(IO_POSIX(fileno)(f));
     if (fd == -1) return NULL;
-    return _fdopen(fd, mode);
+    return IO_POSIX(fdopen)(fd, mode);
 }
 
 size_t Fwrite_unlocked(const void *ptr, size_t sz, size_t cnt, FILE *file)
 {
-    return _fwrite_nolock(ptr, sz, cnt, file);
+    return IO_UNLOCKED(fwrite)(ptr, sz, cnt, file);
 }
 
 int Fflush_unlocked(FILE *file)
 {
-    return _fflush_nolock(file);
+    return IO_UNLOCKED(fflush)(file);
 }
 
-int Fseeki64(FILE *file, int64_t offset, int origin)
+IF_UNIX_APPLE(int Fseeki64(FILE *file, int64_t offset, int origin)
+{
+    return fseeko(file, (off_t) offset, origin);
+})
+
+IF_WIN(int Fseeki64(FILE *file, int64_t offset, int origin)
 {
     return _fseeki64(file, offset, origin);
-}
+})
 
-int64_t Ftelli64(FILE *file)
+IF_UNIX_APPLE(int64_t Ftelli64(FILE *file)
+{
+    return (int64_t) ftello(file);
+})
+
+IF_WIN(int64_t Ftelli64(FILE *file)
 {
     return _ftelli64(file);
-}
-
-#define WSTR_CMP(WSTR, LEN, CMP) \
-    ((LEN) >= (countof(CMP) - 1) && \
-    !wcsncmp((WSTR), (CMP), (countof(CMP) - 1)) && \
-    (WSTR += (countof(CMP) - 1), LEN -= (countof(CMP) - 1), 1))
+})
 
 // The implementation below is inspired by:
 // https://github.com/k-takata/ptycheck
 // https://github.com/msys2/MINGW-packages/blob/master/mingw-w64-gcc/0140-gcc-8.2.0-diagnostic-color.patch
 bool Fisatty(FILE *f)
 {
-    int fd = _fileno(f);
-    if (_isatty(fd)) return 1;
+    int fd = IO_POSIX(fileno)(f);
+    if (IO_POSIX(isatty)(fd)) return 1;
+#if TEST(IF_WIN)
     DWORD mode;
     HANDLE ho = (HANDLE) _get_osfhandle(fd);
     if (!ho || ho == INVALID_HANDLE_VALUE) return 0;
@@ -130,223 +198,108 @@ bool Fisatty(FILE *f)
     for (tmp = 0; len && iswdigit(*wstr); tmp++, wstr++, len--); // Skip at least one digit
     if (!tmp || (!WSTR_CMP(wstr, len, L"-from-master") && !WSTR_CMP(wstr, len, L"-to-master"))) return 0; // Skip suffix: L"-from-master" or L"-to-master"
     return !len;
-}
-
-int64_t Fsize(FILE *f)
-{
-    struct _stat64 st;
-    if (!_fstat64(_fileno(f), &st)) return (int64_t) st.st_size;
-    else return 0;
-}
-
-Errno_t Strerror_s(char *buff, size_t cap, Errno_t code)
-{
-    return strerror_s(buff, cap, code);
-}
-
-Errno_t Localtime_s(struct tm *tm, const time_t *t)
-{
-    return localtime_s(tm, t);
-}
-
-int Stricmp(const char *a, const char *b)
-{
-    return _stricmp(a, b);
-}
-
-int Strnicmp(const char *a, const char *b, size_t len)
-{
-    return _strnicmp(a, b, len);
-}
-
-size_t get_processor_count()
-{
-    SYSTEM_INFO inf;
-    GetSystemInfo(&inf);
-    return (size_t) inf.dwNumberOfProcessors;
-}
-
-size_t get_page_size()
-{
-    SYSTEM_INFO inf;
-    GetSystemInfo(&inf);
-    return (size_t) inf.dwPageSize;
-}
-
-size_t get_process_id()
-{
-    return (size_t) GetCurrentProcessId();
-}
-
-uint64_t get_time()
-{
-    FILETIME ft;
-    GetSystemTimePreciseAsFileTime(&ft);
-    uint64_t t = (uint64_t) ft.dwHighDateTime << (sizeof(uint32_t) * CHAR_BIT) | (uint64_t) ft.dwLowDateTime;
-    return t / 10 + !!(t % 10);
-}
-
-#elif (defined __GNUC__ || defined __clang__) && (defined __unix__ || defined __APPLE__)
-
-#   include <stdlib.h>
-#   include <strings.h>
-#   include <unistd.h>
-#   include <fcntl.h>
-#   include <sys/types.h>
-#   include <sys/stat.h>
-#   include <sys/time.h>
-
-void *Aligned_malloc(size_t al, size_t sz)
-{
-    void *res;
-    int code = posix_memalign(&res, al, sz);
-    if (code) errno = code;
-    return res;
-}
-
-void *Aligned_realloc(void *ptr, size_t al, size_t sz)
-{
-    (void) ptr;
-    (void) al;
-    if (sz) errno = ENOSYS; // Function not implemented
-    else Aligned_free(ptr);
-    return NULL;
-}
-
-void *Aligned_calloc(size_t al, size_t cnt, size_t sz)
-{
-    size_t hi, tot = size_mul(&hi, cnt, sz);
-    if (hi)
-    {
-        errno = ENOMEM;
-        return NULL;
-    }
-    void *res = Aligned_malloc(al, tot);
-    if (!res) return NULL;
-    memset(res, 0, tot);
-    return res;
-}
-
-void Aligned_free(void *ptr)
-{
-    free(ptr);
-}
-
-FILE *Fopen(const char *path, const char *mode)
-{
-    return fopen(path, mode);
-}
-
-FILE *Fdup(FILE *f, const char *mode)
-{
-    int fd = dup(fileno(f));
-    if (fd == -1) return NULL;
-    return fdopen(fd, mode);
-}
-
-#   ifndef __APPLE__
-
-size_t Fwrite_unlocked(const void *ptr, size_t sz, size_t cnt, FILE *file)
-{
-    return fwrite_unlocked(ptr, sz, cnt, file);
-}
-
-int Fflush_unlocked(FILE *file)
-{
-    return fflush_unlocked(file);
-}
-
-#   else
-
-size_t Fwrite_unlocked(const void *ptr, size_t sz, size_t cnt, FILE *file)
-{
-    return fwrite(ptr, sz, cnt, file);
-}
-
-int Fflush_unlocked(FILE *file)
-{
-    return fflush(file);
-}
-
-#   endif
-
-int Fseeki64(FILE *file, int64_t offset, int origin)
-{
-    return fseeko(file, (off_t) offset, origin);
-}
-
-int64_t Ftelli64(FILE *file)
-{
-    return (int64_t) ftello(file);
-}
-
-bool Fisatty(FILE *f)
-{
-    return isatty(fileno(f));
-}
-
-int64_t Fsize(FILE *f)
-{
-    struct stat st;
-    if (!fstat(fileno(f), &st)) return (int64_t) st.st_size;
-    else return 0;
-}
-
-Errno_t Strerror_s(char *buff, size_t cap, Errno_t code)
-{
-    return strerror_r(code, buff, cap);
-}
-
-Errno_t Localtime_s(struct tm *tm, const time_t *t)
-{
-    return localtime_r(t, tm) ? 0 : errno;
-}
-
-int Stricmp(const char *a, const char *b)
-{
-    return strcasecmp(a, b);
-}
-
-int Strnicmp(const char *a, const char *b, size_t len)
-{
-    return strncasecmp(a, b, len);
-}
-
-size_t get_processor_count() 
-{ 
-    return (size_t) sysconf(_SC_NPROCESSORS_CONF);
-}
-
-size_t get_page_size() 
-{ 
-    return (size_t) sysconf(_SC_PAGESIZE);
-}
-
-size_t get_process_id() 
-{
-    return (size_t) getpid();
-}
-
-uint64_t get_time()
-{
-    struct timeval tv;
-    gettimeofday(&tv, NULL);
-    return (uint64_t) tv.tv_sec * 1000000 + (uint64_t) tv.tv_usec;
-}
-
 #endif
+}
 
-void *Realloc(void *ptr, size_t sz)
+int64_t Fsize(FILE *f)
 {
-    if (sz) return realloc(ptr, sz);
-    free(ptr);
-    return NULL;
+    struct IO_FSTAT(stat) st;
+    return IO_FSTAT(fstat)(IO_POSIX(fileno)(f), &st) ? 0 : (int64_t) st.st_size;
 }
 
 int Fclose(FILE *f)
 {
     return f ? fclose(f) : 0;
 }
+
+IF_UNIX_APPLE(Errno_t Strerror_s(char *buff, size_t cap, Errno_t code)
+{
+    return strerror_r(code, buff, cap);
+})
+
+IF_WIN(Errno_t Strerror_s(char *buff, size_t cap, Errno_t code)
+{
+    return strerror_s(buff, cap, code);
+})
+
+IF_UNIX_APPLE(Errno_t Localtime_s(struct tm *tm, const time_t *t)
+{
+    return localtime_r(t, tm) ? 0 : errno;
+})
+
+IF_WIN(Errno_t Localtime_s(struct tm *tm, const time_t *t)
+{
+    return localtime_s(tm, t);
+})
+
+IF_UNIX_APPLE(int Stricmp(const char *a, const char *b)
+{
+    return strcasecmp(a, b);
+})
+
+IF_WIN(int Stricmp(const char *a, const char *b)
+{
+    return _stricmp(a, b);
+})
+
+IF_UNIX_APPLE(int Strnicmp(const char *a, const char *b, size_t len)
+{
+    return strncasecmp(a, b, len);
+})
+
+IF_WIN(int Strnicmp(const char *a, const char *b, size_t len)
+{
+    return _strnicmp(a, b, len);
+})
+
+IF_UNIX_APPLE(size_t get_processor_count()
+{
+    return (size_t) sysconf(_SC_NPROCESSORS_CONF);
+})
+
+IF_WIN(size_t get_processor_count()
+{
+    SYSTEM_INFO inf;
+    GetSystemInfo(&inf);
+    return (size_t) inf.dwNumberOfProcessors;
+})
+
+IF_UNIX_APPLE(size_t get_page_size()
+{
+    return (size_t) sysconf(_SC_PAGESIZE);
+})
+
+IF_WIN(size_t get_page_size()
+{
+    SYSTEM_INFO inf;
+    GetSystemInfo(&inf);
+    return (size_t) inf.dwPageSize;
+})
+
+IF_UNIX_APPLE(size_t get_process_id()
+{
+    return (size_t) getpid();
+})
+
+IF_WIN(size_t get_process_id()
+{
+    return (size_t) GetCurrentProcessId();
+})
+
+IF_UNIX_APPLE(uint64_t get_time()
+{
+    struct timeval tv;
+    gettimeofday(&tv, NULL);
+    return (uint64_t) tv.tv_sec * 1000000 + (uint64_t) tv.tv_usec;
+})
+
+IF_WIN(uint64_t get_time()
+{
+    FILETIME ft;
+    GetSystemTimePreciseAsFileTime(&ft);
+    uint64_t t = (uint64_t) ft.dwHighDateTime << (sizeof(uint32_t) * CHAR_BIT) | (uint64_t) ft.dwLowDateTime;
+    return t / 10 + !!(t % 10);
+})
 
 size_t Strnlen(const char *str, size_t len)
 {

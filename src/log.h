@@ -5,6 +5,8 @@
 #include "strproc.h"
 #include "utf8.h"
 
+typedef Errno_t Errno_dom_t;
+
 /*
 #define ARG_PTR(ARG, PTR) \
     (sizeof(*(PTR)) <= sizeof(void *) && alignof(*(PTR)) <= alignof(void *) ? (void *) (ARG) : (void *) (PTR))

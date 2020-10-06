@@ -6,23 +6,10 @@
 //  Warning! This file should be included prior to any standard library header!
 //
 
-#if defined _WIN32 && (defined _MSC_BUILD || defined __MINGW32__)
-#   ifndef _CRT_SECURE_NO_WARNINGS
-#       define _CRT_SECURE_NO_WARNINGS
-#   endif
+#include "common.h"
 
-#   define _CRTDBG_MAP_ALLOC
-#   include <crtdbg.h>
+#if TEST(IF_UNIX_APPLE)
 
-#   include <malloc.h>
-#   define Alloca(SIZE) (_alloca((SIZE)))
-
-#   include <errno.h>
-typedef errno_t Errno_t;
-
-#   define HAS_ALIGNED_REALLOC
-
-#elif (defined __GNUC__ || defined __clang__) && (defined __unix__ || defined __APPLE__)
 // Required for some POSIX only functions
 #   define _DEFAULT_SOURCE
 #   define _POSIX_C_SOURCE 200112L
@@ -35,17 +22,30 @@ typedef errno_t Errno_t;
 #   define Alloca(SIZE) (alloca((SIZE)))
 
 #   include <errno.h>
-typedef int Errno_t;
+
+#elif TEST(IF_WIN)
+
+#   ifndef _CRT_SECURE_NO_WARNINGS
+#       define _CRT_SECURE_NO_WARNINGS
+#   endif
+
+#   define _CRTDBG_MAP_ALLOC
+#   include <crtdbg.h>
+
+#   include <malloc.h>
+#   include <errno.h>
+
+#   define HAS_ALIGNED_REALLOC
 
 #endif
-
-typedef Errno_t Errno_dom_t;
-
-#include "common.h"
 
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
+
+typedef IF_UNIX_APPLE(int) IF_WIN(errno_t) Errno_t;
+#define Alloca(SIZE) IF_UNIX_APPLE((alloca((SIZE)))) IF_WIN((_alloca((SIZE))))
+#define Aligned_alloca(SZ, ALIGN) ((void *) ((((uintptr_t) Alloca((SZ) + (ALIGN) - 1) + (ALIGN) - 1) / (ALIGN)) * (ALIGN)))
 
 // This can be safely passed by pointer
 typedef struct { va_list va_list; } Va_list;
@@ -53,8 +53,6 @@ typedef struct { va_list va_list; } Va_list;
 #define Va_start(AP, P) va_start((AP).va_list, P)
 #define Va_end(AP) va_end((AP).va_list)
 #define Va_copy(DST, SRC) va_copy((DST).va_list, (SRC).va_list)
-
-#define Aligned_alloca(SZ, ALIGN) ((void *) ((((uintptr_t) Alloca((SZ) + (ALIGN) - 1) + (ALIGN) - 1) / (ALIGN)) * (ALIGN)))
 
 // Aligned memory allocation/deallocation
 void *Realloc(void *, size_t); // Releases the memory when size is zero

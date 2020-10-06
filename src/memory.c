@@ -31,7 +31,7 @@ static void *Aligned_realloc_impl(void *ptr, size_t *restrict p_cap, size_t al, 
     (void) p_cap;
     return Aligned_realloc(ptr, al, tot);
 #else
-    if (!p_cap || !tot) return Aligned_realloc(ptr, al, tot); // This will return 'NULL' and set 'errno' if 'tot' is non-zero and release memory otherwise
+    if (!p_cap || !tot) return Aligned_realloc(ptr, al, tot); // This will return 'NULL' and set 'errno' if 'tot' is non-zero, and release memory otherwise
     void *res = Aligned_malloc(al, tot);
     if (!res) return NULL;
     memcpy(res, ptr, *p_cap);
@@ -99,9 +99,7 @@ struct array_result array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, 
 struct array_result array_test_impl(void *p_Arr, size_t *restrict p_cap, size_t sz, size_t diff, enum array_flags flags, size_t *restrict cntl, size_t cnt)
 {
     size_t sum;
-    return test_sum(&sum, cntl, cnt) == cnt ? 
-        array_init(p_Arr, p_cap, sum, sz, diff, flags | ARRAY_REALLOC) : 
-        (struct array_result) { .error = ARRAY_OVERFLOW };
+    return test_sum(&sum, cntl, cnt) == cnt ? array_init(p_Arr, p_cap, sum, sz, diff, flags | ARRAY_REALLOC) : (struct array_result) { .error = ARRAY_OVERFLOW };
 }
 
 struct array_result queue_init(struct queue *queue, size_t cnt, size_t sz)
@@ -124,7 +122,6 @@ struct array_result queue_test(struct queue *queue, size_t diff, size_t sz)
     size_t cap = queue->cap;
     struct array_result res = array_test(&queue->arr, &cap, sz, 0, 0, queue->cnt, diff);
     if (!res.status || (res.status & ARRAY_UNTOUCHED)) return res;
-
     unsigned char bor = 0;
     size_t rem = sub(&bor, queue->begin, queue->cap - queue->cnt);
     if (!bor && rem) // queue->begin > queue->cap - queue->cnt
@@ -144,14 +141,12 @@ struct array_result queue_test(struct queue *queue, size_t diff, size_t sz)
 
 void *queue_fetch(struct queue *queue, size_t offset, size_t sz)
 {
-    unsigned char bor = 0;
-    size_t diff = sub(&bor, queue->begin, queue->cap - offset);
-    if (!bor) return (char *) queue->arr + diff * sz;
-    return (char *) queue->arr + (queue->begin + offset) * sz;
+    size_t diff;
+    return (char *) queue->arr + (test_sub(&diff, queue->begin, queue->cap - offset) ? diff : queue->begin + offset) * sz;
 }
 
 // This function should be called ONLY if 'queue_test' succeeds
-static void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
+static void queue_enqueue_lo(struct queue *restrict queue, generator_callback generator, void *restrict arrco, size_t cnt, size_t sz)
 {
     unsigned char bor = 0;
     size_t left = sub(&bor, queue->begin, queue->cap - queue->cnt);
@@ -161,86 +156,61 @@ static void queue_enqueue_lo(struct queue *restrict queue, void *restrict arr, s
     size_t diff2 = sub(&bor2, cnt, diff);
     if (!bor2 && diff2) // cnt > queue->cap - left
     {
-        size_t tot = diff * sz;
-        memcpy((char *) queue->arr + left * sz, arr, tot);
-        memcpy(queue->arr, (char *) arr + tot, diff2 * sz);
+        if (generator)
+        {
+            size_t ind = 0;
+            for (size_t i = left * sz; ind < diff; i += sz, ind++) generator((char *) queue->arr + i, ind, arrco);
+            for (size_t i = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, arrco);
+        }
+        else
+        {
+            size_t tot = diff * sz;
+            memcpy((char *) queue->arr + left * sz, arrco, tot);
+            memcpy(queue->arr, (char *) arrco + tot, diff2 * sz);
+        }
     }
-    else memcpy((char *) queue->arr + left * sz, arr, cnt * sz);    
-    queue->cnt += cnt;
-}
-
-static void queue_enqueue_yield_lo(struct queue *restrict queue, generator_callback generator, void *context, size_t cnt, size_t sz)
-{
-    unsigned char bor = 0;
-    size_t left = sub(&bor, queue->begin, queue->cap - queue->cnt);
-    if (bor) left += queue->cap;
-    size_t diff = queue->cap - left; // Never overflows
-    unsigned char bor2 = 0;
-    size_t diff2 = sub(&bor2, cnt, diff);
-    if (!bor2 && diff2) // cnt > queue->cap - left
-    {
-        size_t ind = 0;
-        for (size_t i = left * sz; ind < diff; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
-        for (size_t i = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
-    }
-    else for (size_t i = left * sz, ind = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
+    else if (generator) for (size_t i = left * sz, ind = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, arrco);
+    else memcpy((char *) queue->arr + left * sz, arrco, cnt * sz);    
     queue->cnt += cnt;
 }
 
 // This function should be called ONLY if 'queue_test' succeeds
-static void queue_enqueue_hi(struct queue *restrict queue, void *restrict arr, size_t cnt, size_t sz)
+static void queue_enqueue_hi(struct queue *restrict queue, generator_callback generator, void *restrict arrco, size_t cnt, size_t sz)
 {
     unsigned char bor = 0;
     size_t diff = sub(&bor, queue->begin, cnt);
     if (bor && diff) // cnt > queue->begin
     {
         diff = 0 - diff;
-        size_t tot = diff * sz, left = queue->cap - diff;
-        memcpy((char *) queue->arr + left * sz, arr, tot);
-        memcpy(queue->arr, (char *) arr + tot, queue->begin * sz);
+        size_t left = queue->cap - diff;
+        if (generator)
+        {
+            size_t ind = 0;
+            for (size_t i = left; ind < diff; i += sz, ind++) generator((char *) queue->arr + i, ind, arrco);
+            for (size_t i = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, arrco);
+        }
+        else
+        {
+            size_t tot = diff * sz;
+            memcpy((char *) queue->arr + left * sz, arrco, tot);
+            memcpy(queue->arr, (char *) arrco + tot, queue->begin * sz);
+        }
         queue->begin = left;
     }
     else
     {
-        memcpy((char *) queue->arr + diff * sz, arr, cnt * sz);
+        if (generator) for (size_t i = diff, ind = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, arrco);
+        else memcpy((char *) queue->arr + diff * sz, arrco, cnt * sz);
         queue->begin = diff;
     }
     queue->cnt += cnt;
 }
 
-static void queue_enqueue_yield_hi(struct queue *restrict queue, generator_callback generator, void *context, size_t cnt, size_t sz)
-{
-    unsigned char bor = 0;
-    size_t diff = sub(&bor, queue->begin, cnt);
-    if (bor && diff) // cnt > queue->begin
-    {
-        diff = 0 - diff;
-        size_t left = queue->cap - diff, ind = 0;
-        for (size_t i = left; ind < diff; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
-        for (size_t i = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
-        queue->begin = left;
-    }
-    else
-    {
-        for (size_t i = diff, ind = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, context);
-        queue->begin = diff;
-    }
-    queue->cnt += cnt;
-}
-
-struct array_result queue_enqueue(struct queue *restrict queue, bool hi, void *restrict arr, size_t cnt, size_t sz)
+struct array_result queue_enqueue(struct queue *restrict queue, bool hi, generator_callback generator, void *restrict arr, size_t cnt, size_t sz)
 {
     struct array_result res = queue_test(queue, cnt, sz);
     if (!res.status) return res;
-    (hi ? queue_enqueue_hi : queue_enqueue_lo)(queue, arr, cnt, sz);
-    return res;
-}
-
-struct array_result queue_enqueue_yield(struct queue *restrict queue, bool hi, generator_callback generator, void *context, size_t cnt, size_t sz)
-{
-    struct array_result res = queue_test(queue, cnt, sz);
-    if (!res.status) return res;
-    (hi ? queue_enqueue_yield_hi : queue_enqueue_yield_lo)(queue, generator, context, cnt, sz);
+    (hi ? queue_enqueue_hi : queue_enqueue_lo)(queue, generator, arr, cnt, sz);
     return res;
 }
 

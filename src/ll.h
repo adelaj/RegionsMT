@@ -16,15 +16,10 @@ enum atomic_mo {
     ATOMIC_ACQ_REL IF_GCC_LLVM(= __ATOMIC_ACQ_REL),
 };
 
-typedef unsigned spinlock_base;
-typedef volatile spinlock_base spinlock;
-
 GPUSH GWRN(pedantic)
-IF_GCC_LLVM(IF_X64(typedef unsigned __int128 Uint128_t;))
+typedef IF_GCC_LLVM(IF_X64(unsigned __int128)) IF_MSVC_X32(struct { uint64_t qw[2]; }) Uint128_t;
 GPOP
-IF_MSVC_X32(typedef struct { uint64_t qw[2]; } Uint128_t;)
-IF_X64(typedef Uint128_t Dsize_t;)
-IF_X32(typedef uint64_t Dsize_t;)
+typedef IF_X32(uint64_t) IF_X64(Uint128_t) Dsize_t;
 
 _Static_assert(sizeof(Uint128_t) == 2 * sizeof(uint64_t), "");
 _Static_assert(sizeof(Dsize_t) == 2 * sizeof(size_t), "");
@@ -43,10 +38,10 @@ _Static_assert(sizeof(Dsize_t) == 2 * sizeof(size_t), "");
     IF_X32(((Dsize_t) (LO) | (((Dsize_t) (HI)) << SIZE_BIT)))
 #define DSIZE_LO(X) \
     IF_X64(((size_t) UINT128_LO((X)))) \
-    IF_X32(((size_t) (D)))
+    IF_X32(((size_t) (X)))
 #define DSIZE_HI(X) \
     IF_X64(((size_t) UINT128_HI((X)))) \
-    IF_X32(((size_t) ((D) >> SIZE_BIT)))
+    IF_X32(((size_t) ((X) >> SIZE_BIT)))
 
 // Rounding down/up to the nearest power of 2 for the inline usage 
 #define RP2_SUPP(X, Y) ((X) | ((X) >> (Y)))
@@ -70,7 +65,7 @@ _Static_assert(sizeof(Dsize_t) == 2 * sizeof(size_t), "");
     unsigned long: ULONG_MAX, \
     unsigned long long: ULLONG_MAX))
 
-// Add
+// Add with input/output carry
 unsigned char uchar_add(unsigned char *, unsigned char, unsigned char);
 unsigned short ushrt_add(unsigned char *, unsigned short, unsigned short);
 unsigned uint_add(unsigned char *, unsigned, unsigned);
@@ -84,7 +79,7 @@ unsigned long long ullong_add(unsigned char *, unsigned long long, unsigned long
     unsigned long: ulong_add, \
     unsigned long long: ullong_add)((P_CAR), (X), (Y)))
 
-// Subtract
+// Subtract with input/output borrow
 unsigned char uchar_sub(unsigned char *, unsigned char, unsigned char);
 unsigned short ushrt_sub(unsigned char *, unsigned short, unsigned short);
 unsigned uint_sub(unsigned char *, unsigned, unsigned);
@@ -294,7 +289,7 @@ bool ullong_test_ma(unsigned long long *, unsigned long long, unsigned long long
     unsigned long: ulong_test_ma, \
     unsigned long long: ullong_test_ma)((P_RES), (X), (Y)))
 
-// Non-destructive sum with overflow test
+// Sum with overflow test
 size_t uchar_test_sum(unsigned char *, unsigned char *, size_t);
 size_t ushrt_test_sum(unsigned short *, unsigned short *, size_t);
 size_t uint_test_sum(unsigned *, unsigned *, size_t);
@@ -308,7 +303,7 @@ size_t ullong_test_sum(unsigned long long *, unsigned long long *, size_t);
     unsigned long: ulong_test_sum, \
     unsigned long long: ullong_test_sum)((P_RES), (L), (C)))
 
-// Non-destructive product with overflow test
+// Product with overflow test
 size_t uchar_test_prod(unsigned char *, unsigned char *, size_t);
 size_t ushrt_test_prod(unsigned short *, unsigned short *, size_t);
 size_t uint_test_prod(unsigned *, unsigned *, size_t);
@@ -329,12 +324,12 @@ unsigned uint_bsr(unsigned);
 unsigned long ulong_bsr(unsigned long);
 unsigned long long ullong_bsr(unsigned long long);
 
-#define bsr(x) (_Generic((x), \
+#define bsr(X) (_Generic((X), \
     unsigned char: uchar_bsr, \
     unsigned short: ushrt_bsr, \
     unsigned: uint_bsr, \
     unsigned long: ulong_bsr, \
-    unsigned long long: ullong_bsr)(x))
+    unsigned long long: ullong_bsr)((X)))
 
 // Bit scan forward
 unsigned char uchar_bsf(unsigned char);
@@ -343,12 +338,12 @@ unsigned uint_bsf(unsigned);
 unsigned long ulong_bsf(unsigned long);
 unsigned long long ullong_bsf(unsigned long long);
 
-#define bsf(x) (_Generic((x), \
+#define bsf(X) (_Generic((X), \
     unsigned char: uchar_bsf, \
     unsigned short: ushrt_bsf, \
     unsigned: uint_bsf, \
     unsigned long: ulong_bsf, \
-    unsigned long long: ullong_bsf)(x))
+    unsigned long long: ullong_bsf)((X)))
 
 // Population count
 unsigned char uchar_pcnt(unsigned char);
@@ -357,12 +352,152 @@ unsigned uint_pcnt(unsigned);
 unsigned long ulong_pcnt(unsigned long);
 unsigned long long ullong_pcnt(unsigned long long);
 
-#define pcnt(x) (_Generic((x), \
+#define pcnt(X) (_Generic((X), \
     unsigned char: uchar_pcnt, \
     unsigned short: ushrt_pcnt, \
     unsigned: uint_pcnt, \
     unsigned long: ulong_pcnt, \
-    unsigned long long: ullong_pcnt)(x))
+    unsigned long long: ullong_pcnt)((X)))
+
+// Bit test
+bool uchar_bit_test(unsigned char *, size_t);
+bool ushrt_bit_test(unsigned short *, size_t);
+bool uint_bit_test(unsigned *, size_t);
+bool ulong_bit_test(unsigned long *, size_t);
+bool ullong_bit_test(unsigned long long *, size_t);
+
+#define bit_test(ARR, POS) (_Generic(*(ARR), \
+    unsigned char: uchar_bit_test, \
+    unsigned short: ushrt_bit_test, \
+    unsigned: uint_bit_test, \
+    unsigned long: ulong_bit_test, \
+    unsigned long long: ullong_bit_test)((ARR), (POS)))
+
+// Bit test and set
+bool uchar_bit_test_set(unsigned char *, size_t);
+bool ushrt_bit_test_set(unsigned short *, size_t);
+bool uint_bit_test_set(unsigned *, size_t);
+bool ulong_bit_test_set(unsigned long *, size_t);
+bool ullong_bit_test_set(unsigned long long *, size_t);
+
+#define bit_test_set(ARR, POS) (_Generic(*(ARR), \
+    unsigned char: uchar_bit_test_set, \
+    unsigned short: ushrt_bit_test_set, \
+    unsigned: uint_bit_test_set, \
+    unsigned long: ulong_bit_test_set, \
+    unsigned long long: ullong_bit_test_set)((ARR), (POS)))
+
+// Bit test and reset
+bool uchar_bit_test_reset(unsigned char *, size_t);
+bool ushrt_bit_test_reset(unsigned short *, size_t);
+bool uint_bit_test_reset(unsigned *, size_t);
+bool ulong_bit_test_reset(unsigned long *, size_t);
+bool ullong_bit_test_reset(unsigned long long *, size_t);
+
+#define bit_test_reset(ARR, POS) (_Generic(*(ARR), \
+    unsigned char: uchar_bit_test_reset, \
+    unsigned short: ushrt_bit_test_reset, \
+    unsigned: uint_bit_test_reset, \
+    unsigned long: ulong_bit_test_reset, \
+    unsigned long long: ullong_bit_test_reset)((ARR), (POS)))
+
+// Bit set
+void uchar_bit_set(unsigned char *, size_t);
+void ushrt_bit_set(unsigned short *, size_t);
+void uint_bit_set(unsigned *, size_t);
+void ulong_bit_set(unsigned long *, size_t);
+void ullong_bit_set(unsigned long long *, size_t);
+
+#define bit_set(ARR, POS) (_Generic(*(ARR), \
+    unsigned char: uchar_bit_set, \
+    unsigned short: ushrt_bit_set, \
+    unsigned: uint_bit_set, \
+    unsigned long: ulong_bit_set, \
+    unsigned long long: ullong_bit_set)((ARR), (POS)))
+
+// Bit reset
+void uchar_bit_reset(unsigned char *, size_t);
+void ushrt_bit_reset(unsigned short *, size_t);
+void uint_bit_reset(unsigned *, size_t);
+void ulong_bit_reset(unsigned long *, size_t);
+void ullong_bit_reset(unsigned long long *, size_t);
+
+#define bit_reset(ARR, POS) (_Generic(*(ARR), \
+    unsigned char: uchar_bit_reset, \
+    unsigned short: ushrt_bit_reset, \
+    unsigned: uint_bit_reset, \
+    unsigned long: ulong_bit_reset, \
+    unsigned long long: ullong_bit_reset)((ARR), (POS)))
+
+// Bit fetch burst
+unsigned char uchar_bit_fetch_burst(unsigned char *, size_t, size_t);
+unsigned short ushrt_bit_fetch_burst(unsigned short *, size_t, size_t);
+unsigned uint_bit_fetch_burst(unsigned *, size_t, size_t);
+unsigned long ulong_bit_fetch_burst(unsigned long *, size_t, size_t);
+unsigned long long ullong_bit_fetch_burst(unsigned long long *, size_t, size_t);
+
+#define bit_fetch_burst(ARR, POS, STRIDE) (_Generic(*(ARR), \
+    unsigned char: uchar_bit_fetch_burst, \
+    unsigned short: ushrt_bit_fetch_burst, \
+    unsigned: uint_bit_fetch_burst, \
+    unsigned long: ulong_bit_fetch_burst, \
+    unsigned long long: ullong_bit_fetch_burst)((ARR), (POS), (STRIDE)))
+
+// Bit fetch and set burst
+unsigned char uchar_bit_fetch_set_burst(unsigned char *, size_t, size_t, unsigned char);
+unsigned short ushrt_bit_fetch_set_burst(unsigned short *, size_t, size_t, unsigned short);
+unsigned uint_bit_fetch_set_burst(unsigned *, size_t, size_t, unsigned);
+unsigned long ulong_bit_fetch_set_burst(unsigned long *, size_t, size_t, unsigned long);
+unsigned long long ullong_bit_fetch_set_burst(unsigned long long *, size_t, size_t, unsigned long long);
+
+#define bit_fetch_set_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
+    unsigned char: uchar_bit_fetch_set_burst, \
+    unsigned short: ushrt_bit_fetch_set_burst, \
+    unsigned: uint_bit_fetch_set_burst, \
+    unsigned long: ulong_bit_fetch_set_burst, \
+    unsigned long long: ullong_bit_fetch_set_burst)((ARR), (POS), (STRIDE), (MSK)))
+
+// Bit fetch and reset burst
+unsigned char uchar_bit_fetch_reset_burst(unsigned char *, size_t, size_t, unsigned char);
+unsigned short ushrt_bit_fetch_reset_burst(unsigned short *, size_t, size_t, unsigned short);
+unsigned uint_bit_fetch_reset_burst(unsigned *, size_t, size_t, unsigned);
+unsigned long ulong_bit_fetch_reset_burst(unsigned long *, size_t, size_t, unsigned long);
+unsigned long long ullong_bit_fetch_reset_burst(unsigned long long *, size_t, size_t, unsigned long long);
+
+#define bit_fetch_reset_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
+    unsigned char: uchar_bit_fetch_reset_burst, \
+    unsigned short: ushrt_bit_fetch_reset_burst, \
+    unsigned: uint_bit_fetch_reset_burst, \
+    unsigned long: ulong_bit_fetch_reset_burst, \
+    unsigned long long: ullong_bit_fetch_reset_burst)((ARR), (POS), (STRIDE), (MSK)))
+
+// Bit set burst
+void uchar_bit_set_burst(unsigned char *, size_t, size_t, unsigned char);
+void ushrt_bit_set_burst(unsigned short *, size_t, size_t, unsigned short);
+void uint_bit_set_burst(unsigned *, size_t, size_t, unsigned);
+void ulong_bit_set_burst(unsigned long *, size_t, size_t, unsigned long);
+void ullong_bit_set_burst(unsigned long long *, size_t, size_t, unsigned long long);
+
+#define bit_set_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
+    unsigned char: uchar_bit_set_burst, \
+    unsigned short: ushrt_bit_set_burst, \
+    unsigned: uint_bit_set_burst, \
+    unsigned long: ulong_bit_set_burst, \
+    unsigned long long: ullong_bit_set_burst)((ARR), (POS), (STRIDE), (MSK)))
+
+// Bit reset burst
+void uchar_bit_reset_burst(unsigned char *, size_t, size_t, unsigned char);
+void ushrt_bit_reset_burst(unsigned short *, size_t, size_t, unsigned short);
+void uint_bit_reset_burst(unsigned *, size_t, size_t, unsigned);
+void ulong_bit_reset_burst(unsigned long *, size_t, size_t, unsigned long);
+void ullong_bit_reset_burst(unsigned long long *, size_t, size_t, unsigned long long);
+
+#define bit_reset_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
+    unsigned char: uchar_bit_reset_burst, \
+    unsigned short: ushrt_bit_reset_burst, \
+    unsigned: uint_bit_reset_burst, \
+    unsigned long: ulong_bit_reset_burst, \
+    unsigned long long: ullong_bit_reset_burst)((ARR), (POS), (STRIDE), (MSK)))
 
 // Atomic load
 bool bool_atomic_load_mo(volatile bool *, enum atomic_mo);
@@ -371,6 +506,7 @@ unsigned short ushrt_atomic_load_mo(volatile unsigned short *, enum atomic_mo);
 unsigned uint_atomic_load_mo(volatile unsigned *, enum atomic_mo);
 unsigned long ulong_atomic_load_mo(volatile unsigned long *, enum atomic_mo);
 unsigned long long ullong_atomic_load_mo(volatile unsigned long long *, enum atomic_mo);
+void *ptr_atomic_load_mo(void *volatile *, enum atomic_mo);
 
 #define atomic_load_mo(SRC, MO) (_Generic((SRC), \
     volatile bool *: bool_atomic_load_mo, \
@@ -378,7 +514,8 @@ unsigned long long ullong_atomic_load_mo(volatile unsigned long long *, enum ato
     volatile unsigned short *: ushrt_atomic_load_mo, \
     volatile unsigned *: uint_atomic_load_mo, \
     volatile unsigned long *: ulong_atomic_load_mo, \
-    volatile unsigned long long *: ullong_atomic_load_mo)((SRC), (MO)))
+    volatile unsigned long long *: ullong_atomic_load_mo, \
+    void *volatile *: ptr_atomic_load_mo)((SRC), (MO)))
 
 #define atomic_load(SRC) \
     (atomic_load_mo((SRC), ATOMIC_ACQUIRE))
@@ -390,6 +527,7 @@ void ushrt_atomic_store_mo(volatile unsigned short *, unsigned short, enum atomi
 void uint_atomic_store_mo(volatile unsigned *, unsigned, enum atomic_mo);
 void ulong_atomic_store_mo(volatile unsigned long *, unsigned long, enum atomic_mo);
 void ullong_atomic_store_mo(volatile unsigned long long *, unsigned long long, enum atomic_mo);
+void ptr_atomic_store_mo(void *volatile *, void *, enum atomic_mo);
 
 #define atomic_store_mo(DST, VAL, MO) (_Generic((DST), \
     volatile bool *: bool_atomic_store_mo, \
@@ -397,7 +535,8 @@ void ullong_atomic_store_mo(volatile unsigned long long *, unsigned long long, e
     volatile unsigned short *: ushrt_atomic_store_mo, \
     volatile unsigned *: uint_atomic_store_mo, \
     volatile unsigned long *: ulong_atomic_store_mo, \
-    volatile unsigned long long *: ullong_atomic_store_mo)((DST), (VAL), (MO)))
+    volatile unsigned long long *: ullong_atomic_store_mo, \
+    void *volatile *: ptr_atomic_store_mo)((DST), (VAL), (MO)))
 
 #define atomic_store(DST, VAL) \
     (atomic_store_mo((DST), (VAL), ATOMIC_RELEASE))
@@ -456,6 +595,23 @@ unsigned long long ullong_atomic_fetch_or_mo(volatile unsigned long long *, unsi
 
 #define atomic_fetch_or(DST, ARG) \
     (atomic_fetch_or_mo((DST), (ARG), ATOMIC_ACQ_REL))
+
+// Atomic fetch-XOR
+unsigned char uchar_atomic_fetch_xor_mo(volatile unsigned char *, unsigned char, enum atomic_mo);
+unsigned short ushrt_atomic_fetch_xor_mo(volatile unsigned short *, unsigned short, enum atomic_mo);
+unsigned uint_atomic_fetch_xor_mo(volatile unsigned *, unsigned, enum atomic_mo);
+unsigned long ulong_atomic_fetch_xor_mo(volatile unsigned long *, unsigned long, enum atomic_mo);
+unsigned long long ullong_atomic_fetch_xor_mo(volatile unsigned long long *, unsigned long long, enum atomic_mo);
+
+#define atomic_fetch_xor_mo(DST, ARG, MO) (_Generic((DST), \
+    volatile unsigned char *: uchar_atomic_fetch_xor_mo, \
+    volatile unsigned short *: ushrt_atomic_fetch_xor_mo, \
+    volatile unsigned *: uint_atomic_fetch_xor_mo, \
+    volatile unsigned long *: ulong_atomic_fetch_xor_mo, \
+    volatile unsigned long long *: ullong_atomic_fetch_xor_mo)((DST), (ARG), (MO)))
+
+#define atomic_fetch_xor(DST, ARG) \
+    (atomic_fetch_xor_mo((DST), (ARG), ATOMIC_ACQ_REL))
 
 // Atomic fetch-add
 unsigned char uchar_atomic_fetch_add_mo(volatile unsigned char *, unsigned char, enum atomic_mo);
@@ -544,45 +700,60 @@ unsigned long long ullong_atomic_fetch_sub_sat_mo(volatile unsigned long long *,
 #define atomic_fetch_sub_sat(DST, ARG) \
     (atomic_fetch_sub_sat_mo((DST), (ARG), ATOMIC_ACQ_REL))
 
-// Hash functions
-unsigned uint_hash(unsigned);
-unsigned long ulong_hash(unsigned long);
-unsigned long long ullong_hash(unsigned long long);
+// Spinlock
+typedef unsigned spinlock_base;
+typedef volatile spinlock_base spinlock;
 
-#define hash(X) (_Generic((X), \
-    unsigned: uint_hash, \
-    unsigned long: ulong_hash, \
-    unsigned long long: ullong_hash)(X))
-
-unsigned uint_hash_inv(unsigned);
-unsigned long ulong_hash_inv(unsigned long);
-unsigned long long ullong_hash_inv(unsigned long long);
-
-#define hash_inv(X) (_Generic((X), \
-    unsigned: uint_hash_inv, \
-    unsigned long: ulong_hash_inv, \
-    unsigned long long: ullong_hash_inv)(X))
-
-// Various macros
-#define atomic_inc(DST) (atomic_add((DST), 1))
-#define atomic_dec(DST) (atomic_sub((DST), 1))
-#define ulog2(X, CEIL) (bsr(X) + ((CEIL) && (X) && ((X) & ((X) - 1))))
-
-uint32_t uint32_log10(uint32_t, bool);
-uint64_t uint64_log10(uint64_t, bool);
-
-
-size_t size_hash(size_t);
-size_t size_hash_inv(size_t);
-
-size_t m128i_byte_scan_forward(__m128i a);
-
-#define SPINLOCK_INIT 0
 void spinlock_acquire(spinlock *);
 #define spinlock_release(SPINLOCK) atomic_store((SPINLOCK), 0); 
 
+// Double lock
 typedef void *(*double_lock_callback)(void *);
+
 void *double_lock_execute(spinlock *, double_lock_callback, double_lock_callback, void *, void *);
+
+// Atomic increment/decrement
+#define atomic_fetch_inc_mo(DST, MO) \
+    (atomic_fetch_add_mo((DST), 1, (MO)))
+#define atomic_fetch_inc(DST) \
+    (atomic_fetch_inc_mo((DST), ATOMIC_ACQ_REL))
+
+#define atomic_fetch_dec_mo(DST, MO) \
+    (atomic_fetch_sub_mo((DST), 1, (MO)))
+#define atomic_fetch_dec(DST) \
+    (atomic_fetch_dec_mo((DST), ATOMIC_ACQ_REL))
+
+// Hash functions
+unsigned uint_uhash(unsigned);
+unsigned long ulong_uhash(unsigned long);
+unsigned long long ullong_uhash(unsigned long long);
+
+#define uhash(X) (_Generic((X), \
+    unsigned: uint_uhash, \
+    unsigned long: ulong_uhash, \
+    unsigned long long: ullong_uhash)(X))
+
+unsigned uint_uhash_inv(unsigned);
+unsigned long ulong_uhash_inv(unsigned long);
+unsigned long long ullong_uhash_inv(unsigned long long);
+
+#define uhash_inv(X) (_Generic((X), \
+    unsigned: uint_uhash_inv, \
+    unsigned long: ulong_uhash_inv, \
+    unsigned long long: ullong_uhash_inv)(X))
+
+
+
+
+// Base 2 integer logarithm
+#define ulog2(X, CEIL) (bsr(X) + ((CEIL) && (X) && ((X) & ((X) - 1))))
+
+// Base 10 integer logarithm
+uint32_t uint32_log10(uint32_t, bool);
+uint64_t uint64_log10(uint64_t, bool);
+
+size_t m128i_byte_scan_forward(__m128i a);
+
 
 int size_stable_cmp_dsc(const void *, const void *, void *);
 int size_stable_cmp_asc(const void *, const void *, void *);
@@ -595,27 +766,3 @@ int flt64_stable_cmp_asc_abs(const void *, const void *, void *);
 int flt64_stable_cmp_dsc_nan(const void *, const void *, void *);
 int flt64_stable_cmp_asc_nan(const void *, const void *, void *);
 int flt64_sign(double x);
-
-bool uint8_bit_test(uint8_t *, size_t);
-bool uint8_bit_test_set(uint8_t *, size_t);
-bool uint8_bit_test_reset(uint8_t *, size_t);
-void uint8_bit_set(uint8_t *, size_t);
-void uint8_bit_reset(uint8_t *, size_t);
-
-uint8_t uint8_bit_fetch_burst2(uint8_t *, size_t);
-uint8_t uint8_bit_fetch_set_burst2(uint8_t *, size_t, uint8_t);
-uint8_t uint8_bit_fetch_reset_burst2(uint8_t *, size_t, uint8_t);
-void uint8_bit_set_burst2(uint8_t *, size_t, uint8_t);
-void uint8_bit_reset_burst2(uint8_t *, size_t, uint8_t);
-
-bool uint8_bit_test_acquire(volatile void *, size_t);
-void uint8_atomic_bit_set_release(volatile void *, size_t);
-void uint8_atomic_bit_reset_release(volatile void *, size_t);
-bool uint8_atomic_bit_test_set(volatile void *, size_t);
-bool uint8_atomic_bit_test_reset(volatile void *, size_t);
-
-bool size_bit_test(size_t *, size_t);
-bool size_bit_test_set(size_t *, size_t);
-bool size_bit_test_reset(size_t *, size_t);
-void size_bit_set(size_t *, size_t);
-void size_bit_reset(size_t *, size_t);

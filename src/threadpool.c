@@ -14,7 +14,7 @@ void aggr_inc(volatile void *Mem, const void *arg, unsigned status)
     (void) arg;
     volatile struct inc_mem *mem = Mem;
     volatile size_t *ptr = (volatile size_t *[]) { &mem->fail, &mem->success, &mem->drop }[MIN(status, AGGR_DROP)];
-    atomic_inc(ptr);
+    atomic_fetch_inc_mo(ptr, ATOMIC_RELEASE);
 }
 
 unsigned cond_inc(volatile void *Mem, const void *Tot)
@@ -89,7 +89,7 @@ bool loop_mt(struct thread_pool *pool, task_callback callback, struct task_cond 
         else for (; k < cnt && (data->ind[j + k] = data->ind[j + k - cnt] + 1) == cntl[k]; data->ind[j + k] = 0, k++);
         for (k++; k < cnt; data->ind[j + k] = data->ind[j + k - cnt], k++);
     }
-    if (thread_pool_enqueue_yield(pool, loop_generator, &(struct loop_mt_generator_context) { .callback = callback, .cond = cond, .aggr = aggr, .cnt = cnt, .context = context, .data = data }, prod + 1, hi, log)) return 1;
+    if (thread_pool_enqueue(pool, loop_generator, &(struct loop_mt_generator_context) { .callback = callback, .cond = cond, .aggr = aggr, .cnt = cnt, .context = context, .data = data }, prod + 1, hi, log)) return 1;
     free(data);
     return 0;
 }
@@ -113,26 +113,16 @@ static bool thread_pool_enqueue_impl(struct thread_pool *pool, size_t cnt, struc
     for (size_t i = pool->task_cnt; i < probe; i++)
         atomic_store(&((struct dispatched_task *) persistent_array_fetch(&pool->dispatched_task, i, sizeof(struct dispatched_task)))->not_garbage, 0);
     if (pool->task_cnt < probe) pool->task_cnt = probe;
-    atomic_add(&pool->task_hint, cnt); // It is believed that this should not overflow
+    atomic_fetch_add(&pool->task_hint, cnt); // It is believed that this should not overflow
     return 1;
 }
 
-bool thread_pool_enqueue(struct thread_pool *pool, struct task *task, size_t cnt, bool hi, struct log *log)
+bool thread_pool_enqueue(struct thread_pool *pool, generator_callback generator, void *restrict arrco, size_t cnt, bool hi, struct log *log)
 {
     spinlock_acquire(&pool->spinlock);
     bool succ =
         thread_pool_enqueue_impl(pool, cnt, log) &&
-        array_assert(log, CODE_METRIC, queue_enqueue(&pool->queue, hi, task, cnt, sizeof(*task)));
-    spinlock_release(&pool->spinlock);
-    return succ;
-}
-
-bool thread_pool_enqueue_yield(struct thread_pool *pool, generator_callback generator, void *context, size_t cnt, bool hi, struct log *log)
-{
-    spinlock_acquire(&pool->spinlock);
-    bool succ =
-        thread_pool_enqueue_impl(pool, cnt, log) && 
-        array_assert(log, CODE_METRIC, queue_enqueue_yield(&pool->queue, hi, generator, context, cnt, sizeof(struct task)));
+        array_assert(log, CODE_METRIC, queue_enqueue(&pool->queue, hi, generator, arrco, cnt, sizeof(struct task)));
     spinlock_release(&pool->spinlock);
     return succ;
 }
@@ -158,7 +148,7 @@ struct thread_arg {
     uint8_t bits[UINT8_CNT(THREAD_BIT_CNT)];
 };
 
-static thread_return thread_callback_convention thread_proc(void *Arg)
+static thread_return thread_callback_conv thread_proc(void *Arg)
 {
     struct thread_arg *arg = Arg;
     struct thread_pool *pool = ((struct tls_base *) arg->tls)->pool;
@@ -178,17 +168,17 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
             if (!dispatched_task)
             {
                 mutex_acquire(&arg->mutex);
-                if (!uint8_bit_test_reset(arg->bits, THREAD_BIT_QUERY_WAKE))
+                if (!bit_test_reset(arg->bits, THREAD_BIT_QUERY_WAKE))
                 {
-                    uint8_bit_reset(arg->bits, THREAD_BIT_ACTIVE);
-                    if (uint8_bit_test(arg->bits, THREAD_BIT_QUERY_SHUTDOWN))
+                    bit_reset(arg->bits, THREAD_BIT_ACTIVE);
+                    if (bit_test(arg->bits, THREAD_BIT_QUERY_SHUTDOWN))
                     {
                         mutex_release(&arg->mutex);
                         return (thread_return) 0;
                     }
                     condition_sleep(&arg->condition, &arg->mutex);                    
                 }
-                uint8_bit_set(arg->bits, THREAD_BIT_ACTIVE);
+                bit_set(arg->bits, THREAD_BIT_ACTIVE);
                 mutex_release(&arg->mutex);
                 continue;
             }
@@ -213,7 +203,7 @@ static thread_return thread_callback_convention thread_proc(void *Arg)
         if (res != TASK_YIELD)
         {
             atomic_store(&dispatched_task->not_garbage, 0);
-            atomic_dec(&pool->task_hint); // This should be done strictly after setting of the garbage flag, not earlier!
+            atomic_fetch_dec(&pool->task_hint); // This should be done strictly after setting of the garbage flag, not earlier! 'ATOMIC_ACQ_REL' memory order is implied
         }
         condition_signal(&pool->condition);
         mutex_release(&pool->mutex);
@@ -243,7 +233,7 @@ void thread_pool_schedule(struct thread_pool *pool)
             case COND_DROP:
                 if (task->aggr.callback) task->aggr.callback(task->aggr.mem, task->aggr.arg, AGGR_DROP);
                 queue_dequeue(&pool->queue, off, sizeof(*task));
-                atomic_dec(&pool->task_hint);
+                atomic_fetch_dec(&pool->task_hint);
                 continue;
             case COND_EXECUTE:
                 dispatch = 1;
@@ -300,7 +290,7 @@ void thread_pool_schedule(struct thread_pool *pool)
                 struct thread_arg *arg = persistent_array_fetch(&pool->arg, ind, sizeof(struct thread_arg));
                 if (!atomic_cmp_xchg(&arg->dispatched_task, &(void *) { NULL }, dispatched_task)) continue;
                 mutex_acquire(&arg->mutex);
-                uint8_bit_set(arg->bits, THREAD_BIT_QUERY_WAKE);
+                bit_set(arg->bits, THREAD_BIT_QUERY_WAKE);
                 condition_signal(&arg->condition);
                 mutex_release(&arg->mutex);
                 break;
@@ -335,7 +325,7 @@ static bool thread_arg_init(struct thread_arg *arg, size_t tls_sz, struct log *l
             {
                 mutex_acquire(&arg->mutex);
                 memset(arg->bits, 0, sizeof(arg->bits));
-                uint8_bit_set(arg->bits, THREAD_BIT_ACTIVE);
+                bit_set(arg->bits, THREAD_BIT_ACTIVE);
                 mutex_release(&arg->mutex);
                 atomic_store(&arg->dispatched_task, NULL);
                 return 1;
@@ -399,7 +389,7 @@ static void thread_pool_finish_range(struct thread_pool *pool, size_t l, size_t 
     {
         struct thread_arg *arg = persistent_array_fetch(&pool->arg, i, sizeof(*arg));
         mutex_acquire(&arg->mutex);
-        uint8_bit_set(arg->bits, THREAD_BIT_QUERY_SHUTDOWN);
+        bit_set(arg->bits, THREAD_BIT_QUERY_SHUTDOWN);
         condition_signal(&arg->condition);
         mutex_release(&arg->mutex);
         thread_return res; // Always zero

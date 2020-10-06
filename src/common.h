@@ -6,6 +6,10 @@
 #include <stdint.h>
 #include <stddef.h>
 
+#define TEST_IMPL_0(X) 0 ## X
+#define TEST_IMPL_1(X) TEST_IMPL_0(X)
+#define TEST(X) TEST_IMPL_1(X(1))
+
 #define OR(A, B, ...) \
     IF_ ## A(IF_ ## B(__VA_ARGS__)) IF_ ## A(IFN_ ## B(__VA_ARGS__)) IFN_ ## A(IF_ ## B(__VA_ARGS__))
 #define OR2(A, B, ...) \
@@ -14,6 +18,14 @@
     IFN_ ## A(IFN_ ## B(__VA_ARGS__))
 #define NAND2(A, B, ...) \
     IFN_ ## A(IFN_ ## B(__VA_ARGS__))
+
+#ifdef VERBOSE
+#   define IF_VERBOSE(...) __VA_ARGS__
+#   define IFN_VERBOSE(...)
+#else
+#   define IF_VERBOSE(...)
+#   define IFN_VERBOSE(...) __VA_ARGS__
+#endif
 
 #ifdef __GNUC__
 #   define IF_GCC(...) __VA_ARGS__
@@ -24,6 +36,22 @@
 #elif _MSC_BUILD
 #   define IF_MSVC(...) __VA_ARGS__
 #   define IFN_MSVC(...)
+#endif
+
+#ifdef __MINGW32__
+#   define IF_MINGW(...) __VA_ARGS__
+#   define IFN_MINGW(...)
+#endif
+
+#ifdef  __unix__
+#   define IF_UNIX(...) __VA_ARGS__
+#   define IFN_UNIX(...)
+#elif __APPLE__
+#   define IF_APPLE(...) __VA_ARGS__
+#   define IFN_APPLE(...)
+#elif _WIN32
+#   define IF_WIN(...) __VA_ARGS__
+#   define IFN_WIN(...)
 #endif
 
 #ifndef IF_GCC
@@ -39,6 +67,26 @@
 #ifndef IF_MSVC
 #   define IF_MSVC(...)
 #   define IFN_MSVC(...) __VA_ARGS__
+#endif
+
+#ifndef IF_UNIX
+#   define IF_UNIX(...)
+#   define IFN_UNIX(...) __VA_ARGS__
+#endif
+
+#ifndef IF_APPLE
+#   define IF_APPLE(...)
+#   define IFN_APPLE(...) __VA_ARGS__
+#endif
+
+#ifndef IF_WIN
+#   define IF_WIN(...)
+#   define IFN_WIN(...) __VA_ARGS__
+#endif
+
+#ifndef IF_MINGW
+#   define IF_MINGW(...)
+#   define IFN_MINGW(...) __VA_ARGS__
 #endif
 
 #if defined __x86_64__ || defined _M_X64
@@ -65,6 +113,9 @@
 #define IFN_MSVC_X32(...) NAND(MSVC, X32, __VA_ARGS__)
 #define IF_GCC_LLVM_MSVC(...) OR2(GCC_LLVM, MSVC, __VA_ARGS__)
 #define IFN_GCC_LLVM_MSVC(...) NAND2(GCC_LLVM, MSVC, __VA_ARGS__)
+
+#define IF_UNIX_APPLE(...) OR(UNIX, APPLE, __VA_ARGS__)
+#define IFN_UNIX_APPLE(...) NAND(UNIX, APPLE, __VA_ARGS__)
 
 #define MAX(a, b) \
     ((a) >= (b) ? (a) : (b))

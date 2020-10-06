@@ -76,8 +76,7 @@ struct thread_pool;
 
 bool loop_mt(struct thread_pool *, task_callback, struct task_cond, struct task_aggr, void *, size_t *restrict, size_t, size_t *restrict, bool, struct log *);
 
-bool thread_pool_enqueue(struct thread_pool *, struct task *, size_t, bool, struct log *);
-bool thread_pool_enqueue_yield(struct thread_pool *, generator_callback, void *, size_t, bool, struct log *);
+bool thread_pool_enqueue(struct thread_pool *, generator_callback, void *restrict, size_t, bool, struct log *);
 void thread_pool_schedule(struct thread_pool *);
 struct thread_pool *thread_pool_create(size_t, size_t, size_t, struct log *);
 void *thread_pool_fetch_tls(struct thread_pool *, size_t);

@@ -61,14 +61,13 @@ struct queue {
     size_t cap, begin, cnt;
 };
 
-typedef void (*generator_callback)(void *, size_t, void *);
+typedef void (*generator_callback)(void *restrict, size_t, void *restrict);
 
 void queue_close(struct queue *);
 struct array_result queue_init(struct queue *, size_t, size_t);
 struct array_result queue_test(struct queue *, size_t, size_t);
 void *queue_fetch(struct queue *, size_t, size_t);
-struct array_result queue_enqueue(struct queue *restrict, bool, void *restrict, size_t, size_t);
-struct array_result queue_enqueue_yield(struct queue *restrict, bool, generator_callback, void *, size_t, size_t);
+struct array_result queue_enqueue(struct queue *restrict, bool, generator_callback, void *restrict, size_t, size_t);
 void queue_dequeue(struct queue *, size_t, size_t);
 
 // 'PERSISTENT_ARRAY_WEAK': elements still can be accessed by pointers in volatile contexts,

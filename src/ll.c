@@ -4,7 +4,7 @@
 #include <limits.h>
 #include <errno.h>
 
-#if _MSC_BUILD
+#if TEST(IF_MSVC)
 #   include <intrin.h>
 #endif
 
@@ -14,12 +14,18 @@
         return BACKEND(x); \
     }
 
-#define DECL_1_COPY(TYPE, PREFIX, SUFFIX, OP_TYPE) \
+#define DECL_1_EXT(TYPE, PREFIX, SUFFIX, OP_TYPE, WIDE, NARR) \
     TYPE PREFIX ## _ ## SUFFIX(TYPE x) \
     { \
-        _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
+        _Static_assert((WIDE) * sizeof(OP_TYPE) == (NARR) * sizeof(TYPE), ""); \
         return (TYPE) SUFFIX((OP_TYPE) x); \
     }
+
+#define DECL_1_COPY(TYPE, PREFIX, SUFFIX, OP_TYPE) \
+    DECL_1_EXT(TYPE, PREFIX, SUFFIX, OP_TYPE, 1, 1)
+
+#define DECL_1_NARR(TYPE, PREFIX, SUFFIX, OP_TYPE) \
+    DECL_1_EXT(TYPE, PREFIX, SUFFIX, OP_TYPE, 1, 2)
 
 // Define operations via GCC intrinsics such as '__builtin_add_overflow' or '__builtin_sub_overflow'
 #define DECL_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
@@ -57,7 +63,7 @@
         return (TYPE) SUFFIX(p_hi, (OP_TYPE) x, (OP_TYPE) y); \
     }
 
-#define DECL_MUL(TYPE, PREFIX, OP_TYPE) \
+#define DECL_MUL_NARR(TYPE, PREFIX, OP_TYPE) \
     TYPE PREFIX ## _mul(TYPE *p_hi, TYPE x, TYPE y) \
     { \
         _Static_assert(sizeof(OP_TYPE) == 2 * sizeof(TYPE), ""); \
@@ -90,7 +96,7 @@
         return hi + car; /* Never overflows! */ \
     }
 
-#define DECL_SHL(TYPE, PREFIX, OP_TYPE) \
+#define DECL_SHL_NARR(TYPE, PREFIX, OP_TYPE) \
     TYPE PREFIX ## _shl(TYPE *p_hi, TYPE x, unsigned char y) \
     { \
         _Static_assert(sizeof(OP_TYPE) == 2 * sizeof(TYPE), ""); \
@@ -99,7 +105,7 @@
         return (TYPE) (val); \
     }
 
-#define DECL_SHR(TYPE, PREFIX, OP_TYPE) \
+#define DECL_SHR_NARR(TYPE, PREFIX, OP_TYPE) \
     TYPE PREFIX ## _shr(TYPE *p_lo, TYPE x, unsigned char y) \
     { \
         _Static_assert(sizeof(OP_TYPE) == 2 * sizeof(TYPE), ""); \
@@ -116,7 +122,7 @@
         TYPE res; \
         __m128i x0 = _mm_set_epi64x(0ll, (long long) x); \
         _mm_storeu_si64(&res, SHL(x0, y %= bitsof(TYPE))); \
-        _mm_storeu_si64(p_hl, SHR(x0, bitsof(TYPE) - y)); \
+        _mm_storeu_si64(p_hl, SHR(x0, bitsof(TYPE) - y)); /* Warning! SSE shift operations yield correct result when y = 0! */ \
         return res; \
     }
 
@@ -252,6 +258,80 @@
         return (TYPE) pcnt((OP_TYPE) x) + (TYPE) pcnt((OP_TYPE) (x >> bitsof(OP_TYPE))); \
     }
 
+#define DECL_BIT_TEST(TYPE, PREFIX) \
+    bool PREFIX ## _bit_test(TYPE *arr, size_t bit) \
+    { \
+        return arr[bit / bitsof(TYPE)] & ((TYPE) 1 << bit % bitsof(TYPE)); \
+    }
+
+#define DECL_BIT_TEST_SET(TYPE, PREFIX) \
+    bool PREFIX ## _bit_test_set(TYPE *arr, size_t bit) \
+    { \
+        size_t div = bit / bitsof(TYPE); \
+        TYPE msk = (TYPE) 1 << bit % bitsof(TYPE); \
+        if (arr[div] & msk) return 1; \
+        arr[div] |= msk; \
+        return 0; \
+    }
+
+#define DECL_BIT_TEST_RESET(TYPE, PREFIX) \
+    bool PREFIX ## _bit_test_reset(TYPE *arr, size_t bit) \
+    { \
+        size_t div = bit / bitsof(TYPE); \
+        TYPE msk = (TYPE) 1 << bit % bitsof(TYPE); \
+        if (!(arr[div] & msk)) return 0; \
+        arr[div] &= ~msk; \
+        return 1; \
+    }
+
+#define DECL_BIT_SET(TYPE, PREFIX) \
+    void PREFIX ## _bit_set(TYPE *arr, size_t bit) \
+    { \
+        arr[bit / bitsof(TYPE)] |= (TYPE) 1 << bit % bitsof(TYPE); \
+    }
+
+#define DECL_BIT_RESET(TYPE, PREFIX) \
+    void PREFIX ## _bit_reset(TYPE *arr, size_t bit) \
+    { \
+        arr[bit / bitsof(TYPE)] &= ~((TYPE) 1 << bit % bitsof(TYPE)); \
+    }
+
+#define DECL_BIT_FETCH_BURST(TYPE, PREFIX) \
+    TYPE PREFIX ## _bit_fetch_burst(TYPE *arr, size_t pos, size_t stride) \
+    { \
+        return (arr[pos / (bitsof(TYPE) >> (stride - 1))] >> (pos % (bitsof(TYPE) >> (stride - 1)) << (stride - 1))) & (((TYPE) 1 << stride) - 1); \
+    }
+
+#define DECL_BIT_FETCH_SET_BURST(TYPE, PREFIX) \
+    TYPE PREFIX ## _bit_fetch_set_burst(TYPE *arr, size_t pos, size_t stride, TYPE msk) \
+    { \
+        size_t div = pos / (bitsof(TYPE) >> (stride - 1)), rem = pos % (bitsof(TYPE) >> (stride - 1)) << (stride - 1); \
+        TYPE res = (arr[div] >> rem) & msk; \
+        if (res != msk) arr[div] |= msk << rem; \
+        return res; \
+    }
+
+#define DECL_BIT_FETCH_RESET_BURST(TYPE, PREFIX) \
+    TYPE PREFIX ## _bit_fetch_reset_burst(TYPE *arr, size_t pos, size_t stride, TYPE msk) \
+    { \
+        size_t div = pos / (bitsof(TYPE) >> (stride - 1)), rem = pos % (bitsof(TYPE) >> (stride - 1)) << (stride - 1); \
+        TYPE res = (arr[div] >> rem) & msk; \
+        if (res) arr[div] &= ~(msk << rem); \
+        return res; \
+    }
+
+#define DECL_BIT_SET_BURST(TYPE, PREFIX) \
+    void PREFIX ## _bit_set_burst(TYPE *arr, size_t pos, size_t stride, TYPE msk) \
+    { \
+        arr[pos / (bitsof(TYPE) >> (stride - 1))] |= msk << (pos % (bitsof(TYPE) >> (stride - 1)) << (stride - 1)); \
+    }
+
+#define DECL_BIT_RESET_BURST(TYPE, PREFIX) \
+    void PREFIX ## _bit_reset_burst(TYPE *arr, size_t pos, size_t stride, TYPE msk) \
+    { \
+        arr[pos / (bitsof(TYPE) >> (stride - 1))] &= ~(msk << (pos % (bitsof(TYPE) >> (stride - 1)) << (stride - 1))); \
+    }
+
 #define DECL_ATOMIC_LOAD_GCC(TYPE, PREFIX) \
     TYPE PREFIX ## _atomic_load_mo(TYPE volatile *src, enum atomic_mo mo) \
     { \
@@ -334,7 +414,7 @@
         (void) weak; \
         (void) mo_succ; \
         (void) mo_fail; \
-        TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not join these lines! */ \
+        TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not join these two lines! */ \
         TYPE res = __sync_val_compare_and_swap(dst, cmp, xchg); \
         if (res == cmp) return 1; \
         *p_cmp = res; \
@@ -348,6 +428,7 @@
         return atomic_cmp_xchg_mo((OP_TYPE volatile *) dst, (OP_TYPE *) p_cmp, (OP_TYPE) xchg, weak, mo_succ, mo_fail); \
     }
 
+// See https://stackoverflow.com/questions/41572808/interlockedcompareexchange-optimization
 #define DECL_ATOMIC_CMP_XCHG_MSVC(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
     bool PREFIX ## _atomic_cmp_xchg_mo(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail) \
     { \
@@ -355,7 +436,7 @@
         (void) mo_succ; \
         (void) mo_fail; \
         _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
-        TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not join these lines! */ \
+        TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not join these two lines! */ \
         TYPE res = (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) xchg, (BACKEND_TYPE) cmp); \
         if (res == cmp) return 1; \
         *p_cmp = res; \
@@ -395,6 +476,38 @@
         return probe; \
     }
 
+#define DECL_ATOMIC_BIT_TEST(TYPE, PREFIX) \
+    bool PREFIX ## _atomic_bit_test(volatile void *arr, size_t bit, atomic_mo mo) \
+    { \
+        return atomic_load_mo((volatile TYPE *) arr + bit / bitsof(TYPE)) & ((TYPE) 1 << bit % bitsof(TYPE), mo); \
+    }
+
+#define DECL_ATOMIC_BIT_SET(TYPE, PREFIX) \
+    void PREFIX ## _atomic_bit_set_release(volatile void *arr, size_t bit, atomic_mo mo) \
+    { \
+        atomic_fetch_or_mo((volatile TYPE *) arr + bit / bitsof(TYPE), (TYPE) 1 << bit % bitsof(TYPE), mo); \
+    }
+
+#define DECL_ATOMIC_BIT_RESET(TYPE, PREFIX) \
+    void PREFIX ## _atomic_bit_reset_release(volatile void *arr, size_t bit, atomic_mo mo) \
+    { \
+        atomic_fetch_and_mo((volatile TYPE *) arr + bit / bitsof(TYPE), ~((TYPE) 1 << bit % bitsof(TYPE)), mo); \
+    }
+
+#define DECL_ATOMIC_BIT_TEST_SET(TYPE, PREFIX) \
+    bool PREFIX ## _atomic_bit_test_set(TYPE volatile arr, size_t bit, atomic_mo mo) \
+    { \
+        TYPE msk = (TYPE) 1 << bit % bitsof(TYPE), res = atomic_fetch_or_mo(arr + bit / bitsof(TYPE), msk, mo); \
+        return res & msk; \
+    }
+
+#define DECL_ATOMIC_BIT_TEST_RESET(TYPE, PREFIX) \
+    bool PREFIX ## _atomic_bit_test_reset(TYPE volatile *arr, size_t bit, atomic_mo mo) \
+    { \
+        TYPE msk = (TYPE) 1 << bit % bitsof(TYPE), res = atomic_fetch_and_mo(arr + bit / bitsof(TYPE), ~msk, mo); \
+        return res & msk; \
+    }
+
 #define DECL2(SUFFIX, ...) \
     DECL ## _ ## SUFFIX(unsigned char, uchar __VA_ARGS__) \
     DECL ## _ ## SUFFIX(unsigned short, ushrt __VA_ARGS__) \
@@ -411,7 +524,7 @@
 #define XY7(X, Y) XY6((X), (Y)), XY6((X) + (Y), (Y))
 #define XY8(X, Y) XY7((X), (Y)), XY7((X) + (Y), (Y))
 
-// Add
+// Add with input/output carry
 IF_GCC_LLVM(DECL_OP_GCC(unsigned char, uchar, add, __builtin_add_overflow))
 IF_MSVC(DECL_OP_INTEL(unsigned char, uchar, add, _addcarry_u8))
 IF_GCC_LLVM(DECL_OP_GCC(unsigned short, ushrt, add, __builtin_add_overflow))
@@ -422,7 +535,7 @@ IF_GCC_LLVM(IF_X64(DECL_OP_COPY(unsigned long, ulong, add, unsigned long long)))
 IF_GCC_LLVM_MSVC(IF_X32(DECL_OP_WIDE(unsigned long long, ullong, add, unsigned)))
 IF_GCC_LLVM_MSVC(IF_X64(DECL_OP_INTEL(unsigned long long, ullong, add, _addcarry_u64)))
 
-// Subtract
+// Subtract with input/output borrow
 IF_GCC_LLVM(DECL_OP_GCC(unsigned char, uchar, sub, __builtin_sub_overflow))
 IF_MSVC(DECL_OP_INTEL(unsigned char, uchar, sub, _subborrow_u8))
 IF_GCC_LLVM(DECL_OP_GCC(unsigned short, ushrt, sub, __builtin_sub_overflow))
@@ -434,17 +547,16 @@ IF_GCC_LLVM_MSVC(IF_X32(DECL_OP_WIDE(unsigned long long, ullong, sub, unsigned))
 IF_GCC_LLVM_MSVC(IF_X64(DECL_OP_INTEL(unsigned long long, ullong, sub, _subborrow_u64)))
 
 // Multiply
-IF_GCC_LLVM_MSVC(DECL_MUL(unsigned char, uchar, unsigned short))
-IF_GCC_LLVM_MSVC(DECL_MUL(unsigned short, ushrt, unsigned))
-IF_GCC_LLVM(DECL_MUL(unsigned, uint, unsigned long))
-IF_MSVC(DECL_MUL(unsigned, uint, unsigned long long))
-IF_GCC_LLVM(DECL_MUL(unsigned long, ulong, Uint128_t))
-IF_MSVC(DECL_MUL(unsigned long, ulong, unsigned long long))
+IF_GCC_LLVM_MSVC(DECL_MUL_NARR(unsigned char, uchar, unsigned short))
+IF_GCC_LLVM_MSVC(DECL_MUL_NARR(unsigned short, ushrt, unsigned))
+IF_GCC_LLVM(DECL_MUL_NARR(unsigned, uint, unsigned long))
+IF_MSVC(DECL_MUL_NARR(unsigned, uint, unsigned long long))
+IF_GCC_LLVM(DECL_MUL_NARR(unsigned long, ulong, Uint128_t))
+IF_MSVC(DECL_MUL_NARR(unsigned long, ulong, unsigned long long))
 IF_GCC_LLVM_MSVC(IF_X32(DECL_MUL_WIDE(unsigned long long, ullong, unsigned)))
-IF_GCC_LLVM(IF_X64(DECL_MUL(unsigned long long, ullong, Uint128_t)))
+IF_GCC_LLVM(IF_X64(DECL_MUL_NARR(unsigned long long, ullong, Uint128_t)))
 
-IF_MSVC(IF_X64(
-unsigned long long ullong_mul(unsigned long long *p_hi, unsigned long long x, unsigned long long y)
+IF_MSVC(IF_X64(unsigned long long ullong_mul(unsigned long long *p_hi, unsigned long long x, unsigned long long y)
 {
     return _umul128(x, y, p_hi);
 }))
@@ -453,34 +565,32 @@ unsigned long long ullong_mul(unsigned long long *p_hi, unsigned long long x, un
 DECL2(MA, )
 
 // Shift left
-IF_GCC_LLVM_MSVC(DECL_SHL(unsigned char, uchar, unsigned short))
-IF_GCC_LLVM_MSVC(DECL_SHL(unsigned short, ushrt, unsigned))
-IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHL(unsigned, uint, unsigned long long)))
-IF_GCC_LLVM(IF_X64(DECL_SHL(unsigned, uint, unsigned long)))
-IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHL(unsigned long, ulong, unsigned long long)))
-IF_GCC_LLVM(IF_X64(DECL_SHL(unsigned long, ulong, Uint128_t)))
+IF_GCC_LLVM_MSVC(DECL_SHL_NARR(unsigned char, uchar, unsigned short))
+IF_GCC_LLVM_MSVC(DECL_SHL_NARR(unsigned short, ushrt, unsigned))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHL_NARR(unsigned, uint, unsigned long long)))
+IF_GCC_LLVM(IF_X64(DECL_SHL_NARR(unsigned, uint, unsigned long)))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHL_NARR(unsigned long, ulong, unsigned long long)))
+IF_GCC_LLVM(IF_X64(DECL_SHL_NARR(unsigned long, ulong, Uint128_t)))
 IF_GCC_LLVM_MSVC(IF_X32(DECL_SH_SSE(unsigned long long, ullong, shl, _mm_slli_epi64, _mm_srli_epi64)))
-IF_GCC_LLVM(IF_X64(DECL_SHL(unsigned long long, ullong, Uint128_t)))
+IF_GCC_LLVM(IF_X64(DECL_SHL_NARR(unsigned long long, ullong, Uint128_t)))
 
-IF_MSVC(IF_X64(
-unsigned long long ullong_shl(unsigned long long *p_hi, unsigned long long x, unsigned char y)
+IF_MSVC(IF_X64(unsigned long long ullong_shl(unsigned long long *p_hi, unsigned long long x, unsigned char y)
 {
     *p_hi = __shiftleft128(x, 0, y); // Warning! 'y %= 64' is done internally!
     return x << y;
 }))
 
 // Shift right
-IF_GCC_LLVM_MSVC(DECL_SHR(unsigned char, uchar, unsigned short))
-IF_GCC_LLVM_MSVC(DECL_SHR(unsigned short, ushrt, unsigned))
-IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHR(unsigned, uint, unsigned long long)))
-IF_GCC_LLVM(IF_X64(DECL_SHR(unsigned, uint, unsigned long)))
-IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHR(unsigned long, ulong, unsigned long long)))
-IF_GCC_LLVM(IF_X64(DECL_SHR(unsigned long, ulong, Uint128_t)))
+IF_GCC_LLVM_MSVC(DECL_SHR_NARR(unsigned char, uchar, unsigned short))
+IF_GCC_LLVM_MSVC(DECL_SHR_NARR(unsigned short, ushrt, unsigned))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHR_NARR(unsigned, uint, unsigned long long)))
+IF_GCC_LLVM(IF_X64(DECL_SHR_NARR(unsigned, uint, unsigned long)))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHR_NARR(unsigned long, ulong, unsigned long long)))
+IF_GCC_LLVM(IF_X64(DECL_SHR_NARR(unsigned long, ulong, Uint128_t)))
 IF_GCC_LLVM_MSVC(IF_X32(DECL_SH_SSE(unsigned long long, ullong, shr, _mm_srli_epi64, _mm_slli_epi64)))
-IF_GCC_LLVM(IF_X64(DECL_SHR(unsigned long long, ullong, Uint128_t)))
+IF_GCC_LLVM(IF_X64(DECL_SHR_NARR(unsigned long long, ullong, Uint128_t)))
 
-IF_MSVC(IF_X64(
-unsigned long long ullong_shr(unsigned long long *p_lo, unsigned long long x, unsigned char y)
+IF_MSVC(IF_X64(unsigned long long ullong_shr(unsigned long long *p_lo, unsigned long long x, unsigned char y)
 {
     *p_lo = __shiftright128(0, x, y); // Warning! 'y %= 64' is done internally!
     return x >> y;
@@ -537,10 +647,10 @@ IF_MSVC(DECL2(TEST_MUL, ))
 // Non-destructive multiply-accumulate with overflow test
 DECL2(TEST_MA, )
 
-// Non-destructive sum with overflow test
+// Sum with overflow test
 DECL2(TEST_REP, , sum, 0, add)
 
-// Non-destructive product with overflow test
+// Product with overflow test
 DECL2(TEST_REP, , prod, 1, mul)
 
 // Bit scan reverse
@@ -551,7 +661,7 @@ unsigned char uchar_bsr(unsigned char x)
     return res[x];
 }
 
-IF_GCC_LLVM_MSVC(DECL_1_COPY(unsigned short, ushrt, bsr, unsigned))
+IF_GCC_LLVM_MSVC(DECL_1_NARR(unsigned short, ushrt, bsr, unsigned))
 IF_GCC_LLVM(DECL_BSR_GCC(unsigned, uint, __builtin_clz))
 IF_MSVC(DECL_1_COPY(unsigned, uint, bsr, unsigned long))
 IF_GCC_LLVM(DECL_BSR_GCC(unsigned long, ulong, __builtin_clzl))
@@ -566,7 +676,7 @@ unsigned char uchar_bsf(unsigned char x)
     return bsr((unsigned char) (x & (0 - x))); 
 }
 
-IF_GCC_LLVM_MSVC(DECL_1_COPY(unsigned short, ushrt, bsf, unsigned))
+IF_GCC_LLVM_MSVC(DECL_1_NARR(unsigned short, ushrt, bsf, unsigned))
 IF_GCC_LLVM(DECL_BSF_GCC(unsigned, uint, __builtin_ctz))
 IF_MSVC(DECL_1_COPY(unsigned, uint, bsf, unsigned long))
 IF_GCC_LLVM(DECL_BSF_GCC(unsigned long, ulong, __builtin_ctzl))
@@ -593,6 +703,36 @@ IF_GCC_LLVM(DECL_1(unsigned long long, ullong, pcnt, __builtin_popcountll))
 IF_MSVC(IF_X32(DECL_PCNT_WIDE(unsigned long long, ullong, unsigned)))
 IF_MSVC(IF_X64(DECL_1(unsigned long long, ullong, pcnt, __popcnt64)))
 
+// Bit test
+DECL2(BIT_TEST, )
+
+// Bit test and set
+DECL2(BIT_TEST_SET, )
+
+// Bit test and reset
+DECL2(BIT_TEST_RESET, )
+
+// Bit set
+DECL2(BIT_SET, )
+
+// Bit reset
+DECL2(BIT_RESET, )
+
+// Bit fetch burst
+DECL2(BIT_FETCH_BURST, )
+
+// Bit fetch and set burst
+DECL2(BIT_FETCH_SET_BURST, )
+
+// Bit fetch and reset burst
+DECL2(BIT_FETCH_RESET_BURST, )
+
+// Bit set burst
+DECL2(BIT_SET_BURST, )
+
+// Bit reset burst
+DECL2(BIT_RESET_BURST, )
+
 // Atomic load
 IF_GCC_LLVM(DECL_ATOMIC_LOAD_GCC(bool, bool))
 IF_MSVC(DECL_ATOMIC_LOAD_MSVC(bool, bool))
@@ -607,6 +747,8 @@ IF_MSVC(DECL_ATOMIC_LOAD_MSVC(unsigned long, ulong))
 IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_LOAD_SSE(unsigned long long, ullong)))
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_LOAD_GCC(unsigned long long, ullong)))
 IF_MSVC(IF_X64(DECL_ATOMIC_LOAD_MSVC(unsigned long long, ullong)))
+IF_GCC_LLVM(DECL_ATOMIC_LOAD_GCC(void *, ptr))
+IF_MSVC(DECL_ATOMIC_LOAD_MSVC(void *, ptr))
 
 // Atomic store
 IF_GCC_LLVM(DECL_ATOMIC_STORE_GCC(bool, bool))
@@ -622,6 +764,8 @@ IF_MSVC(DECL_ATOMIC_STORE_MSVC(unsigned long, ulong))
 IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_STORE_SSE(unsigned long long, ullong)))
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_STORE_GCC(unsigned long long, ullong)))
 IF_MSVC(IF_X64(DECL_ATOMIC_STORE_MSVC(unsigned long long, ullong)))
+IF_GCC_LLVM(DECL_ATOMIC_STORE_GCC(void *, ptr))
+IF_MSVC(DECL_ATOMIC_STORE_MSVC(void *, ptr))
 
 // Atomic compare and swap
 IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(unsigned char, uchar))
@@ -640,8 +784,7 @@ IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(void *, ptr, void *, _InterlockedCompareExchan
 IF_GCC(IF_X64(DECL_ATOMIC_CMP_XCHG_SYNC(Uint128_t, Uint128)))
 IF_LLVM(IF_X64(DECL_ATOMIC_CMP_XCHG_GCC(Uint128_t, Uint128)))
 
-IF_MSVC(IF_X64(
-bool Uint128_atomic_cmp_xchg_mo(volatile Uint128_t *dst, Uint128_t *p_cmp, Uint128_t xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail)
+IF_MSVC(IF_X64(bool Uint128_atomic_cmp_xchg_mo(volatile Uint128_t *dst, Uint128_t *p_cmp, Uint128_t xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail)
 {
     (void) weak;
     (void) mo_succ;
@@ -659,11 +802,11 @@ IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_and, __atomic_fetch_and))
 IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_and, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_and, __atomic_fetch_and))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_and, long, _InterlockedAnd))
-IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_and, , &)))
+IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_and, , &)))
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_and, __atomic_fetch_and)))
-IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_and, long long, _InterlockedAnd64)))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_and, long long, _InterlockedAnd64))
 
-// Atomic fetch OR
+// Atomic fetch-OR
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_or, __atomic_fetch_or))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, fetch_or, char, _InterlockedOr8))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_or, __atomic_fetch_or))
@@ -672,11 +815,24 @@ IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_or, __atomic_fetch_or))
 IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_or, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_or, __atomic_fetch_or))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_or, long, _InterlockedOr))
-IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_or, , |)))
+IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_or, , |)))
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_or, __atomic_fetch_or)))
-IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_or, long long, _InterlockedOr64)))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_or, long long, _InterlockedOr64))
 
-// Atomic fetch add
+// Atomic fetch-XOR
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_xor, __atomic_fetch_xor))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, fetch_xor, char, _InterlockedXor8))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_xor, __atomic_fetch_xor))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, fetch_xor, short, _InterlockedXor16))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_xor, __atomic_fetch_xor))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_xor, unsigned long))
+IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_xor, __atomic_fetch_xor))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_xor, long, _InterlockedXor))
+IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_xor, , ^)))
+IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_xor, __atomic_fetch_xor)))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_xor, long long, _InterlockedXor64))
+
+// Atomic fetch-add
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_add, __atomic_fetch_add))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, fetch_add, char, _InterlockedExchangeAdd8))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_add, __atomic_fetch_add))
@@ -685,11 +841,11 @@ IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_add, __atomic_fetch_add))
 IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_add, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_add, __atomic_fetch_add))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_add, long, _InterlockedExchangeAdd))
-IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_add, , +)))
+IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_add, , +)))
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_add, __atomic_fetch_add)))
-IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_add, long long, _InterlockedExchangeAdd64)))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_add, long long, _InterlockedExchangeAdd64))
 
-// Atomic fetch subtract
+// Atomic fetch-subtract
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_sub, __atomic_fetch_sub))
 IF_MSVC(DECL_ATOMIC_FETCH_SUB_MSVC(unsigned char, uchar))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_sub, __atomic_fetch_sub))
@@ -698,9 +854,9 @@ IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_sub, __atomic_fetch_sub))
 IF_MSVC(DECL_ATOMIC_FETCH_SUB_MSVC(unsigned, uint))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_sub, __atomic_fetch_sub))
 IF_MSVC(DECL_ATOMIC_FETCH_SUB_MSVC(unsigned long, ulong))
-IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_sub, , -)))
+IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_sub, , -)))
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_sub, __atomic_fetch_sub)))
-IF_MSVC(IF_X64(DECL_ATOMIC_FETCH_SUB_MSVC(unsigned long long, ullong)))
+IF_MSVC(DECL_ATOMIC_FETCH_SUB_MSVC(unsigned long long, ullong))
 
 // Atomic exchange
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, xchg, __atomic_exchange_n))
@@ -711,9 +867,9 @@ IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, xchg, __atomic_exchange_n))
 IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, xchg, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, xchg, __atomic_exchange_n))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, xchg, long, _InterlockedExchange))
-IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, xchg, , , )))
+IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, xchg, , , )))
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, xchg, __atomic_exchange_n)))
-IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, xchg, long long, _InterlockedExchange64)))
+IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, xchg, long long, _InterlockedExchange64))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(void *, ptr, xchg, __atomic_exchange_n))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(void *, ptr, xchg, void *, _InterlockedExchangePointer))
 
@@ -724,9 +880,9 @@ DECL2(ATOMIC_FETCH_ADD_SAT, )
 DECL2(ATOMIC_FETCH_SUB_SAT, )
 
 // Hash functions
-unsigned uint_hash(unsigned x)
+unsigned uint_uhash(unsigned x)
 {
-    _Static_assert(sizeof(x) == sizeof(uint32_t), "");
+    _Static_assert(umax(x) == UINT32_MAX, "");
     // Copy-pasted from https://github.com/skeeto/hash-prospector
     x ^= x >> 16;
     x *= 0x7feb352du;
@@ -736,12 +892,12 @@ unsigned uint_hash(unsigned x)
     return x;
 }
 
-IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_1_COPY(unsigned long, ulong, hash, unsigned)))
-IF_GCC_LLVM(IF_X64(DECL_1_COPY(unsigned long, ulong, hash, unsigned long long)))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_1_COPY(unsigned long, ulong, uhash, unsigned)))
+IF_GCC_LLVM(IF_X64(DECL_1_COPY(unsigned long, ulong, uhash, unsigned long long)))
 
-unsigned long long ullong_hash(unsigned long long x)
+unsigned long long ullong_uhash(unsigned long long x)
 {
-    _Static_assert(sizeof(x) == sizeof(uint64_t), "");
+    _Static_assert(umax(x) == UINT64_MAX, "");
     // Copy-pasted from https://stackoverflow.com/questions/664014/what-integer-hash-function-are-good-that-accepts-an-integer-hash-key
     x ^= x >> 30;
     x *= 0xbf58476d1ce4e5b9ull;
@@ -751,9 +907,9 @@ unsigned long long ullong_hash(unsigned long long x)
     return x;
 }
 
-unsigned uint_hash_inv(unsigned x)
+unsigned uint_uhash_inv(unsigned x)
 {
-    _Static_assert(sizeof(x) == sizeof(uint32_t), "");
+    _Static_assert(umax(x) == UINT32_MAX, "");
     x ^= x >> 16;
     x *= 0x43021123u;
     x ^= x >> 15 ^ x >> 30;
@@ -762,12 +918,12 @@ unsigned uint_hash_inv(unsigned x)
     return x;
 }
 
-IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_1_COPY(unsigned long, ulong, hash_inv, unsigned)))
-IF_GCC_LLVM(IF_X64(DECL_1_COPY(unsigned long, ulong, hash_inv, unsigned long long)))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_1_COPY(unsigned long, ulong, uhash_inv, unsigned)))
+IF_GCC_LLVM(IF_X64(DECL_1_COPY(unsigned long, ulong, uhash_inv, unsigned long long)))
 
-unsigned long long ullong_hash_inv(unsigned long long x)
+unsigned long long ullong_uhash_inv(unsigned long long x)
 {
-    _Static_assert(sizeof(x) == sizeof(uint64_t), "");
+    _Static_assert(umax(x) == UINT64_MAX, "");
     x ^= x >> 31 ^ x >> 62;
     x *= 0x319642b2d24d8ec3ull;
     x ^= x >> 27 ^ x >> 54;
@@ -831,12 +987,14 @@ size_t m128i_byte_scan_forward(__m128i a)
     return res;
 }
 
+// Spinlock
 void spinlock_acquire(spinlock *spinlock)
 {
     while (!atomic_cmp_xchg_mo(spinlock, &(spinlock_base) { 0 }, 1, 1, ATOMIC_ACQUIRE, ATOMIC_RELAXED)) // Weak CAS is sufficient 
         while (atomic_load_mo(spinlock, ATOMIC_ACQUIRE)) _mm_pause();
 }
 
+// Double lock
 GPUSH GWRN(implicit-fallthrough)
 void *double_lock_execute(spinlock *spinlock, double_lock_callback init, double_lock_callback comm, void *init_args, void *comm_args)
 {
@@ -928,134 +1086,3 @@ int flt64_sign(double x)
     return res & 1 ? 0 : res - 1;
 }
 
-#define DECL_BIT_TEST(TYPE, PREFIX) \
-    bool PREFIX ## _bit_test(TYPE *arr, size_t bit) \
-    { \
-        return arr[bit / bitsof(TYPE)] & ((TYPE) 1 << bit % bitsof(TYPE)); \
-    }
-
-#define DECL_BIT_TEST_ACQUIRE(TYPE, PREFIX) \
-    bool PREFIX ## _bit_test_acquire(volatile void *arr, size_t bit) \
-    { \
-        return atomic_load_mo((volatile TYPE *) arr + bit / bitsof(TYPE)) & ((TYPE) 1 << bit % bitsof(TYPE), ATOMIC_ACQUIRE); \
-    }
-
-#define DECL_BIT_TEST_SET(TYPE, PREFIX) \
-    bool PREFIX ## _bit_test_set(TYPE *arr, size_t bit) \
-    { \
-        size_t div = bit / bitsof(TYPE); \
-        TYPE msk = (TYPE) 1 << bit % bitsof(TYPE); \
-        if (arr[div] & msk) return 1; \
-        arr[div] |= msk; \
-        return 0; \
-    }
-
-#define DECL_ATOMIC_BIT_TEST_SET(TYPE, PREFIX) \
-    bool PREFIX ## _atomic_bit_test_set(volatile void *arr, size_t bit) \
-    { \
-        TYPE msk = (TYPE) 1 << bit % bitsof(TYPE), res = atomic_or((volatile TYPE *) arr + bit / bitsof(TYPE), msk); \
-        return res & msk; \
-    }
-
-#define DECL_BIT_TEST_RESET(TYPE, PREFIX) \
-    bool PREFIX ## _bit_test_reset(TYPE *arr, size_t bit) \
-    { \
-        size_t div = bit / bitsof(TYPE); \
-        TYPE msk = (TYPE) 1 << bit % bitsof(TYPE); \
-        if (!(arr[div] & msk)) return 0; \
-        arr[div] &= ~msk; \
-        return 1; \
-    }
-
-#define DECL_ATOMIC_BIT_TEST_RESET(TYPE, PREFIX) \
-    bool PREFIX ## _atomic_bit_test_reset(volatile void *arr, size_t bit) \
-    { \
-        TYPE msk = (TYPE) 1 << bit % bitsof(TYPE), res = atomic_and((volatile TYPE *) arr + bit / bitsof(TYPE), ~msk); \
-        return res & msk; \
-    }
-
-#define DECL_BIT_SET(TYPE, PREFIX) \
-    void PREFIX ## _bit_set(TYPE *arr, size_t bit) \
-    { \
-        arr[bit / bitsof(TYPE)] |= (TYPE) 1 << bit % bitsof(TYPE); \
-    }
-
-#define DECL_ATOMIC_BIT_SET_RELEASE(TYPE, PREFIX) \
-    void PREFIX ## _atomic_bit_set_release(volatile void *arr, size_t bit) \
-    { \
-        atomic_fetch_or_mo((volatile TYPE *) arr + bit / bitsof(TYPE), (TYPE) 1 << bit % bitsof(TYPE), ATOMIC_RELEASE); \
-    }
-
-#define DECL_BIT_RESET(TYPE, PREFIX) \
-    void PREFIX ## _bit_reset(TYPE *arr, size_t bit) \
-    { \
-        arr[bit / bitsof(TYPE)] &= ~((TYPE) 1 << bit % bitsof(TYPE)); \
-    }
-
-#define DECL_ATOMIC_BIT_RESET_RELEASE(TYPE, PREFIX) \
-    void PREFIX ## _atomic_bit_reset_release(volatile void *arr, size_t bit) \
-    { \
-        atomic_fetch_and_mo((volatile TYPE *) arr + bit / bitsof(TYPE), ~((TYPE) 1 << bit % bitsof(TYPE)), ATOMIC_RELEASE); \
-    }
-
-#define DECL_BIT_FETCH_BURST(TYPE, PREFIX, STRIDE) \
-    TYPE PREFIX ## _bit_fetch_burst ## STRIDE(TYPE *arr, size_t pos) \
-    { \
-        return (arr[pos / (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1))] >> (pos % (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1)) << ((STRIDE) - 1))) & (((TYPE) 1 << (STRIDE)) - 1); \
-    }
-
-#define DECL_BIT_FETCH_SET_BURST(TYPE, PREFIX, STRIDE) \
-    TYPE PREFIX ## _bit_fetch_set_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
-    { \
-        size_t div = pos / (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1)), rem = pos % (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1)) << ((STRIDE) - 1); \
-        TYPE res = (arr[div] >> rem) & msk; \
-        if (res != msk) arr[div] |= msk << rem; \
-        return res; \
-    }
-
-#define DECL_BIT_FETCH_RESET_BURST(TYPE, PREFIX, STRIDE) \
-    TYPE PREFIX ## _bit_fetch_reset_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
-    { \
-        size_t div = pos / (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1)), rem = pos % (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1)) << ((STRIDE) - 1); \
-        TYPE res = (arr[div] >> rem) & msk; \
-        if (res) arr[div] &= ~(msk << rem); \
-        return res; \
-    }
-
-#define DECL_BIT_SET_BURST(TYPE, PREFIX, STRIDE) \
-    void PREFIX ## _bit_set_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
-    { \
-        arr[pos / (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1))] |= msk << (pos % (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1)) << ((STRIDE) - 1)); \
-    }
-
-#define DECL_BIT_RESET_BURST(TYPE, PREFIX, STRIDE) \
-    void PREFIX ## _bit_reset_burst ## STRIDE(TYPE *arr, size_t pos, TYPE msk) \
-    { \
-        arr[pos / (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1))] &= ~(msk << (pos % (CHAR_BIT * sizeof(TYPE) >> ((STRIDE) - 1)) << ((STRIDE) - 1))); \
-    }
-
-DECL_BIT_TEST(uint8_t, uint8)
-DECL_BIT_TEST_SET(uint8_t, uint8)
-DECL_BIT_TEST_RESET(uint8_t, uint8)
-DECL_BIT_SET(uint8_t, uint8)
-DECL_BIT_RESET(uint8_t, uint8)
-
-DECL_BIT_FETCH_BURST(uint8_t, uint8, 2)
-DECL_BIT_FETCH_SET_BURST(uint8_t, uint8, 2)
-DECL_BIT_FETCH_RESET_BURST(uint8_t, uint8, 2)
-DECL_BIT_SET_BURST(uint8_t, uint8, 2)
-DECL_BIT_RESET_BURST(uint8_t, uint8, 2)
-
-/*
-DECL_BIT_TEST_ACQUIRE(uint8_t, uint8)
-DECL_ATOMIC_BIT_SET_RELEASE(uint8_t, uint8)
-DECL_ATOMIC_BIT_RESET_RELEASE(uint8_t, uint8)
-DECL_ATOMIC_BIT_TEST_SET(uint8_t, uint8)
-DECL_ATOMIC_BIT_TEST_RESET(uint8_t, uint8)
-*/
-
-DECL_BIT_TEST(size_t, size)
-DECL_BIT_TEST_SET(size_t, size)
-DECL_BIT_TEST_RESET(size_t, size)
-DECL_BIT_SET(size_t, size)
-DECL_BIT_RESET(size_t, size)

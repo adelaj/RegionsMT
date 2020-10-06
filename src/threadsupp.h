@@ -12,46 +12,36 @@
 #include <stdbool.h>
 #include <stdint.h>
 
+#include "common.h"
 #include "np.h"
 #include "log.h"
 
-#if defined _WIN32 && !defined FORCE_POSIX_THREADS
+#if defined FORCE_PTHREAD || TEST(IF_UNIX_APPLE)
+#   define IF_PTHREAD(...) __VA_ARGS__
+#   define IFN_PTHREAD(...)
+#else
+#   define IF_PTHREAD(...)
+#   define IFN_PTHREAD(...) __VA_ARGS__
+#endif
 
-#define thread_callback_convention __stdcall
-typedef unsigned thread_return;
-typedef thread_return(thread_callback_convention *thread_callback)(void *);
+#define thread_callback_conv IF_WIN(__stdcall)
 
-#   ifdef VERBOSE
+typedef IF_PTHREAD(void *) IFN_PTHREAD(unsigned) thread_return;
+typedef thread_return (thread_callback_conv *thread_callback)(void *);
+
+#if TEST(IF_VERBOSE)
+#   if TEST(IF_PTHREAD)
+#       include <pthread.h>
+#   else
 #       include <windows.h>
 #       include <process.h>
-struct thread { uintptr_t thread; };
-struct mutex { CRITICAL_SECTION mutex; };
-struct condition { CONDITION_VARIABLE condition; };
-struct tls { DWORD tls; };
 #   endif
-
-#elif defined __unix__ || defined __APPLE__ || (defined _WIN32 && defined FORCE_POSIX_THREADS)
-
-#define thread_callback_convention
-typedef void *thread_return;
-typedef thread_return (thread_callback_convention *thread_callback)(void *);
-
-#   ifdef VERBOSE
-#       include <pthread.h>
-struct thread { pthread_t  thread; };
-struct mutex { pthread_mutex_t mutex; };
-struct condition { pthread_cond_t condition; };
-struct tls { pthread_key_t tls; };
-#   endif
-
 #endif
 
-#ifndef VERBOSE
-struct thread;
-struct mutex;
-struct condition;
-struct tls;
-#endif
+struct thread IF_VERBOSE({ IF_PTHREAD(pthread_t) IFN_PTHREAD(uintptr_t) thread; });
+struct mutex IF_VERBOSE({ IF_PTHREAD(pthread_mutex_t) IFN_PTHREAD(CRITICAL_SECTION) mutex; });
+struct condition IF_VERBOSE({ IF_PTHREAD(pthread_cond_t) IFN_PTHREAD(CONDITION_VARIABLE) condition; });
+struct tls IF_VERBOSE({ IF_PTHREAD(pthread_key_t) IFN_PTHREAD(DWORD) tls; });
 
 // To print an error status of the listed functions, except of 'thread_init', 'thread_assert' should be used
 bool thread_assert(struct log *, struct code_metric, Errno_t);
