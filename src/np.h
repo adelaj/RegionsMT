@@ -19,8 +19,6 @@
 #   define _FILE_OFFSET_BITS 64
 
 #   include <alloca.h>
-#   define Alloca(SIZE) (alloca((SIZE)))
-
 #   include <errno.h>
 
 #elif TEST(IF_WIN)
