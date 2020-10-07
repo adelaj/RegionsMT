@@ -1,6 +1,6 @@
 tcv = $(addprefix -,$(call __tcv,$(subst -, ,$1)))
 __tcv = $(if $(filter-out 1,$(words $1)),$(lastword $1))
-tcn = $(firstword $(subst @, ,$1))$(call tcv,$1)
+tcn = $(firstword $(subst @,$(call tcv,$1) ,$1))
 ftrin = $(call striplast,$(call __ftrin,$1,$2))
 __ftrin = $(if $2,$(if $(findstring $1,$(firstword $2)),$(firstword $2)) $(call __ftrin,$1,$(call nofirstword,$2)))
 nftrin = $(call striplast,$(call __nftrin,$1,$2))
