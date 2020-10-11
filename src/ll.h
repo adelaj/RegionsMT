@@ -44,10 +44,16 @@ _Static_assert(sizeof(Dsize_t) == 2 * sizeof(size_t), "");
     IF_X32(((size_t) ((X) >> SIZE_BIT)))
 
 // Rounding down/up to the nearest power of 2 for the inline usage 
-#define RP2_SUPP(X, Y) ((X) | ((X) >> (Y)))
-#define RP2_64(X) RP2_SUPP(RP2_SUPP(RP2_SUPP(RP2_SUPP(RP2_SUPP(RP2_SUPP(0ull | (X), 1), 2), 4), 8), 16), 32)
-#define RDP2(X) ((X) && ((X) & ((X) - 1)) ? (RP2_64(X) >> 1) + 1 : (X))
-#define RUP2(X) ((X) && ((X) & ((X) - 1)) ? RP2_64(X) + 1 : (X))
+#define RP2_1(X, Y) ((X) | ((X) >> (Y)))
+#define RP2_64(X) RP2_1(RP2_1(RP2_1(RP2_1(RP2_1(RP2_1(0ull | (X), 1), 2), 4), 8), 16), 32)
+#define RP2(X, CEIL) ((X) && ((X) & ((X) - 1)) ? (CEIL) ? RP2_64(X) + 1 : (RP2_64(X) >> 1) + 1 : (X))
+
+// Base 10 integer logarithm for inline usage
+#define LOG10_1(X, C, Z) ((X) C 1 ## Z ## u)
+#define LOG10_5(X, C, Z) (LOG10_1(X, C, Z) + LOG10_1(X, C, Z ## 0) + LOG10_1(X, C, Z ## 00) + LOG10_1(X, C, Z ## 000) + LOG10_1(X, C, Z ## 0000))
+#define LOG10_10(X, C, Z) (LOG10_5(X, C, Z) + LOG10_5(X, C, Z ## 00000))
+#define LOG10_20(X, C, Z) (LOG10_10(X, C, Z) + LOG10_10(X, C, Z ## 0000000000))
+#define LOG10(X, CEIL) (((CEIL) ? (((X) > 0) + LOG10_20((X), >, )) : (LOG10_20((X), >=, ))) - 1)
 
 #define TYPE_CNT(BIT, TOT) ((BIT) / (TOT) + !!((BIT) % (TOT))) // Not always equals to ((BIT) + (TOT) - 1) / (TOT)
 #define NIBBLE_CNT(NIBBLE) TYPE_CNT(NIBBLE, bitsof(uint8_t) >> 1)
@@ -703,13 +709,11 @@ unsigned long long ullong_atomic_fetch_sub_sat_mo(volatile unsigned long long *,
 // Spinlock
 typedef unsigned spinlock_base;
 typedef volatile spinlock_base spinlock;
-
 void spinlock_acquire(spinlock *);
 #define spinlock_release(SPINLOCK) atomic_store((SPINLOCK), 0); 
 
 // Double lock
 typedef void *(*double_lock_callback)(void *);
-
 void *double_lock_execute(spinlock *, double_lock_callback, double_lock_callback, void *, void *);
 
 // Atomic increment/decrement
@@ -742,15 +746,22 @@ unsigned long long ullong_uhash_inv(unsigned long long);
     unsigned long: ulong_uhash_inv, \
     unsigned long long: ullong_uhash_inv)(X))
 
-
-
-
 // Base 2 integer logarithm
 #define ulog2(X, CEIL) (bsr(X) + ((CEIL) && (X) && ((X) & ((X) - 1))))
 
 // Base 10 integer logarithm
-uint32_t uint32_log10(uint32_t, bool);
-uint64_t uint64_log10(uint64_t, bool);
+unsigned char uchar_ulog10(unsigned char, bool);
+unsigned short ushrt_ulog10(unsigned short, bool);
+unsigned uint_ulog10(unsigned, bool);
+unsigned long ulong_ulog10(unsigned long, bool);
+unsigned long long ullong_ulog10(unsigned long long, bool);
+
+#define ulog10(X, C) (_Generic((X), \
+    unsigned char: uchar_ulog10, \
+    unsigned short: ushrt_ulog10, \
+    unsigned: uint_ulog10, \
+    unsigned long: ulong_ulog10, \
+    unsigned long long: ullong_ulog10)((X), (C)))
 
 size_t m128i_byte_scan_forward(__m128i a);
 

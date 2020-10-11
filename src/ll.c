@@ -27,6 +27,13 @@
 #define DECL_1_NARR(TYPE, PREFIX, SUFFIX, OP_TYPE) \
     DECL_1_EXT(TYPE, PREFIX, SUFFIX, OP_TYPE, 1, 2)
 
+#define DECL_2_COPY(TYPE, ARG_TYPE, PREFIX, SUFFIX, OP_TYPE) \
+    TYPE PREFIX ## _ ## SUFFIX(TYPE x, ARG_TYPE y) \
+    { \
+        _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
+        return (TYPE) SUFFIX((OP_TYPE) x, y); \
+    }
+
 // Define operations via GCC intrinsics such as '__builtin_add_overflow' or '__builtin_sub_overflow'
 #define DECL_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
     TYPE PREFIX ## _ ## SUFFIX(unsigned char *p_hi, TYPE x, TYPE y) \
@@ -136,13 +143,6 @@
     TYPE PREFIX ## _ ## SUFFIX(TYPE x, unsigned char y) \
     { \
         return BACKEND(x, y); \
-    }
-
-#define DECL_RO_COPY(TYPE, PREFIX, SUFFIX, OP_TYPE) \
-    TYPE PREFIX ## _ ## SUFFIX(TYPE x, unsigned char y) \
-    { \
-        _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
-        return (TYPE) SUFFIX((OP_TYPE) x, y); \
     }
 
 #define DECL_ADD_SAT(TYPE, PREFIX) \
@@ -604,7 +604,7 @@ IF_MSVC(DECL_RO_MSVC(unsigned short, ushrt, rol, _rotl16))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned, uint, rol, <<, >>))
 IF_MSVC(DECL_RO_MSVC(unsigned, uint, rol, _rotl))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned long, ulong, rol, <<, >>))
-IF_MSVC(DECL_RO_COPY(unsigned long, ulong, rol, unsigned))
+IF_MSVC(DECL_2_COPY(unsigned long, unsigned char, ulong, rol, unsigned))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned long long, ullong, rol, <<, >>))
 IF_MSVC(DECL_RO_MSVC(unsigned long long, ullong, rol, _rotl64))
 
@@ -616,7 +616,7 @@ IF_MSVC(DECL_RO_MSVC(unsigned short, ushrt, ror, _rotr16))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned, uint, ror, >>, <<))
 IF_MSVC(DECL_RO_MSVC(unsigned, uint, ror, _rotr))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned long, ulong, ror, >>, <<))
-IF_MSVC(DECL_RO_COPY(unsigned long, ulong, ror, unsigned))
+IF_MSVC(DECL_2_COPY(unsigned long, unsigned char, ulong, ror, unsigned))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned long long, ullong, ror, >>, <<))
 IF_MSVC(DECL_RO_MSVC(unsigned long long, ullong, ror, _rotr64))
 
@@ -666,8 +666,8 @@ IF_GCC_LLVM(DECL_BSR_GCC(unsigned, uint, __builtin_clz))
 IF_MSVC(DECL_1_COPY(unsigned, uint, bsr, unsigned long))
 IF_GCC_LLVM(DECL_BSR_GCC(unsigned long, ulong, __builtin_clzl))
 IF_MSVC(DECL_BS_MSVC(unsigned long, ulong, reverse, _BitScanReverse))
-IF_GCC_LLVM(DECL_BSR_GCC(unsigned long long, ullong, __builtin_clzll))
-IF_MSVC(IF_X32(DECL_BSR_WIDE(unsigned long long, ullong, unsigned)))
+IF_GCC_LLVM(IF_X64(DECL_BSR_GCC(unsigned long long, ullong, __builtin_clzll)))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_BSR_WIDE(unsigned long long, ullong, unsigned)))
 IF_MSVC(IF_X64(DECL_BS_MSVC(unsigned long long, ullong, reverse, _BitScanReverse64)))
 
 // Bit scan forward
@@ -681,8 +681,8 @@ IF_GCC_LLVM(DECL_BSF_GCC(unsigned, uint, __builtin_ctz))
 IF_MSVC(DECL_1_COPY(unsigned, uint, bsf, unsigned long))
 IF_GCC_LLVM(DECL_BSF_GCC(unsigned long, ulong, __builtin_ctzl))
 IF_MSVC(DECL_BS_MSVC(unsigned long, ulong, forward, _BitScanForward))
-IF_GCC_LLVM(DECL_BSF_GCC(unsigned long long, ullong, __builtin_ctzll))
-IF_MSVC(IF_X32(DECL_BSF_WIDE(unsigned long long, ullong, unsigned)))
+IF_GCC_LLVM(IF_X64(DECL_BSF_GCC(unsigned long long, ullong, __builtin_ctzll)))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_BSF_WIDE(unsigned long long, ullong, unsigned)))
 IF_MSVC(IF_X64(DECL_BS_MSVC(unsigned long long, ullong, forward, _BitScanForward64)))
 
 // Population count
@@ -879,6 +879,36 @@ DECL2(ATOMIC_FETCH_ADD_SAT, )
 // Atomic fetch-add subtract
 DECL2(ATOMIC_FETCH_SUB_SAT, )
 
+// Spinlock
+void spinlock_acquire(spinlock *spinlock)
+{
+    while (!atomic_cmp_xchg_mo(spinlock, &(spinlock_base) { 0 }, 1, 1, ATOMIC_ACQUIRE, ATOMIC_RELAXED)) // Weak CAS is sufficient 
+        while (atomic_load_mo(spinlock, ATOMIC_ACQUIRE)) _mm_pause();
+}
+
+// Double lock
+GPUSH GWRN(implicit-fallthrough)
+void *double_lock_execute(spinlock *spinlock, double_lock_callback init, double_lock_callback comm, void *init_args, void *comm_args)
+{
+    void *res = NULL;
+    switch (atomic_load(spinlock))
+    {
+    case 0:
+        if (atomic_cmp_xchg_mo(spinlock, &(spinlock_base) { 0 }, 1, 0, ATOMIC_ACQUIRE, ATOMIC_RELAXED)) // Strong CAS required here!
+        {
+            if (init) res = init(init_args);
+            atomic_store(spinlock, 2);
+            break;
+        }
+    case 1: 
+        while (atomic_load(spinlock) != 2) _mm_pause();
+    case 2:
+        if (comm) res = comm(comm_args);
+    }
+    return res;
+}
+GPOP
+
 // Hash functions
 unsigned uint_uhash(unsigned x)
 {
@@ -932,41 +962,50 @@ unsigned long long ullong_uhash_inv(unsigned long long x)
     return x;
 }
 
-////
+// Base 10 integer logarithm (based on expanded binary search)
+#define EXP10(T, N) ((T) 1e ## N)
+#define LOG10_LEAF_1(T, X, N, C) \
+    ((X) <= EXP10(T, N) ? (X) == EXP10(T, N) ? (N) : (N) + (C) - 1 : (N) + (C))
+#define LOG10_LEAF_1_I(_1, X, _2, C) \
+    ((X) <= 10 ? (X) == 10 ? 1 : (X) <= 1 ? (X) == 1 ? 0 : umax(X) : (C) : (C) + 1)
+#define LOG10_LEAF_4(T, X, N0, N1, N2, N3, C, I) (\
+    (X) <= EXP10(T, N1) ? (X) == EXP10(T, N1) ? (N1) : LOG10_LEAF_1 ## I(T, (X), N0, (C)) : \
+    (X) <= EXP10(T, N2) ? (X) == EXP10(T, N2) ? (N2) : (N1) + (C) : LOG10_LEAF_1(T, (X), N3, (C)))
+#define LOG10_LEAF_8(T, X, C, P, I) (\
+    (X) <= EXP10(T, P ## 5) ? (X) == EXP10(T, P ## 5) ? P ## 5 : \
+    LOG10_LEAF_4(T, (X), P ## 1, P ## 2, P ## 3, P ## 4, (C), I) : \
+    LOG10_LEAF_4(T, (X), P ## 6, P ## 7, P ## 8, P ## 9, (C), ))
+#define LOG10_LEAF_16(T, X, C) (\
+    (X) <= EXP10(T, 10) ? (X) == EXP10(T, 10) ? 10 : \
+    LOG10_LEAF_8(T, (X), (C), , _I) : \
+    LOG10_LEAF_8(T, (X), (C), 1, ))
 
-#define DECL_UINT_LOG10(TYPE, PREFIX, MAX, ...) \
-    TYPE PREFIX ## _log10(TYPE x, bool ceil) \
-    { \
-        const TYPE arr[] = { __VA_ARGS__ }; \
-        if (!x) return (MAX); \
-        uint8_t left = 0, right = countof(arr) - 1; \
-        while (left < right) \
-        { \
-            uint8_t mid = (left + right + !ceil) >> 1; \
-            TYPE t = arr[mid]; \
-            if (x > t) left = mid + ceil; \
-            else if (x < t) right = mid - !ceil; \
-            else return mid; \
-        } \
-        return ceil && left == countof(arr) - 1 && x > arr[left] ? countof(arr) : left; \
-    }
+unsigned char uchar_ulog10(unsigned char x, bool ceil)
+{
+    _Static_assert(LOG10(umax(x), 0) == 2 && LOG10(umax(x), 1) == 3, "");
+    return x <= 100 ? x == 100 ? 2 : LOG10_LEAF_1_I(, x, , ceil) : ceil + 2;
+}
 
-#define TEN5(X) 1 ## X, 10 ## X, 100 ## X, 1000 ## X, 10000 ## X
-#define TEN10(X) TEN5(X), TEN5(00000 ## X)
-#define TEN20(X) TEN10(X), TEN10(0000000000 ## X)
-DECL_UINT_LOG10(uint16_t, uint16, UINT16_MAX, TEN5(u))
-DECL_UINT_LOG10(uint32_t, uint32, UINT32_MAX, TEN10(u))
-DECL_UINT_LOG10(uint64_t, uint64, UINT64_MAX, TEN20(u))
+unsigned short ushrt_ulog10(unsigned short x, bool ceil)
+{
+    _Static_assert(LOG10(umax(x), 0) == 4 && LOG10(umax(x), 1) == 5, "");
+    return LOG10_LEAF_4(unsigned short, x, 1, 2, 3, 4, ceil, _I);
+}
 
-#if defined _M_X64 || defined __x86_64__
+unsigned uint_ulog10(unsigned x, bool ceil)
+{
+    _Static_assert(LOG10(umax(x), 0) == 9 && LOG10(umax(x), 1) == 10, "");
+    return LOG10_LEAF_8(unsigned, x, ceil, , _I);
+}
 
-DECL_UINT_LOG10(size_t, size, SIZE_MAX, TEN20(u))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_2_COPY(unsigned long, bool, ulong, ulog10, unsigned)))
+IF_GCC_LLVM(IF_X64(DECL_2_COPY(unsigned long, bool, ulong, ulog10, unsigned long long)))
 
-#elif defined _M_IX86 || defined __i386__
-
-DECL_UINT_LOG10(size_t, size, SIZE_MAX, TEN10(u))
-
-#endif
+unsigned long long ullong_ulog10(unsigned long long x, bool ceil)
+{
+    _Static_assert(LOG10(umax(x), 0) == 19 && LOG10(umax(x), 1) == 20, "");
+    return LOG10_LEAF_16(unsigned long long, x, ceil);
+}
 
 size_t m128i_byte_scan_forward(__m128i a)
 {
@@ -986,36 +1025,6 @@ size_t m128i_byte_scan_forward(__m128i a)
     if (!_mm_testz_si128(a, msk[countof(msk) - 1])) res++;
     return res;
 }
-
-// Spinlock
-void spinlock_acquire(spinlock *spinlock)
-{
-    while (!atomic_cmp_xchg_mo(spinlock, &(spinlock_base) { 0 }, 1, 1, ATOMIC_ACQUIRE, ATOMIC_RELAXED)) // Weak CAS is sufficient 
-        while (atomic_load_mo(spinlock, ATOMIC_ACQUIRE)) _mm_pause();
-}
-
-// Double lock
-GPUSH GWRN(implicit-fallthrough)
-void *double_lock_execute(spinlock *spinlock, double_lock_callback init, double_lock_callback comm, void *init_args, void *comm_args)
-{
-    void *res = NULL;
-    switch (atomic_load(spinlock))
-    {
-    case 0:
-        if (atomic_cmp_xchg_mo(spinlock, &(spinlock_base) { 0 }, 1, 0, ATOMIC_ACQUIRE, ATOMIC_RELAXED)) // Strong CAS required here!
-        {
-            if (init) res = init(init_args);
-            atomic_store(spinlock, 2);
-            break;
-        }
-    case 1: 
-        while (atomic_load(spinlock) != 2) _mm_pause();
-    case 2:
-        if (comm) res = comm(comm_args);
-    }
-    return res;
-}
-GPOP
 
 #define DECL_STABLE_CMP_ASC(PREFIX, SUFFIX) \
     int PREFIX ## _stable_cmp_asc ## SUFFIX (const void *A, const void *B, void *thunk) \
