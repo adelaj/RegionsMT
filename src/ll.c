@@ -549,7 +549,7 @@ IF_GCC_LLVM_MSVC(DECL_MUL_NARR(unsigned char, uchar, unsigned short))
 IF_GCC_LLVM_MSVC(DECL_MUL_NARR(unsigned short, ushrt, unsigned))
 IF_GCC_LLVM_MSVC(DECL_MUL_NARR(unsigned, uint, unsigned long long))
 IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_OP_COPY(unsigned long, ulong, mul, unsigned long, unsigned, unsigned)))
-IF_GCC_LLVM(IF_X64(DECL_OP_COPY(unsigned long, ulong, mul, unsigned long, unsigned long long, unsigned long)))
+IF_GCC_LLVM(IF_X64(DECL_OP_COPY(unsigned long, ulong, mul, unsigned long, unsigned long long, unsigned long long)))
 IF_GCC_LLVM_MSVC(IF_X32(DECL_MUL_WIDE(unsigned long long, ullong, unsigned)))
 IF_GCC_LLVM(IF_X64(DECL_MUL_NARR(unsigned long long, ullong, Uint128_t)))
 
