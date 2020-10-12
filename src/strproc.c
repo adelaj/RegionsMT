@@ -53,7 +53,7 @@ bool empty_handler(const char *str, size_t len, void *Ptr, void *Context)
     (void) str;
     (void) len;
     struct handler_context *context = Context;
-    if (context) uint8_bit_set((uint8_t *) Ptr + context->offset, context->bit_pos);
+    if (context) bs((uint8_t *) Ptr + context->offset, context->bit_pos);
     return 1;
 }
 
@@ -131,7 +131,8 @@ bool bool_handler(const char *str, size_t len, void *Ptr, void *Context)
     if (res > 1) return 0;
     struct bool_handler_context *context = Context;
     if (!context) return 1;
-    (res ? uint8_bit_set : uint8_bit_reset)((uint8_t *) Ptr, context->bit_pos);
+    if (res) bs((uint8_t *) Ptr, context->bit_pos);
+    else br((uint8_t *) Ptr, context->bit_pos);
     return empty_handler(str, len, Ptr, context->context);
 }
 
@@ -193,7 +194,7 @@ struct array_result str_pool_init(struct str_pool *pool, size_t cnt, size_t len,
     if (!res0.status) return res0;
     pool->buff.len = 0;
     struct array_result res1 = hash_table_init(&pool->tbl, cnt, sizeof(size_t), szv);
-    if (res1.status) return (struct array_result) { .status = ARRAY_SUCCESS, .tot = size_add_sat(res0.tot, res1.tot) };
+    if (res1.status) return (struct array_result) { .status = ARRAY_SUCCESS, .tot = add_sat(res0.tot, res1.tot) };
     free(pool->buff.str);
     return res1;
 }
@@ -248,7 +249,7 @@ struct array_result str_pool_insert(struct str_pool *pool, const char *str, size
     *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t)) = off;
     if (p_off) *p_off = off;
     if (p_val) *(void **) p_val = hash_table_fetch_val(&pool->tbl, h, szv);
-    return (struct array_result) { .status = res0.status & res1.status, .tot = size_add_sat(res0.tot, res1.tot) };
+    return (struct array_result) { .status = res0.status & res1.status, .tot = add_sat(res0.tot, res1.tot) };
 }
 
 bool str_pool_fetch(struct str_pool *pool, const char *str, size_t szv, void *p_val)

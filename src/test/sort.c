@@ -3,6 +3,7 @@
 #include "../memory.h"
 #include "../sort.h"
 #include "../test.h"
+#include "../cmp.h"
 #include "sort.h"
 
 #include <string.h> 

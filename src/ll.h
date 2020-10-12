@@ -114,18 +114,18 @@ unsigned long long ullong_mul(unsigned long long *, unsigned long long, unsigned
     unsigned long long: ullong_mul)((P_HI), (X), (Y)))
 
 // Multiply–accumulate
-unsigned char uchar_ma(unsigned char *, unsigned char, unsigned char);
-unsigned short ushrt_ma(unsigned short *, unsigned short, unsigned short);
-unsigned uint_ma(unsigned *, unsigned, unsigned);
-unsigned long ulong_ma(unsigned long *, unsigned long, unsigned long);
-unsigned long long ullong_ma(unsigned long long *, unsigned long long, unsigned long long);
+unsigned char uchar_ma(unsigned char *, unsigned char, unsigned char, unsigned char);
+unsigned short ushrt_ma(unsigned short *, unsigned short, unsigned short, unsigned short);
+unsigned uint_ma(unsigned *, unsigned, unsigned, unsigned);
+unsigned long ulong_ma(unsigned long *, unsigned long, unsigned long, unsigned long);
+unsigned long long ullong_ma(unsigned long long *, unsigned long long, unsigned long long, unsigned long long);
 
-#define ma(P_RES, X, Y) (_Generic(*(P_RES), \
+#define ma(P_RES, X, Y, Z) (_Generic(*(P_RES), \
     unsigned char: uchar_ma, \
     unsigned short: ushrt_ma, \
     unsigned: uint_ma, \
     unsigned long: ulong_ma, \
-    unsigned long long: ullong_ma)((P_RES), (X), (Y)))
+    unsigned long long: ullong_ma)((P_RES), (X), (Y), (Z)))
 
 // Shift left
 unsigned char uchar_shl(unsigned char *, unsigned char, unsigned char);
@@ -240,46 +240,46 @@ unsigned long long ullong_udist(unsigned long long, unsigned long long);
     unsigned long long: ullong_udist)((X), (Y)))
 
 // Non-destructive add with overflow test
-bool uchar_test_add(unsigned char *, unsigned char, unsigned char);
-bool ushrt_test_add(unsigned short *, unsigned short, unsigned short);
-bool uint_test_add(unsigned *, unsigned, unsigned);
-bool ulong_test_add(unsigned long *, unsigned long, unsigned long);
-bool ullong_test_add(unsigned long long *, unsigned long long, unsigned long long);
+bool uchar_test_add(unsigned char *, unsigned char);
+bool ushrt_test_add(unsigned short *, unsigned short);
+bool uint_test_add(unsigned *, unsigned);
+bool ulong_test_add(unsigned long *, unsigned long);
+bool ullong_test_add(unsigned long long *, unsigned long long);
 
-#define test_add(P_RES, X, Y) (_Generic(*(P_RES), \
+#define test_add(P_RES, X) (_Generic(*(P_RES), \
     unsigned char: uchar_test_add, \
     unsigned short: ushrt_test_add, \
     unsigned: uint_test_add, \
     unsigned long: ulong_test_add, \
-    unsigned long long: ullong_test_add)((P_RES), (X), (Y)))
+    unsigned long long: ullong_test_add)((P_RES), (X)))
 
 // Non-destructive subtract with overflow test
-bool uchar_test_sub(unsigned char *, unsigned char, unsigned char);
-bool ushrt_test_sub(unsigned short *, unsigned short, unsigned short);
-bool uint_test_sub(unsigned *, unsigned, unsigned);
-bool ulong_test_sub(unsigned long *, unsigned long, unsigned long);
-bool ullong_test_sub(unsigned long long *, unsigned long long, unsigned long long);
+bool uchar_test_sub(unsigned char *, unsigned char);
+bool ushrt_test_sub(unsigned short *, unsigned short);
+bool uint_test_sub(unsigned *, unsigned);
+bool ulong_test_sub(unsigned long *, unsigned long);
+bool ullong_test_sub(unsigned long long *, unsigned long long);
 
-#define test_sub(P_RES, X, Y) (_Generic(*(P_RES), \
+#define test_sub(P_RES, X) (_Generic(*(P_RES), \
     unsigned char: uchar_test_sub, \
     unsigned short: ushrt_test_sub, \
     unsigned: uint_test_sub, \
     unsigned long: ulong_test_sub, \
-    unsigned long long: ullong_test_sub)((P_RES), (X), (Y)))
+    unsigned long long: ullong_test_sub)((P_RES), (X)))
 
 // Non-destructive multiply with overflow test
-bool uchar_test_mul(unsigned char *, unsigned char, unsigned char);
-bool ushrt_test_mul(unsigned short *, unsigned short, unsigned short);
-bool uint_test_mul(unsigned *, unsigned, unsigned);
-bool ulong_test_mul(unsigned long *, unsigned long, unsigned long);
-bool ullong_test_mul(unsigned long long *, unsigned long long, unsigned long long);
+bool uchar_test_mul(unsigned char *, unsigned char);
+bool ushrt_test_mul(unsigned short *, unsigned short);
+bool uint_test_mul(unsigned *, unsigned);
+bool ulong_test_mul(unsigned long *, unsigned long);
+bool ullong_test_mul(unsigned long long *, unsigned long long);
 
-#define test_mul(P_RES, X, Y) (_Generic(*(P_RES), \
+#define test_mul(P_RES, X) (_Generic(*(P_RES), \
     unsigned char: uchar_test_mul, \
     unsigned short: ushrt_test_mul, \
     unsigned: uint_test_mul, \
     unsigned long: ulong_test_mul, \
-    unsigned long long: ullong_test_mul)((P_RES), (X), (Y)))
+    unsigned long long: ullong_test_mul)((P_RES), (X)))
 
 // Non-destructive multiply–accumulate with overflow test
 bool uchar_test_ma(unsigned char *, unsigned char, unsigned char);
@@ -366,144 +366,144 @@ unsigned long long ullong_pcnt(unsigned long long);
     unsigned long long: ullong_pcnt)((X)))
 
 // Bit test
-bool uchar_bit_test(unsigned char *, size_t);
-bool ushrt_bit_test(unsigned short *, size_t);
-bool uint_bit_test(unsigned *, size_t);
-bool ulong_bit_test(unsigned long *, size_t);
-bool ullong_bit_test(unsigned long long *, size_t);
+bool uchar_bt(unsigned char *, size_t);
+bool ushrt_bt(unsigned short *, size_t);
+bool uint_bt(unsigned *, size_t);
+bool ulong_bt(unsigned long *, size_t);
+bool ullong_bt(unsigned long long *, size_t);
 
-#define bit_test(ARR, POS) (_Generic(*(ARR), \
-    unsigned char: uchar_bit_test, \
-    unsigned short: ushrt_bit_test, \
-    unsigned: uint_bit_test, \
-    unsigned long: ulong_bit_test, \
-    unsigned long long: ullong_bit_test)((ARR), (POS)))
+#define bt(ARR, POS) (_Generic(*(ARR), \
+    unsigned char: uchar_bt, \
+    unsigned short: ushrt_bt, \
+    unsigned: uint_bt, \
+    unsigned long: ulong_bt, \
+    unsigned long long: ullong_bt)((ARR), (POS)))
 
 // Bit test and set
-bool uchar_bit_test_set(unsigned char *, size_t);
-bool ushrt_bit_test_set(unsigned short *, size_t);
-bool uint_bit_test_set(unsigned *, size_t);
-bool ulong_bit_test_set(unsigned long *, size_t);
-bool ullong_bit_test_set(unsigned long long *, size_t);
+bool uchar_bts(unsigned char *, size_t);
+bool ushrt_bts(unsigned short *, size_t);
+bool uint_bts(unsigned *, size_t);
+bool ulong_bts(unsigned long *, size_t);
+bool ullong_bts(unsigned long long *, size_t);
 
-#define bit_test_set(ARR, POS) (_Generic(*(ARR), \
-    unsigned char: uchar_bit_test_set, \
-    unsigned short: ushrt_bit_test_set, \
-    unsigned: uint_bit_test_set, \
-    unsigned long: ulong_bit_test_set, \
-    unsigned long long: ullong_bit_test_set)((ARR), (POS)))
+#define bts(ARR, POS) (_Generic(*(ARR), \
+    unsigned char: uchar_bts, \
+    unsigned short: ushrt_bts, \
+    unsigned: uint_bts, \
+    unsigned long: ulong_bts, \
+    unsigned long long: ullong_bts)((ARR), (POS)))
 
 // Bit test and reset
-bool uchar_bit_test_reset(unsigned char *, size_t);
-bool ushrt_bit_test_reset(unsigned short *, size_t);
-bool uint_bit_test_reset(unsigned *, size_t);
-bool ulong_bit_test_reset(unsigned long *, size_t);
-bool ullong_bit_test_reset(unsigned long long *, size_t);
+bool uchar_btr(unsigned char *, size_t);
+bool ushrt_btr(unsigned short *, size_t);
+bool uint_btr(unsigned *, size_t);
+bool ulong_btr(unsigned long *, size_t);
+bool ullong_btr(unsigned long long *, size_t);
 
-#define bit_test_reset(ARR, POS) (_Generic(*(ARR), \
-    unsigned char: uchar_bit_test_reset, \
-    unsigned short: ushrt_bit_test_reset, \
-    unsigned: uint_bit_test_reset, \
-    unsigned long: ulong_bit_test_reset, \
-    unsigned long long: ullong_bit_test_reset)((ARR), (POS)))
+#define btr(ARR, POS) (_Generic(*(ARR), \
+    unsigned char: uchar_btr, \
+    unsigned short: ushrt_btr, \
+    unsigned: uint_btr, \
+    unsigned long: ulong_btr, \
+    unsigned long long: ullong_btr)((ARR), (POS)))
 
 // Bit set
-void uchar_bit_set(unsigned char *, size_t);
-void ushrt_bit_set(unsigned short *, size_t);
-void uint_bit_set(unsigned *, size_t);
-void ulong_bit_set(unsigned long *, size_t);
-void ullong_bit_set(unsigned long long *, size_t);
+void uchar_bs(unsigned char *, size_t);
+void ushrt_bs(unsigned short *, size_t);
+void uint_bs(unsigned *, size_t);
+void ulong_bs(unsigned long *, size_t);
+void ullong_bs(unsigned long long *, size_t);
 
-#define bit_set(ARR, POS) (_Generic(*(ARR), \
-    unsigned char: uchar_bit_set, \
-    unsigned short: ushrt_bit_set, \
-    unsigned: uint_bit_set, \
-    unsigned long: ulong_bit_set, \
-    unsigned long long: ullong_bit_set)((ARR), (POS)))
+#define bs(ARR, POS) (_Generic(*(ARR), \
+    unsigned char: uchar_bs, \
+    unsigned short: ushrt_bs, \
+    unsigned: uint_bs, \
+    unsigned long: ulong_bs, \
+    unsigned long long: ullong_bs)((ARR), (POS)))
 
 // Bit reset
-void uchar_bit_reset(unsigned char *, size_t);
-void ushrt_bit_reset(unsigned short *, size_t);
-void uint_bit_reset(unsigned *, size_t);
-void ulong_bit_reset(unsigned long *, size_t);
-void ullong_bit_reset(unsigned long long *, size_t);
+void uchar_br(unsigned char *, size_t);
+void ushrt_br(unsigned short *, size_t);
+void uint_br(unsigned *, size_t);
+void ulong_br(unsigned long *, size_t);
+void ullong_br(unsigned long long *, size_t);
 
-#define bit_reset(ARR, POS) (_Generic(*(ARR), \
-    unsigned char: uchar_bit_reset, \
-    unsigned short: ushrt_bit_reset, \
-    unsigned: uint_bit_reset, \
-    unsigned long: ulong_bit_reset, \
-    unsigned long long: ullong_bit_reset)((ARR), (POS)))
+#define br(ARR, POS) (_Generic(*(ARR), \
+    unsigned char: uchar_br, \
+    unsigned short: ushrt_br, \
+    unsigned: uint_br, \
+    unsigned long: ulong_br, \
+    unsigned long long: ullong_br)((ARR), (POS)))
 
 // Bit fetch burst
-unsigned char uchar_bit_fetch_burst(unsigned char *, size_t, size_t);
-unsigned short ushrt_bit_fetch_burst(unsigned short *, size_t, size_t);
-unsigned uint_bit_fetch_burst(unsigned *, size_t, size_t);
-unsigned long ulong_bit_fetch_burst(unsigned long *, size_t, size_t);
-unsigned long long ullong_bit_fetch_burst(unsigned long long *, size_t, size_t);
+unsigned char uchar_bt_burst(unsigned char *, size_t, size_t);
+unsigned short ushrt_bt_burst(unsigned short *, size_t, size_t);
+unsigned uint_bt_burst(unsigned *, size_t, size_t);
+unsigned long ulong_bt_burst(unsigned long *, size_t, size_t);
+unsigned long long ullong_bt_burst(unsigned long long *, size_t, size_t);
 
-#define bit_fetch_burst(ARR, POS, STRIDE) (_Generic(*(ARR), \
-    unsigned char: uchar_bit_fetch_burst, \
-    unsigned short: ushrt_bit_fetch_burst, \
-    unsigned: uint_bit_fetch_burst, \
-    unsigned long: ulong_bit_fetch_burst, \
-    unsigned long long: ullong_bit_fetch_burst)((ARR), (POS), (STRIDE)))
+#define bt_burst(ARR, POS, STRIDE) (_Generic(*(ARR), \
+    unsigned char: uchar_bt_burst, \
+    unsigned short: ushrt_bt_burst, \
+    unsigned: uint_bt_burst, \
+    unsigned long: ulong_bt_burst, \
+    unsigned long long: ullong_bt_burst)((ARR), (POS), (STRIDE)))
 
 // Bit fetch and set burst
-unsigned char uchar_bit_fetch_set_burst(unsigned char *, size_t, size_t, unsigned char);
-unsigned short ushrt_bit_fetch_set_burst(unsigned short *, size_t, size_t, unsigned short);
-unsigned uint_bit_fetch_set_burst(unsigned *, size_t, size_t, unsigned);
-unsigned long ulong_bit_fetch_set_burst(unsigned long *, size_t, size_t, unsigned long);
-unsigned long long ullong_bit_fetch_set_burst(unsigned long long *, size_t, size_t, unsigned long long);
+unsigned char uchar_bts_burst(unsigned char *, size_t, size_t, unsigned char);
+unsigned short ushrt_bts_burst(unsigned short *, size_t, size_t, unsigned short);
+unsigned uint_bts_burst(unsigned *, size_t, size_t, unsigned);
+unsigned long ulong_bts_burst(unsigned long *, size_t, size_t, unsigned long);
+unsigned long long ullong_bts_burst(unsigned long long *, size_t, size_t, unsigned long long);
 
-#define bit_fetch_set_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
-    unsigned char: uchar_bit_fetch_set_burst, \
-    unsigned short: ushrt_bit_fetch_set_burst, \
-    unsigned: uint_bit_fetch_set_burst, \
-    unsigned long: ulong_bit_fetch_set_burst, \
-    unsigned long long: ullong_bit_fetch_set_burst)((ARR), (POS), (STRIDE), (MSK)))
+#define bts_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
+    unsigned char: uchar_bts_burst, \
+    unsigned short: ushrt_bts_burst, \
+    unsigned: uint_bts_burst, \
+    unsigned long: ulong_bts_burst, \
+    unsigned long long: ullong_bts_burst)((ARR), (POS), (STRIDE), (MSK)))
 
 // Bit fetch and reset burst
-unsigned char uchar_bit_fetch_reset_burst(unsigned char *, size_t, size_t, unsigned char);
-unsigned short ushrt_bit_fetch_reset_burst(unsigned short *, size_t, size_t, unsigned short);
-unsigned uint_bit_fetch_reset_burst(unsigned *, size_t, size_t, unsigned);
-unsigned long ulong_bit_fetch_reset_burst(unsigned long *, size_t, size_t, unsigned long);
-unsigned long long ullong_bit_fetch_reset_burst(unsigned long long *, size_t, size_t, unsigned long long);
+unsigned char uchar_btr_burst(unsigned char *, size_t, size_t, unsigned char);
+unsigned short ushrt_btr_burst(unsigned short *, size_t, size_t, unsigned short);
+unsigned uint_btr_burst(unsigned *, size_t, size_t, unsigned);
+unsigned long ulong_btr_burst(unsigned long *, size_t, size_t, unsigned long);
+unsigned long long ullong_btr_burst(unsigned long long *, size_t, size_t, unsigned long long);
 
-#define bit_fetch_reset_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
-    unsigned char: uchar_bit_fetch_reset_burst, \
-    unsigned short: ushrt_bit_fetch_reset_burst, \
-    unsigned: uint_bit_fetch_reset_burst, \
-    unsigned long: ulong_bit_fetch_reset_burst, \
-    unsigned long long: ullong_bit_fetch_reset_burst)((ARR), (POS), (STRIDE), (MSK)))
+#define btr_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
+    unsigned char: uchar_btr_burst, \
+    unsigned short: ushrt_btr_burst, \
+    unsigned: uint_btr_burst, \
+    unsigned long: ulong_btr_burst, \
+    unsigned long long: ullong_btr_burst)((ARR), (POS), (STRIDE), (MSK)))
 
 // Bit set burst
-void uchar_bit_set_burst(unsigned char *, size_t, size_t, unsigned char);
-void ushrt_bit_set_burst(unsigned short *, size_t, size_t, unsigned short);
-void uint_bit_set_burst(unsigned *, size_t, size_t, unsigned);
-void ulong_bit_set_burst(unsigned long *, size_t, size_t, unsigned long);
-void ullong_bit_set_burst(unsigned long long *, size_t, size_t, unsigned long long);
+void uchar_bs_burst(unsigned char *, size_t, size_t, unsigned char);
+void ushrt_bs_burst(unsigned short *, size_t, size_t, unsigned short);
+void uint_bs_burst(unsigned *, size_t, size_t, unsigned);
+void ulong_bs_burst(unsigned long *, size_t, size_t, unsigned long);
+void ullong_bs_burst(unsigned long long *, size_t, size_t, unsigned long long);
 
-#define bit_set_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
-    unsigned char: uchar_bit_set_burst, \
-    unsigned short: ushrt_bit_set_burst, \
-    unsigned: uint_bit_set_burst, \
-    unsigned long: ulong_bit_set_burst, \
-    unsigned long long: ullong_bit_set_burst)((ARR), (POS), (STRIDE), (MSK)))
+#define bs_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
+    unsigned char: uchar_bs_burst, \
+    unsigned short: ushrt_bs_burst, \
+    unsigned: uint_bs_burst, \
+    unsigned long: ulong_bs_burst, \
+    unsigned long long: ullong_bs_burst)((ARR), (POS), (STRIDE), (MSK)))
 
 // Bit reset burst
-void uchar_bit_reset_burst(unsigned char *, size_t, size_t, unsigned char);
-void ushrt_bit_reset_burst(unsigned short *, size_t, size_t, unsigned short);
-void uint_bit_reset_burst(unsigned *, size_t, size_t, unsigned);
-void ulong_bit_reset_burst(unsigned long *, size_t, size_t, unsigned long);
-void ullong_bit_reset_burst(unsigned long long *, size_t, size_t, unsigned long long);
+void uchar_br_burst(unsigned char *, size_t, size_t, unsigned char);
+void ushrt_br_burst(unsigned short *, size_t, size_t, unsigned short);
+void uint_br_burst(unsigned *, size_t, size_t, unsigned);
+void ulong_br_burst(unsigned long *, size_t, size_t, unsigned long);
+void ullong_br_burst(unsigned long long *, size_t, size_t, unsigned long long);
 
-#define bit_reset_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
-    unsigned char: uchar_bit_reset_burst, \
-    unsigned short: ushrt_bit_reset_burst, \
-    unsigned: uint_bit_reset_burst, \
-    unsigned long: ulong_bit_reset_burst, \
-    unsigned long long: ullong_bit_reset_burst)((ARR), (POS), (STRIDE), (MSK)))
+#define br_burst(ARR, POS, STRIDE, MSK) (_Generic(*(ARR), \
+    unsigned char: uchar_br_burst, \
+    unsigned short: ushrt_br_burst, \
+    unsigned: uint_br_burst, \
+    unsigned long: ulong_br_burst, \
+    unsigned long long: ullong_br_burst)((ARR), (POS), (STRIDE), (MSK)))
 
 // Atomic load
 bool bool_atomic_load_mo(volatile bool *, enum atomic_mo);
@@ -653,7 +653,7 @@ unsigned long long ullong_atomic_fetch_sub_mo(volatile unsigned long long *, uns
 #define atomic_fetch_sub(DST, ARG) \
     (atomic_fetch_sub_mo((DST), (ARG), ATOMIC_ACQ_REL))
 
-// Atomic exchange
+// Atomic swap
 unsigned char uchar_atomic_xchg_mo(volatile unsigned char *, unsigned char, enum atomic_mo);
 unsigned short ushrt_atomic_xchg_mo(volatile unsigned short *, unsigned short, enum atomic_mo);
 unsigned uint_atomic_xchg_mo(volatile unsigned *, unsigned, enum atomic_mo);
@@ -705,6 +705,91 @@ unsigned long long ullong_atomic_fetch_sub_sat_mo(volatile unsigned long long *,
 
 #define atomic_fetch_sub_sat(DST, ARG) \
     (atomic_fetch_sub_sat_mo((DST), (ARG), ATOMIC_ACQ_REL))
+
+// Atomic bit test
+bool uchar_atomic_bt_mo(volatile unsigned char *, size_t, enum atomic_mo);
+bool ushrt_atomic_bt_mo(volatile unsigned short *, size_t, enum atomic_mo);
+bool uint_atomic_bt_mo(volatile unsigned *, size_t, enum atomic_mo);
+bool ulong_atomic_bt_mo(volatile unsigned long *, size_t, enum atomic_mo);
+bool ullong_atomic_bt_mo(volatile unsigned long long *, size_t, enum atomic_mo);
+
+#define atomic_bt_mo(ARR, POS, MO) (_Generic((ARR), \
+    volatile unsigned char *: uchar_atomic_bt_mo, \
+    volatile unsigned short *: ushrt_atomic_bt_mo, \
+    volatile unsigned *: uint_atomic_bt_mo, \
+    volatile unsigned long *: ulong_atomic_bt_mo, \
+    volatile unsigned long long *: ullong_atomic_bt_mo)((ARR), (POS), (MO)))
+
+#define atomic_bt(DST, ARG) \
+    (atomic_bt_mo((DST), (ARG), ATOMIC_ACQ_REL))
+
+// Atomic bit test and set
+bool uchar_atomic_bts_mo(volatile unsigned char *, size_t, enum atomic_mo);
+bool ushrt_atomic_bts_mo(volatile unsigned short *, size_t, enum atomic_mo);
+bool uint_atomic_bts_mo(volatile unsigned *, size_t, enum atomic_mo);
+bool ulong_atomic_bts_mo(volatile unsigned long *, size_t, enum atomic_mo);
+bool ullong_atomic_bts_mo(volatile unsigned long long *, size_t, enum atomic_mo);
+
+#define atomic_bts_mo(ARR, POS, MO) (_Generic((ARR), \
+    volatile unsigned char *: uchar_atomic_bts_mo, \
+    volatile unsigned short *: ushrt_atomic_bts_mo, \
+    volatile unsigned *: uint_atomic_bts_mo, \
+    volatile unsigned long *: ulong_atomic_bts_mo, \
+    volatile unsigned long long *: ullong_atomic_bts_mo)((ARR), (POS), (MO)))
+
+#define atomic_bts(DST, ARG) \
+    (atomic_bts_mo((DST), (ARG), ATOMIC_ACQ_REL))
+
+// Atomic bit test and reset
+bool uchar_atomic_btr_mo(volatile unsigned char *, size_t, enum atomic_mo);
+bool ushrt_atomic_btr_mo(volatile unsigned short *, size_t, enum atomic_mo);
+bool uint_atomic_btr_mo(volatile unsigned *, size_t, enum atomic_mo);
+bool ulong_atomic_btr_mo(volatile unsigned long *, size_t, enum atomic_mo);
+bool ullong_atomic_btr_mo(volatile unsigned long long *, size_t, enum atomic_mo);
+
+#define atomic_btr_mo(ARR, POS, MO) (_Generic((ARR), \
+    volatile unsigned char *: uchar_atomic_btr_mo, \
+    volatile unsigned short *: ushrt_atomic_btr_mo, \
+    volatile unsigned *: uint_atomic_btr_mo, \
+    volatile unsigned long *: ulong_atomic_btr_mo, \
+    volatile unsigned long long *: ullong_atomic_btr_mo)((ARR), (POS), (MO)))
+
+#define atomic_btr(DST, ARG) \
+    (atomic_btr_mo((DST), (ARG), ATOMIC_ACQ_REL))
+
+// Atomic bit set
+void uchar_atomic_bs_mo(volatile unsigned char *, size_t, enum atomic_mo);
+void ushrt_atomic_bs_mo(volatile unsigned short *, size_t, enum atomic_mo);
+void uint_atomic_bs_mo(volatile unsigned *, size_t, enum atomic_mo);
+void ulong_atomic_bs_mo(volatile unsigned long *, size_t, enum atomic_mo);
+void ullong_atomic_bs_mo(volatile unsigned long long *, size_t, enum atomic_mo);
+
+#define atomic_bs_mo(ARR, POS, MO) (_Generic((ARR), \
+    volatile unsigned char *: uchar_atomic_bs_mo, \
+    volatile unsigned short *: ushrt_atomic_bs_mo, \
+    volatile unsigned *: uint_atomic_bs_mo, \
+    volatile unsigned long *: ulong_atomic_bs_mo, \
+    volatile unsigned long long *: ullong_atomic_bs_mo)((ARR), (POS), (MO)))
+
+#define atomic_bs(DST, ARG) \
+    (atomic_bs_mo((DST), (ARG), ATOMIC_ACQ_REL))
+
+// Atomic bit reset
+void uchar_atomic_br_mo(volatile unsigned char *, size_t, enum atomic_mo);
+void ushrt_atomic_br_mo(volatile unsigned short *, size_t, enum atomic_mo);
+void uint_atomic_br_mo(volatile unsigned *, size_t, enum atomic_mo);
+void ulong_atomic_br_mo(volatile unsigned long *, size_t, enum atomic_mo);
+void ullong_atomic_br_mo(volatile unsigned long long *, size_t, enum atomic_mo);
+
+#define atomic_br_mo(ARR, POS, MO) (_Generic((ARR), \
+    volatile unsigned char *: uchar_atomic_br_mo, \
+    volatile unsigned short *: ushrt_atomic_br_mo, \
+    volatile unsigned *: uint_atomic_br_mo, \
+    volatile unsigned long *: ulong_atomic_br_mo, \
+    volatile unsigned long long *: ullong_atomic_br_mo)((ARR), (POS), (MO)))
+
+#define atomic_br(DST, ARG) \
+    (atomic_br_mo((DST), (ARG), ATOMIC_ACQ_REL))
 
 // Spinlock
 typedef unsigned spinlock_base;
@@ -763,17 +848,11 @@ unsigned long long ullong_ulog10(unsigned long long, bool);
     unsigned long: ulong_ulog10, \
     unsigned long long: ullong_ulog10)((X), (C)))
 
-size_t m128i_byte_scan_forward(__m128i a);
+// Byte scan reverse for 128-bit SSE register 
+unsigned char m128i_b8sr(__m128i); // returns 16 if argument is zero 
 
+// Byte scan forward for 128-bit SSE register
+unsigned char m128i_b8sf(__m128i); // returns 16 if argument is zero 
 
-int size_stable_cmp_dsc(const void *, const void *, void *);
-int size_stable_cmp_asc(const void *, const void *, void *);
-bool size_cmp_dsc(const void *, const void *, void *);
-bool size_cmp_asc(const void *, const void *, void *);
-int flt64_stable_cmp_dsc(const void *, const void *, void *);
-int flt64_stable_cmp_asc(const void *, const void *, void *);
-int flt64_stable_cmp_dsc_abs(const void *, const void *, void *);
-int flt64_stable_cmp_asc_abs(const void *, const void *, void *);
-int flt64_stable_cmp_dsc_nan(const void *, const void *, void *);
-int flt64_stable_cmp_asc_nan(const void *, const void *, void *);
+// Correct sign of 64-bit float
 int flt64_sign(double x);

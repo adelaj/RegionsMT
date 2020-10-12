@@ -69,9 +69,9 @@ static bool message_error_tbl_read(char *buff, size_t *p_buff_cnt, void *Context
             break;
         }
         if (tmp < 0) return 0;
-        len = size_sub_sat(len, (size_t) tmp);
+        len = sub_sat(len, tmp);
         if (i == 1) break;
-        cnt = size_add_sat(cnt, (size_t) tmp);
+        cnt = add_sat(cnt, tmp);
     }
     *p_buff_cnt = cnt;
     return 1;
@@ -79,7 +79,7 @@ static bool message_error_tbl_read(char *buff, size_t *p_buff_cnt, void *Context
 
 static bool log_message_error_tbl_read(struct log *restrict log, struct code_metric code_metric, const char *path, struct text_metric metric, char *str, size_t len, enum row_read_status status)
 {
-    return log_message(log, code_metric, MESSAGE_ERROR, message_error_tbl_read, &(struct row_read_context) { .path = path, .str = str, .len = len, .metric = metric, .status = status });
+    //return log_message(log, code_metric, MESSAGE_ERROR, message_error_tbl_read, &(struct row_read_context) { .path = path, .str = str, .len = len, .metric = metric, .status = status });
 }
 
 bool dsv_index(const char *path, uint64_t **p_ind, size_t *p_cnt, struct log *log)

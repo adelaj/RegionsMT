@@ -69,8 +69,8 @@ void loop_generator(void *Task, size_t ind, void *Context)
 
 bool loop_mt(struct thread_pool *pool, task_callback callback, struct task_cond cond, struct task_aggr aggr, void *context, size_t *restrict cntl, size_t cnt, size_t *restrict offl, bool hi, struct log *log)
 {
-    size_t prod, tot = 0;
-    if (!crt_assert_impl(log, CODE_METRIC, test_prod(&prod, cntl, cnt) == cnt && prod != SIZE_MAX && test_mul(&tot, prod, cnt) ? 0 : ERANGE)) return 0;
+    size_t prod, tot = cnt;
+    if (!crt_assert_impl(log, CODE_METRIC, test_prod(&prod, cntl, cnt) == cnt && prod != SIZE_MAX && test_mul(&tot, prod) ? 0 : ERANGE)) return 0;
     struct loop_mt *data;
     if (!array_assert(log, CODE_METRIC, array_init(&data, NULL, fam_countof(struct loop_mt, ind, tot), fam_sizeof(struct loop_mt, ind), fam_diffof(struct loop_mt, ind, tot), ARRAY_STRICT))) return 0;
     atomic_store(&data->mem.fail, 0);
@@ -107,8 +107,8 @@ struct thread_pool {
 
 static bool thread_pool_enqueue_impl(struct thread_pool *pool, size_t cnt, struct log *log)
 {
-    size_t probe;
-    if (!crt_assert_impl(log, CODE_METRIC, test_add(&probe, atomic_load(&pool->task_hint), cnt) ? 0 : ERANGE) ||
+    size_t probe = atomic_load(&pool->task_hint);
+    if (!crt_assert_impl(log, CODE_METRIC, test_add(&probe, cnt) ? 0 : ERANGE) ||
         !array_assert(log, CODE_METRIC, persistent_array_test(&pool->dispatched_task, probe, sizeof(struct dispatched_task), PERSISTENT_ARRAY_WEAK))) return 0;
     for (size_t i = pool->task_cnt; i < probe; i++)
         atomic_store(&((struct dispatched_task *) persistent_array_fetch(&pool->dispatched_task, i, sizeof(struct dispatched_task)))->not_garbage, 0);
@@ -168,17 +168,17 @@ static thread_return thread_callback_conv thread_proc(void *Arg)
             if (!dispatched_task)
             {
                 mutex_acquire(&arg->mutex);
-                if (!bit_test_reset(arg->bits, THREAD_BIT_QUERY_WAKE))
+                if (!btr(arg->bits, THREAD_BIT_QUERY_WAKE))
                 {
-                    bit_reset(arg->bits, THREAD_BIT_ACTIVE);
-                    if (bit_test(arg->bits, THREAD_BIT_QUERY_SHUTDOWN))
+                    br(arg->bits, THREAD_BIT_ACTIVE);
+                    if (bt(arg->bits, THREAD_BIT_QUERY_SHUTDOWN))
                     {
                         mutex_release(&arg->mutex);
                         return (thread_return) 0;
                     }
                     condition_sleep(&arg->condition, &arg->mutex);                    
                 }
-                bit_set(arg->bits, THREAD_BIT_ACTIVE);
+                bs(arg->bits, THREAD_BIT_ACTIVE);
                 mutex_release(&arg->mutex);
                 continue;
             }
@@ -290,7 +290,7 @@ void thread_pool_schedule(struct thread_pool *pool)
                 struct thread_arg *arg = persistent_array_fetch(&pool->arg, ind, sizeof(struct thread_arg));
                 if (!atomic_cmp_xchg(&arg->dispatched_task, &(void *) { NULL }, dispatched_task)) continue;
                 mutex_acquire(&arg->mutex);
-                bit_set(arg->bits, THREAD_BIT_QUERY_WAKE);
+                bs(arg->bits, THREAD_BIT_QUERY_WAKE);
                 condition_signal(&arg->condition);
                 mutex_release(&arg->mutex);
                 break;
@@ -325,7 +325,7 @@ static bool thread_arg_init(struct thread_arg *arg, size_t tls_sz, struct log *l
             {
                 mutex_acquire(&arg->mutex);
                 memset(arg->bits, 0, sizeof(arg->bits));
-                bit_set(arg->bits, THREAD_BIT_ACTIVE);
+                bs(arg->bits, THREAD_BIT_ACTIVE);
                 mutex_release(&arg->mutex);
                 atomic_store(&arg->dispatched_task, NULL);
                 return 1;
@@ -389,7 +389,7 @@ static void thread_pool_finish_range(struct thread_pool *pool, size_t l, size_t 
     {
         struct thread_arg *arg = persistent_array_fetch(&pool->arg, i, sizeof(*arg));
         mutex_acquire(&arg->mutex);
-        bit_set(arg->bits, THREAD_BIT_QUERY_SHUTDOWN);
+        bs(arg->bits, THREAD_BIT_QUERY_SHUTDOWN);
         condition_signal(&arg->condition);
         mutex_release(&arg->mutex);
         thread_return res; // Always zero
@@ -451,8 +451,8 @@ struct thread_pool *thread_pool_create(size_t cnt, size_t tls_sz, size_t task_hi
 bool thread_pool_add(struct thread_pool *pool, size_t diff, size_t tls_sz, struct log *log)
 {
     spinlock_acquire(&pool->add);
-    size_t l = thread_pool_get_count(pool), r, tmp = 0;
-    if (crt_assert_impl(log, CODE_METRIC, test_add(&r, l, diff) ? 0 : ERANGE) &&
+    size_t l = thread_pool_get_count(pool), r = l, tmp = 0;
+    if (crt_assert_impl(log, CODE_METRIC, test_add(&r, diff) ? 0 : ERANGE) &&
         array_assert(log, CODE_METRIC, persistent_array_test(&pool->arg, r, sizeof(struct thread_arg), 0)))
     {
         tmp = thread_pool_start_range(pool, tls_sz, l, r, log);

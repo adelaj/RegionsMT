@@ -45,7 +45,7 @@ struct array_result gauss_col(double *restrict m, size_t dimx, size_t *restrict 
             maxx = 0;
             maxy = i;
             amax = fabs(max = m[i]);
-            for (size_t j = 0, k = 0; j < dimx; j++, k += tda) if (!uint8_bit_test(pivx, j)) for (size_t l = i; l < dimy; l++)
+            for (size_t j = 0, k = 0; j < dimx; j++, k += tda) if (!bt(pivx, j)) for (size_t l = i; l < dimy; l++)
             {
                 double tmp = m[l + k], atmp = fabs(tmp);
                 if (atmp <= amax) continue;
@@ -56,7 +56,7 @@ struct array_result gauss_col(double *restrict m, size_t dimx, size_t *restrict 
             }
             if (max < tol) break;
         }
-        uint8_bit_set(pivx, maxx);
+        bs(pivx, maxx);
         maxx *= tda;
 
         // Swapping columns

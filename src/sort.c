@@ -174,10 +174,10 @@ void ranks_from_pointers_inplace_impl(uintptr_t *restrict ptr, uintptr_t base, s
     {
         size_t j = i;
         uintptr_t k = (ptr[i] - base) / stride;
-        while (!bit_test(bits, j))
+        while (!bt(bits, j))
         {
             uintptr_t l = (ptr[k] - base) / stride;
-            bit_set(bits, j);
+            bs(bits, j);
             ptr[k] = j;
             j = k;
             k = l;
@@ -219,14 +219,14 @@ void orders_apply_impl(uintptr_t *restrict ord, size_t cnt, size_t sz, void *res
 {
     for (size_t i = 0; i < cnt; i++)
     {
-        if (bit_test(bits, i)) continue;
+        if (bt(bits, i)) continue;
         size_t k = ord[i];
         if (k == i) continue;
-        bit_set(bits, i);
+        bs(bits, i);
         memcpy(swp, (char *) arr + i * stride, sz);
         for (size_t j = i;;)
         {
-            while (k < cnt && bit_test(bits, k)) k = ord[k];
+            while (k < cnt && bt(bits, k)) k = ord[k];
             memcpy((char *) arr + j * stride, (char *) arr + k * stride, sz);
             if (k >= cnt)
             {
@@ -235,7 +235,7 @@ void orders_apply_impl(uintptr_t *restrict ord, size_t cnt, size_t sz, void *res
             }
             j = k;
             k = ord[j];
-            bit_set(bits, j);
+            bs(bits, j);
             if (k == i)
             {
                 memcpy((char *) arr + j * stride, swp, sz);
@@ -548,7 +548,7 @@ bool hash_table_search(struct hash_table *tbl, size_t *p_h, const void *key, siz
     size_t msk = ((size_t) 1 << tbl->lcap) - 1, h = *p_h & msk;
     for (size_t i = 0, j = h;;)
     {
-        uint8_t flags = bit_fetch_burst(tbl->flags, h, 2);
+        uint8_t flags = bt_burst(tbl->flags, h, 2);
         if (!(flags & FLAG_NOT_EMPTY)) return 0;
         if (!(flags & FLAG_REMOVED) && eq((char *) tbl->key + h * szk, key, context)) break;
         h = (h + ++i) & msk;
@@ -560,7 +560,7 @@ bool hash_table_search(struct hash_table *tbl, size_t *p_h, const void *key, siz
 
 void hash_table_dealloc(struct hash_table *tbl, size_t h)
 {
-    bit_set_burst(tbl->flags, h, 2, FLAG_REMOVED);
+    bs_burst(tbl->flags, h, 2, FLAG_REMOVED);
     tbl->cnt--;
 }
 
@@ -589,20 +589,20 @@ static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt
     if (!res.status) return res;
     for (size_t i = 0; i < cap; i++)
     {
-        if (bit_fetch_burst(tbl->flags, i, 2) != FLAG_NOT_EMPTY) continue;
-        bit_set_burst(tbl->flags, i, 2, FLAG_REMOVED);
+        if (bt_burst(tbl->flags, i, 2) != FLAG_NOT_EMPTY) continue;
+        bs_burst(tbl->flags, i, 2, FLAG_REMOVED);
         for (;;)
         {
             size_t h = hash((char *) tbl->key + i * szk, context) & msk;
-            for (size_t j = 0; bit_fetch_set_burst(flags, h, 2, FLAG_NOT_EMPTY); h = (h + ++j) & msk);
+            for (size_t j = 0; bts_burst(flags, h, 2, FLAG_NOT_EMPTY); h = (h + ++j) & msk);
             if (i == h) break;
-            if (h >= cap || bit_fetch_burst(tbl->flags, h, 2) != FLAG_NOT_EMPTY)
+            if (h >= cap || bt_burst(tbl->flags, h, 2) != FLAG_NOT_EMPTY)
             {
                 memcpy((char *) tbl->key + h * szk, (char *) tbl->key + i * szk, szk);
                 memcpy((char *) tbl->val + h * szv, (char *) tbl->val + i * szv, szv);
                 break;
             }            
-            bit_set_burst(tbl->flags, h, 2, FLAG_REMOVED);
+            bs_burst(tbl->flags, h, 2, FLAG_REMOVED);
             swap((char *) tbl->key + i * szk, (char *) tbl->key + h * szk, swpk, szk);
             swap((char *) tbl->val + i * szv, (char *) tbl->val + h * szv, swpv, szv);
         }
@@ -670,7 +670,7 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
     size_t msk = cap - 1, h = *p_h & msk;
     for (size_t i = 0, j = h, tmp = cap;;)
     {
-        uint8_t flags = bit_fetch_burst(tbl->flags, h, 2);
+        uint8_t flags = bt_burst(tbl->flags, h, 2);
         if (!(flags & FLAG_NOT_EMPTY)) break;
         if (flags & FLAG_REMOVED) tmp = h;
         else if (eq((char *) tbl->key + h * szk, key, context))
@@ -684,8 +684,8 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
         if (tmp != cap) h = tmp;        
         break;
     }
-    if (!bit_fetch_reset_burst(tbl->flags, h, 2, FLAG_REMOVED)) tbl->tot++;
-    bit_set_burst(tbl->flags, h, 2, FLAG_NOT_EMPTY);
+    if (!btr_burst(tbl->flags, h, 2, FLAG_REMOVED)) tbl->tot++;
+    bs_burst(tbl->flags, h, 2, FLAG_NOT_EMPTY);
     tbl->cnt++;
     *p_h = h;
     return res;

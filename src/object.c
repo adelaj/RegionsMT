@@ -240,7 +240,7 @@ struct xml_context {
 };
 
 struct bits {
-    char *arr;
+    uint8_t *arr;
     size_t cap;
 };
 
@@ -287,7 +287,7 @@ static unsigned xml_name_impl(bool terminator, struct utf8 *utf8, struct buff *r
         if (terminator) buff->str[len] = '\0';
         return 1;
     }
-    else log_message_error_char_xml(log, CODE_METRIC, metric, path, utf8->byte, utf8->len, XML_UNEXPECTED_CHAR);
+    else {};// log_message_error_char_xml(log, CODE_METRIC, metric, path, utf8->byte, utf8->len, XML_UNEXPECTED_CHAR);
     return 0;
 }
 
@@ -310,7 +310,7 @@ static unsigned xml_char_ref_impl(uint32_t *p_val, bool hex, struct utf8 *utf8, 
         if (val != utf8->val)
         {
             *p_val &= 0x7fffffff; // 'init' flag should be resetted        
-            if (uint32_fused_mul_add(p_val, hex ? 16 : 10, val)) log_message_error_xml(log, CODE_METRIC, metric, XML_OUT_OF_RANGE);
+            if (!test_ma(p_val, hex ? 16 : 10, val)) log_message_error_xml(log, CODE_METRIC, metric, XML_OUT_OF_RANGE);
             else
             {
                 *p_val |= 0x80000000;
@@ -557,12 +557,12 @@ static bool xml_att_impl(uint32_t *p_st, struct xml_att_context context, xml_val
                     if (!array_test(&bits->arr, &bits->cap, sizeof(*bits->arr), 0, ARRAY_CLEAR, ARG_SIZE(UINT8_CNT(ind + 1)))) log_message_crt(log, CODE_METRIC, MESSAGE_ERROR, errno);
                     else
                     {
-                        uint8_bit_set(bits->arr, ind);
+                        uint8_bs(bits->arr, ind);
                         st++;
                         continue;
                     }
                 }
-                else if (uint8_bit_test_set(bits->arr, ind)) log_message_error_str_xml(log, CODE_METRIC, att_context->metric, path, buff->str, buff->len, XML_ERROR_STR_DUPLICATED_ATTRIBUTE);
+                else if (uint8_bts(bits->arr, ind)) log_message_error_str_xml(log, CODE_METRIC, att_context->metric, path, buff->str, buff->len, XML_ERROR_STR_DUPLICATED_ATTRIBUTE);
                 else
                 {
                     st++;
@@ -746,7 +746,7 @@ static bool xml_decl_impl(uint32_t *restrict p_st, struct xml_decl_context conte
             if (utf8->val == '>')
             {
                 // Checking if version number is provided in the XML declaration
-                if (bits->arr && !uint8_bit_test(bits->arr, 0)) log_message_error_xml(log, CODE_METRIC, metric, XML_INVALID_DECL);
+                if (bits->arr && !bt(bits->arr, 0)) log_message_error_xml(log, CODE_METRIC, metric, XML_INVALID_DECL);
                 else
                 {
                     st = 0;

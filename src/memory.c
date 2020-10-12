@@ -141,8 +141,8 @@ struct array_result queue_test(struct queue *queue, size_t diff, size_t sz)
 
 void *queue_fetch(struct queue *queue, size_t offset, size_t sz)
 {
-    size_t diff;
-    return (char *) queue->arr + (test_sub(&diff, queue->begin, queue->cap - offset) ? diff : queue->begin + offset) * sz;
+    size_t diff = queue->begin;
+    return (char *) queue->arr + (test_sub(&diff, queue->cap - offset) ? diff : diff + offset) * sz;
 }
 
 // This function should be called ONLY if 'queue_test' succeeds

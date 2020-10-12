@@ -161,10 +161,14 @@
 #define CLII(...) ARRI((__VA_ARGS__))
 
 // Common value for the size of temporary buffer used for file writing
-#define BLOCK_WRITE 4096
+#ifndef BLOCK_WRITE
+#   define BLOCK_WRITE 4096
+#endif
 
 // Common value for the size of temporary buffer used for file reading
-#define BLOCK_READ 4096
+#ifndef BLOCK_READ
+#   define BLOCK_READ 4096
+#endif
 
 #define GPUSH IF_GCC_LLVM(_Pragma("GCC diagnostic push"))
 #define GWRN(WRN) IF_GCC_LLVM(_Pragma(TOSTR(GCC diagnostic ignored TOSTR(-W ## WRN))))

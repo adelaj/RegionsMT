@@ -64,7 +64,7 @@ void print_time_stamp(char *buff, size_t *p_cnt)
         struct tm ts;
         Localtime_s(&ts, &t);
         size_t len = strftime(buff, cnt, "%Y-%m-%d %H:%M:%S UTC%z", &ts);
-        *p_cnt = len ? len : size_add_sat(cnt, cnt);
+        *p_cnt = len ? len : add_sat(cnt, cnt);
     }
     else *p_cnt = 1;
 }
@@ -91,7 +91,7 @@ struct message_result print_time_diff(char *buff, size_t *p_cnt, uint64_t start,
 void print_crt(char *buff, size_t *p_cnt, Errno_t err)
 {
     size_t cnt = *p_cnt;
-    *p_cnt = cnt ? Strerror_s(buff, cnt, err) ? size_add_sat(cnt, cnt) : Strnlen(buff, cnt) : 1;
+    *p_cnt = cnt ? Strerror_s(buff, cnt, err) ? add_sat(cnt, cnt) : Strnlen(buff, cnt) : 1;
 }
 
 enum fmt_type {
@@ -576,13 +576,13 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
         {
             print(buff + cnt, &len, fmt + pos, off, 0);
             pos += off + 1;
-            off = cnt = size_add_sat(cnt, len);
-            tmp = len = size_sub_sat(tmp, len);
+            off = cnt = add_sat(cnt, len);
+            tmp = len = sub_sat(tmp, len);
             if (!tmp) i = SIZE_MAX; // Exit the loop if there is no more space
             break;
         }
         print(buff + cnt, &len, fmt + pos, off, 1);
-        cnt = size_add_sat(cnt, len);
+        cnt = add_sat(cnt, len);
         i = SIZE_MAX; // Exit loop if there are no more arguments
         break;
     case 2:
@@ -680,8 +680,8 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
                 else if (execute_flags & FMT_EXE_FLAG_PHONY) j++;
                 break;
             case 2:
-                cnt = size_add_sat(cnt, len);
-                tmp = len = size_sub_sat(tmp, len);
+                cnt = add_sat(cnt, len);
+                tmp = len = sub_sat(tmp, len);
             case 3:
                 j = SIZE_MAX;
             }
@@ -693,8 +693,8 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
             case 4:
             case 6:
             case 8:
-                cnt = size_add_sat(cnt, len);
-                tmp = len = size_sub_sat(tmp, len);
+                cnt = add_sat(cnt, len);
+                tmp = len = sub_sat(tmp, len);
                 if (!tmp) j = SIZE_MAX;
                 break;            
             case 1:
@@ -749,8 +749,8 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
                 else j++;
                 break;
             case 10:
-                cnt = size_add_sat(cnt, len);
-                tmp = len = size_sub_sat(tmp, len);
+                cnt = add_sat(cnt, len);
+                tmp = len = sub_sat(tmp, len);
             case 11:
                 j = SIZE_MAX;
             } 
@@ -762,7 +762,7 @@ static struct message_result fmt_execute(char *buff, size_t *p_cnt, void *p_arg,
     case 3:
         if (res.flags & FMT_LEFT_JUSTIFY)
         {
-            size_t diff = cnt - off, disp = size_sub_sat(off, diff);
+            size_t diff = cnt - off, disp = sub_sat(off, diff);
             memmove(buff + disp, buff + off, diff * sizeof(*buff));
             cnt = res.flags & FMT_OVERPRINT ? disp : disp + diff;
             tmp = len = *p_cnt - cnt;
@@ -1016,8 +1016,8 @@ static struct message_result fmt_execute_wstr(char *buff, size_t *p_cnt, void *p
         utf8_encode(val, str, &ulen);
         size_t tmp = cnt;
         print(buff + len, &tmp, (char *) str, ulen, 0);
-        len = size_add_sat(len, tmp);
-        cnt = size_sub_sat(cnt, tmp);
+        len = add_sat(len, tmp);
+        cnt = sub_sat(cnt, tmp);
         if (!cnt) break;
     }
     if (context) return MESSAGE_FAILURE;
@@ -1033,7 +1033,7 @@ static struct message_result fmt_execute_wapi(char *buff, size_t *p_cnt, void *p
     wchar_t *wstr = NULL;
     size_t wlen = FormatMessageW(FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS, NULL, (DWORD) err, MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), (LPWSTR) &wstr, 0, NULL);
     if (!wstr) return MESSAGE_FAILURE;
-    struct message_result res = print_fmt(buff, p_cnt, NULL, "%&", fmt_execute_wstr, (void *) wstr, size_sub_sat(wlen, lengthof(".\r\n"))); // Cutting ".\r\n" at the end of the string
+    struct message_result res = print_fmt(buff, p_cnt, NULL, "%&", fmt_execute_wstr, (void *) wstr, sub_sat(wlen, lengthof(".\r\n"))); // Cutting ".\r\n" at the end of the string
     LocalFree(wstr);
     return res;
 }

@@ -16,7 +16,7 @@
         size_t res = 0; \
         for (size_t i = 0; i < cnt; i++) \
         { \
-            if (uint8_bit_test_set(bits, data[filter[i]])) continue; \
+            if (bts(bits, data[filter[i]])) continue; \
             if (++res == ucnt) break; \
         } \
         return res; \
@@ -132,7 +132,7 @@ struct array_result categorical_init(struct categorical_supp *supp, size_t phen_
 {
     *supp = (struct categorical_supp) { 0 };
     struct array_result res = { 0 };
-    for (size_t i = 0, tot = 0;; i++, tot = size_add_sat(tot, res.tot))
+    for (size_t i = 0, tot = 0;; i++, tot = add_sat(tot, res.tot))
     {
         switch (i)
         {
@@ -180,7 +180,7 @@ struct array_result categorical_adj_average_init(struct categorical_adj_average_
 {
     *supp = (struct categorical_adj_average_supp) { 0 };
     struct array_result res = { 0 };
-    for (size_t i = 0, tot = 0;; i++, tot = size_add_sat(tot, res.tot))
+    for (size_t i = 0, tot = 0;; i++, tot = add_sat(tot, res.tot))
     {
         switch (i)
         {
@@ -263,7 +263,7 @@ static void contingency_table_shuffle_alt_impl(enum mt_alt alt, size_t *dst, siz
 {
     for (size_t i = 0, j = 0, off = 0; i < phen_pcnt; i++, j += GEN_CNT)
     {
-        if (!uint8_bit_test(phen_bits, i)) continue;
+        if (!bt(phen_bits, i)) continue;
         gen_shuffle_alt_impl(alt, dst + off, src + j, gen_bits);
         off += gen_pcnt;
     }
@@ -310,7 +310,7 @@ bool outer_combined_init(size_t *outer, size_t *xmar, size_t *ymar, size_t mar, 
 
 double stat_exact(size_t *tbl, size_t *xmar, size_t *ymar)
 {
-    size_t g0 = xmar[0], p0 = ymar[0], p1 = ymar[1], lo = size_sub_sat(g0, p1), hi = MIN(g0, p0);
+    size_t g0 = xmar[0], p0 = ymar[0], p1 = ymar[1], lo = sub_sat(g0, p1), hi = MIN(g0, p0);
     double hyp_comp = pdf_hypergeom(tbl[0], p0, p1, g0), a = 0., b = 0.;
     for (size_t i = lo; i <= hi; i++)
     {
@@ -341,7 +341,7 @@ double stat_chisq(size_t *tbl, size_t *outer, size_t mar, size_t dimx, size_t di
 
 static void val_init(size_t *val, uint8_t *bits, size_t cnt)
 {
-    for (size_t i = 0, j = 0; i < cnt; i++) if (uint8_bit_test(bits, i)) val[j++] = i;
+    for (size_t i = 0, j = 0; i < cnt; i++) if (bt(bits, i)) val[j++] = i;
 }
 
 double qas_fisher(size_t *tbl, size_t *xval, size_t *yval, size_t *xmar, size_t *ymar, size_t mar, size_t dimx, size_t dimy)

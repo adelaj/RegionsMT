@@ -60,10 +60,9 @@ bool lm_init(struct lm_supp *supp, size_t phen_cnt, size_t reg_cnt, enum mt_flag
         return 1;
     }
 
-    size_t hi, dphen_cnt = size_shl(&hi, phen_cnt, flags & TEST_A);
+    size_t hi, dphen_cnt = shl(&hi, phen_cnt, flags & TEST_A);
     if (hi) return 0;
-    reg_cnt = size_add(&hi, reg_cnt, (size_t) (flags & TEST_CD) + 2);
-    if (hi) return 0;
+    if (!test_add(&reg_cnt, (size_t) (flags & TEST_CD) + 2)) return 0;
 
     supp->workspace = gsl_multifit_linear_alloc(dphen_cnt, reg_cnt);
 
@@ -470,7 +469,7 @@ bool lm_expr_impl(void *Arg, void *Context, struct utf8 utf8, struct text_metric
                 return 1;
             }
             else if (context->len || utf8.val < '0' || utf8.val > '9') log_message_error_xml_chr(log, CODE_METRIC, metric, XML_UNEXPECTED_CHAR, utf8.byte, utf8.len);
-            else if (!size_test_ma(&context->val.uz, 10, (size_t) (utf8.val - '0'))) log_message_error_xml(log, CODE_METRIC, context->metric, XML_OUT_OF_RANGE);
+            else if (!test_ma(&context->val.uz, 10, (size_t) (utf8.val - '0'))) log_message_error_xml(log, CODE_METRIC, context->metric, XML_OUT_OF_RANGE);
             else return 1;
         }
         break;
@@ -624,8 +623,8 @@ static bool term_cmp(const void *A, const void *B, void *Thunk)
     const size_t *a = A, *b = B;
     int cmp = 0;
     size_t i = 0;
-    for (; i < thunk->blk0 && !cmp; cmp = size_sign(a[i], b[i]), i++);
-    for (; i < thunk->blk && !cmp; cmp = size_sign(size_bsf(~a[i] & b[i]), size_bsf(a[i] & ~b[i])), i++);
+    for (; i < thunk->blk0 && !cmp; cmp = usign(a[i], b[i]), i++);
+    for (; i < thunk->blk && !cmp; cmp = usign(bsf(~a[i] & b[i]), bsf(a[i] & ~b[i])), i++);
     return cmp > 0;
 }
 
@@ -657,7 +656,7 @@ bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t
                     const char *str = cov->buff.str + cov->off[j + cov->dim * ind];
                     if (!flt64_handler(str, 0, &res, NULL)) log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Unable to interpret string %\"~s as decimal number for covariate %\"~s. Sample no. %~uz excluded from analysis!\n", str, name, j);
                     {
-                        uint8_bit_set(filter, j);
+                        bs(filter, j);
                         (*(double **) ptr)[j] = res;
                     }
                 }
@@ -680,25 +679,21 @@ static bool lm_term_cnt(size_t *data, size_t blk0, size_t blk, size_t *p_cnt)
         {
             if (data[i] == SIZE_MAX) return 0;
             if (!data[i]) continue;
-            size_t hi;
-            cnt = size_mul(&hi, cnt, data[i] + 1);
-            if (hi) return 0;
+            if (!test_mul(&cnt, data[i] + 1)) return 0;
         }
     }
     else if (blk)
     {
         if (data[0] == SIZE_MAX) return 0;
-        size_t m = size_pcnt(data[0]);
+        size_t m = pcnt(data[0]);
         if (m) cnt = (size_t) 1 << m;
     }
     for (; i < blk; i++)
     {
         if (data[i] == SIZE_MAX) return 0;
-        size_t m = size_pcnt(data[i]);
+        size_t m = pcnt(data[i]);
         if (!m) continue;
-        size_t hi;
-        cnt = size_mul(&hi, cnt, (size_t) 1 << m);
-        if (hi) return 0;
+        if (!test_mul(&cnt, (size_t) 1 << m)) return 0;
     }
     *p_cnt = cnt - 1;
     return 1;
@@ -712,10 +707,8 @@ static bool lm_cnt(size_t *data, size_t blk0, size_t blk, size_t *p_cnt)
     if (!lm_term_cnt(data, blk0, blk, &ecnt)) return 0;
     for (size_t i = 1, j = blk; i < cnt; i++, j += blk)
     {
-        size_t car, tmp = ecnt;
-        if (!lm_term_cnt(data + j, blk0, blk, &ecnt)) return 0;
-        ecnt = size_add(&car, ecnt, tmp);
-        if (car) return 0;
+        size_t tmp = ecnt;
+        if (!lm_term_cnt(data + j, blk0, blk, &ecnt) || !test_add(&ecnt, tmp)) return 0;
     }
     *p_cnt = ecnt;
     return 1;
@@ -830,7 +823,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             {
                 if (cov.level[arg.term[j].off] > 1)
                 {
-                    size_bit_set(data + i * blk + blk0, arg.term[j].off);
+                    size_bs(data + i * blk + blk0, arg.term[j].off);
                     //par_term[i] *= cov.level[arg.term[j].off] - 1;
                 }
             }
@@ -854,7 +847,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
         }
         for (size_t k = 0; k < blk0; k++)
         {
-            if (!size_bit_test(data + i * blk + blk0, k)) continue;
+            if (!size_bt(data + i * blk + blk0, k)) continue;
             if (!par_term[i]) par_term[i] = cov.level[k] - 1;
             else par_term[i] *= cov.level[k] - 1;
         }
@@ -866,10 +859,10 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
 
     for (size_t i = 0; i < arg.term_len_cnt; i++)
     {
-        if (uint8_bit_test(bits, i)) continue;
+        if (uint8_bt(bits, i)) continue;
         for (size_t j = i + 1; j < arg.term_len_cnt; j++)
         {
-            if (uint8_bit_test(bits, j)) continue;
+            if (uint8_bt(bits, j)) continue;
             size_t k = 0, gr = 0, le = 0, eq = 0;
             for (; k < blk; k++) 
             {
@@ -883,15 +876,15 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             if (k < blk) continue;
             if (le == blk || eq == blk)
             {
-                uint8_bit_set(bits, i);
+                uint8_bs(bits, i);
                 break;
             }
-            if (gr == blk) uint8_bit_set(bits, j);
+            if (gr == blk) uint8_bs(bits, j);
         }
     }
     
     size_t pos = 0, new_cnt = 0;
-    for (size_t i = 0; i < arg.term_len_cnt; i++) if (!uint8_bit_test(bits, i))
+    for (size_t i = 0; i < arg.term_len_cnt; i++) if (!uint8_bt(bits, i))
     {
         if (i && pos < arg.term_len[i - 1])
             memmove(arg.term + pos, arg.term + arg.term_len[i - 1], sizeof(*arg.term) * arg.term_len[i]);
@@ -939,7 +932,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
         for (size_t i = 0; i < cnt; i++)
         {
             size_t off = 0, mul = 1, j = 0;
-            for (; j < blk0; j++) if (size_bit_test(data + blk * i + blk0, j))
+            for (; j < blk0; j++) if (size_bt(data + blk * i + blk0, j))
             {
                 size_t val = ((size_t *) cov.ord[j])[x];
                 if (!val) break;

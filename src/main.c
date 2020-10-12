@@ -156,7 +156,7 @@ static bool test_main(struct fallback *fallback)
 struct main_args main_args_default()
 {
     struct main_args res = { .thread_cnt = get_processor_count() };
-    uint8_bit_set(res.bits, MAIN_ARGS_BIT_POS_THREAD_CNT);
+    uint8_bs(res.bits, MAIN_ARGS_BIT_POS_THREAD_CNT);
     return res;
 }
 
@@ -164,11 +164,11 @@ struct main_args main_args_override(struct main_args args_hi, struct main_args a
 {
     struct main_args res = { .log_path = args_hi.log_path ? args_hi.log_path : args_lo.log_path };
     memcpy(res.bits, args_hi.bits, UINT8_CNT(MAIN_ARGS_BIT_CNT));
-    if (uint8_bit_test(args_hi.bits, MAIN_ARGS_BIT_POS_THREAD_CNT)) res.thread_cnt = args_hi.thread_cnt;
+    if (uint8_bt(args_hi.bits, MAIN_ARGS_BIT_POS_THREAD_CNT)) res.thread_cnt = args_hi.thread_cnt;
     else
     {
         res.thread_cnt = args_lo.thread_cnt;
-        uint8_bit_set(res.bits, MAIN_ARGS_BIT_POS_THREAD_CNT);
+        uint8_bs(res.bits, MAIN_ARGS_BIT_POS_THREAD_CNT);
     }
     return res;
 }
@@ -455,32 +455,32 @@ static int Main(int argc, char **argv)
             {
                 wapi_assert(&log, CODE_METRIC, 0);
                 /*
-                if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY))
+                if (uint8_bt(main_args.bits, MAIN_ARGS_BIT_POS_FANCY))
                 {
-                    if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY_USER))
+                    if (uint8_bt(main_args.bits, MAIN_ARGS_BIT_POS_FANCY_USER))
                         log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: ON.\n");
                     else
                         log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: set to DEFAULT.\n");
                 }
                 else
                 {
-                    if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_FANCY_USER))
+                    if (uint8_bt(main_args.bits, MAIN_ARGS_BIT_POS_FANCY_USER))
                         log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: OFF.\n");
                     else
                         log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Fancy: DEFAULT.\n");
                 }
                 */
 
-                if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_HELP))
+                if (uint8_bt(main_args.bits, MAIN_ARGS_BIT_POS_HELP))
                 {
                     // Help mode
                     log_message_fmt(&log, CODE_METRIC, MESSAGE_INFO, "Help mode triggered!\n");
                 }
-                else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_TEST))
+                else if (uint8_bt(main_args.bits, MAIN_ARGS_BIT_POS_TEST))
                 {
                     succ = test_main(main_args.thread_cnt, &log);
                 }
-                else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CAT))
+                else if (uint8_bt(main_args.bits, MAIN_ARGS_BIT_POS_CAT))
                 {
                     if (pos_cnt >= 7)
                     {
@@ -489,18 +489,18 @@ static int Main(int argc, char **argv)
                         succ = categorical_run_adj(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], pos_arr[4], rpl, seed, &log);
                     }
                 }
-                else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LDE))
+                else if (uint8_bt(main_args.bits, MAIN_ARGS_BIT_POS_LDE))
                 {
                     if (pos_cnt >= 2) lde_run(pos_arr[0], pos_arr[1], &fallback);
                 }
-                else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_CHISQ))
+                else if (uint8_bt(main_args.bits, MAIN_ARGS_BIT_POS_CHISQ))
                 {
                     if (pos_cnt >= 4)
                     {
                         succ = categorical_run_chisq(pos_arr[0], pos_arr[1], pos_arr[2], pos_arr[3], &log);
                     }
                 }
-                else if (uint8_bit_test(main_args.bits, MAIN_ARGS_BIT_POS_LM))
+                else if (uint8_bt(main_args.bits, MAIN_ARGS_BIT_POS_LM))
                 {
                     if (pos_cnt >= 5)
                     {

@@ -1,5 +1,6 @@
 #include "../np.h"
 #include "../ll.h"
+#include "../cmp.h"
 #include "ll.h"
 
 #include <float.h>
@@ -120,7 +121,7 @@ unsigned test_ll_b(void *In, void *Context, void *Tls)
     (void) Context;
     (void) Tls;
     const struct test_ll_b *in = In;
-    uint32_t res_bsr = uint32_bsr(in->a), res_bsf = uint32_bsf(in->a);
+    uint32_t res_bsr = bsr(in->a), res_bsf = bsf(in->a);
     if (res_bsr != in->res_bsr || res_bsf != in->res_bsf) return 0;
     return 1;
 }

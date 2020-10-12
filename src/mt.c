@@ -15,17 +15,17 @@ struct array_result levels_from_phen_impl(size_t *lev, size_t *phen, char *buff,
     for (; i < cnt; i++)
     {
         ip = (size_t) ((ptr[i] - (uintptr_t) phen) / sizeof(*phen));
-        if (uint8_bit_test(filter, ip)) break;
+        if (bt(filter, ip)) break;
         lev[ip] = SIZE_MAX;
     }
     for (size_t j = i + 1; j < cnt; j++)
     {
         size_t jp = (size_t) ((ptr[j] - (uintptr_t) phen) / sizeof(*phen));
-        if (uint8_bit_test(filter, jp))
+        if (bt(filter, jp))
         {
             size_t tmp = ucnt;
             if (str_off_cmp((void *) ptr[j], (void *) ptr[i], buff)) ucnt++;
-            lev[ip] = uint8_bit_test(grouping, ip) ? tmp : SIZE_MAX;
+            lev[ip] = bt(grouping, ip) ? tmp : SIZE_MAX;
             i = j;
             ip = jp;
         }
@@ -33,7 +33,7 @@ struct array_result levels_from_phen_impl(size_t *lev, size_t *phen, char *buff,
     }
     if (i < cnt)
     {
-        lev[ip] = uint8_bit_test(grouping, ip) ? ucnt : SIZE_MAX;
+        lev[ip] = bt(grouping, ip) ? ucnt : SIZE_MAX;
         ucnt++;
     }
     free(ptr);

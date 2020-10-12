@@ -37,7 +37,7 @@ static bool utf8_str_to_wstr(const char *restrict str, wchar_t **p_wstr, size_t 
     {
         if (!utf8_decode(ch, &val, NULL, &ulen, &context)) return 0;
         if (context) continue;
-        if (!test_add(&wcnt, wcnt, utf16_len(val))) return 0;
+        if (!test_add(&wcnt, utf16_len(val))) return 0;
     }
     if (context) return 0;
     wchar_t *wstr;
@@ -101,7 +101,7 @@ IF_WIN(void *Aligned_realloc(void *ptr, size_t al, size_t sz)
 
 IF_UNIX_APPLE(void *Aligned_calloc(size_t al, size_t cnt, size_t sz)
 {
-    if (!test_mul(&sz, cnt, sz)) return errno = ENOMEM, NULL;
+    if (!test_mul(&sz, cnt)) return errno = ENOMEM, NULL;
     void *res = Aligned_malloc(al, sz);
     if (!res) return NULL;
     memset(res, 0, sz);
@@ -326,14 +326,12 @@ void *Memrchr(const void *Str, int ch, size_t cnt)
     const char *str = (const char *) Str;
     const size_t off = ((uintptr_t) Str + cnt) % alignof(__m128i), n = MIN(off, cnt);
     for (size_t i = 0; i < n; i++) if (str[--cnt] == ch) return (void *) (str + cnt);
-
     while (cnt >= sizeof(__m128i))
     {
         cnt -= sizeof(__m128i);
         __m128i a = _mm_cmpeq_epi8(_mm_load_si128((const __m128i *) (str + cnt)), msk);
-        if (!_mm_testz_si128(a, a)) return (void *) (str + cnt + m128i_byte_scan_forward(a));
+        if (!_mm_testz_si128(a, a)) return (void *) (str + cnt + m128i_b8sr(a));
     }
-
     while (cnt) if (str[--cnt] == ch) return (void *) (str + cnt);
     return NULL;
 }
@@ -344,15 +342,13 @@ void *Memrchr2(const void *Str, int ch0, int ch1, size_t cnt)
     const char *str = (const char *) Str;
     const size_t off = ((uintptr_t) Str + cnt) % alignof(__m128i), n = MIN(off, cnt);
     for (size_t i = 0; i < n; i++) if (str[--cnt] == ch0 || str[cnt] == ch1) return ( void *) (str + cnt);
-
     while (cnt >= sizeof(__m128i))
     {
         cnt -= sizeof(__m128i);
         __m128i tmp = _mm_load_si128((const __m128i *) (str + cnt));
         __m128i a = _mm_or_si128(_mm_cmpeq_epi8(tmp, msk0), _mm_cmpeq_epi8(tmp, msk1));
-        if (!_mm_testz_si128(a, a)) return ( void *) (str + cnt + m128i_byte_scan_forward(a));
+        if (!_mm_testz_si128(a, a)) return ( void *) (str + cnt + m128i_b8sr(a));
     }
-
     while (cnt) if (str[--cnt] == ch0 || str[cnt] == ch1) return ( void *) (str + cnt);
     return NULL;
 }
