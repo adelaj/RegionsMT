@@ -31,7 +31,7 @@ bool lde_run(const char *path_gen, const char *path_out, struct log *log)
 
     for (size_t i = 0; i < snp_cnt; i++)
     {
-        for (size_t j = size_sub_sat(i, 80); j < i; j++)
+        for (size_t j = sub_sat(i, 80); j < i; j++)
         {
             double lde = lde_impl(gen + gen_context.phen_cnt * i, gen + gen_context.phen_cnt * j, gen_context.phen_cnt);
             //unsigned res = -lde > .9;

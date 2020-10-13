@@ -45,7 +45,7 @@ DECL_ARG_FETCH(intmax, intmax_t, Intmax_dom_t)
 
 // In: '*p_cnt' -- size of the buffer
 // Out: '*p_cnt' -- length of the string to be written (optional null-terminator is not taken in account)
-void print(char *buff, size_t *p_cnt, const char *str, size_t len, bool term)
+void print(char *restrict buff, size_t *restrict p_cnt, const char *restrict str, size_t len, bool term)
 {
     size_t cnt = *p_cnt;
     *p_cnt = len;
@@ -54,7 +54,7 @@ void print(char *buff, size_t *p_cnt, const char *str, size_t len, bool term)
     if (term) buff[len] = '\0';
 }
 
-void print_time_stamp(char *buff, size_t *p_cnt)
+void print_time_stamp(char *restrict buff, size_t *restrict p_cnt)
 {
     size_t cnt = *p_cnt;
     if (cnt)

@@ -28,8 +28,8 @@ double log_choose(size_t n, size_t m)
 
 double pdf_hypergeom(size_t k, size_t n1, size_t n2, size_t t)
 {
-    size_t car, n12 = size_add(&car, n1, n2);
-    if (car) return nan(__func__);
+    size_t n12 = n1;
+    if (!test_add(&n12, n2)) return nan(__func__);
     if (t > n12) t = n12;
     if (k > n1 || k > t || (t > n2 && k < t - n2)) return 0.;
     return exp(log_choose(n1, k) + log_choose(n2, t - k) - log_choose(n12, t));

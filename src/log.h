@@ -149,7 +149,7 @@ struct message_result {
 
 typedef struct message_result (*fmt_callback)(char *, size_t *, void *, const struct env *, enum fmt_execute_flags);
 
-void print(char *, size_t *, const char *, size_t, bool);
+void print(char *restrict, size_t *restrict, const char *restrict, size_t, bool);
 struct message_result print_fmt(char *, size_t *, const struct style *, ...);
 struct message_result print_time_diff(char *, size_t *, uint64_t, uint64_t, const struct env *);
 void print_time_stamp(char *, size_t *);

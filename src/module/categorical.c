@@ -193,8 +193,8 @@ static bool str_is_whitespace(const char *str)
 void phen_filter_na(const size_t *phen, const char *str, size_t cnt, uint8_t *filter)
 {
     for (size_t i = 0; i < cnt; i++)
-        if (!filter[i] || str_is_whitespace(str + phen[i]) || !Stricmp(str + phen[i], "na")) uint8_br(filter, i);
-        else uint8_bs(filter, i);
+        if (!filter[i] || str_is_whitespace(str + phen[i]) || !Stricmp(str + phen[i], "na")) br(filter, i);
+        else bs(filter, i);
 }
 
 bool categorical_run_chisq(const char *phen_name, const char *path_phen, const char *path_gen, const char *path_out, struct log *log)

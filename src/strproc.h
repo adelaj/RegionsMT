@@ -45,10 +45,11 @@ struct handler_context {
     size_t bit_pos;
 };
 
-enum {
+enum cvt_result {
     CVT_ERROR = 0,
     CVT_SUCCESS,
-    CVT_OUT_OF_RANGE
+    CVT_OUT_OF_RANGE,
+    CVT_EMPTY
 };
 
 unsigned str_to_uint64(const char *, const char **, uint64_t *);

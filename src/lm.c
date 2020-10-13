@@ -823,7 +823,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             {
                 if (cov.level[arg.term[j].off] > 1)
                 {
-                    size_bs(data + i * blk + blk0, arg.term[j].off);
+                    bs(data + i * blk + blk0, arg.term[j].off);
                     //par_term[i] *= cov.level[arg.term[j].off] - 1;
                 }
             }
@@ -847,7 +847,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
         }
         for (size_t k = 0; k < blk0; k++)
         {
-            if (!size_bt(data + i * blk + blk0, k)) continue;
+            if (!bt(data + i * blk + blk0, k)) continue;
             if (!par_term[i]) par_term[i] = cov.level[k] - 1;
             else par_term[i] *= cov.level[k] - 1;
         }
@@ -932,7 +932,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
         for (size_t i = 0; i < cnt; i++)
         {
             size_t off = 0, mul = 1, j = 0;
-            for (; j < blk0; j++) if (size_bt(data + blk * i + blk0, j))
+            for (; j < blk0; j++) if (bt(data + blk * i + blk0, j))
             {
                 size_t val = ((size_t *) cov.ord[j])[x];
                 if (!val) break;
@@ -953,7 +953,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
             }
             array_broadcast(reg + pos, off, sizeof(*reg), &(double) { 0. });
             reg[pos + off] = pr;
-            array_broadcast(reg + pos + off + 1, size_sub_sat(par_term[i], off + 1), sizeof(*reg), &(double) { 0. });
+            array_broadcast(reg + pos + off + 1, sub_sat(par_term[i], off + 1), sizeof(*reg), &(double) { 0. });
             pos += par_term[i];
         }
     }

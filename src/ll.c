@@ -27,36 +27,25 @@
 #define DECL_1_NARR(TYPE, PREFIX, SUFFIX, OP_TYPE) \
     DECL_1_EXT(TYPE, PREFIX, SUFFIX, OP_TYPE, 1, 2)
 
-#define DECL_2(TYPE, ARG_TYPE, PREFIX, SUFFIX, BACKEND) \
+#define DECL_2(TYPE, PREFIX, SUFFIX, ARG_TYPE, BACKEND) \
     TYPE PREFIX ## _ ## SUFFIX(TYPE x, ARG_TYPE y) \
     { \
         return BACKEND(x, y); \
     }
 
-#define DECL_2_COPY(TYPE, ARG_TYPE, PREFIX, SUFFIX, OP_TYPE) \
+#define DECL_2_COPY(TYPE, PREFIX, SUFFIX, ARG_TYPE, OP_TYPE) \
     TYPE PREFIX ## _ ## SUFFIX(TYPE x, ARG_TYPE y) \
     { \
         _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
         return (TYPE) SUFFIX((OP_TYPE) x, y); \
     }
 
-// Define operations via GCC intrinsics such as '__builtin_add_overflow' or '__builtin_sub_overflow'
-#define DECL_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
-    TYPE PREFIX ## _ ## SUFFIX(unsigned char *p_hi, TYPE x, TYPE y) \
+// Define redirected operation for similar types
+#define DECL_OP_COPY(TYPE, PREFIX, SUFFIX, HI_TYPE, OP_TYPE, OP_HI_TYPE) \
+    TYPE PREFIX ## _ ## SUFFIX(HI_TYPE *p_hi, TYPE x, TYPE y) \
     { \
-        TYPE res; \
-        unsigned char hi = BACKEND(x, y, &res); \
-        *p_hi = hi + BACKEND(res, *p_hi, &res); \
-        return res; \
-    }
-
-// Define operations via intel intrinsics such as '_addcarry_u32' and '_subborrow_u32'
-#define DECL_OP_INTEL(TYPE, PREFIX, SUFFIX, BACKEND) \
-    TYPE PREFIX ## _ ## SUFFIX(unsigned char *p_hi, TYPE x, TYPE y) \
-    { \
-        TYPE res; \
-        *p_hi = BACKEND(*p_hi, x, y, &res); \
-        return res; \
+        _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE) && sizeof(OP_HI_TYPE) == sizeof(HI_TYPE), ""); \
+        return (TYPE) SUFFIX((OP_HI_TYPE *) p_hi, (OP_TYPE) x, (OP_TYPE) y); \
     }
 
 // Define operations with wide integers
@@ -68,12 +57,23 @@
         return (TYPE) lo | ((TYPE) hi << bitsof(OP_TYPE)); \
     }
 
-// Define redirected operation for similar types
-#define DECL_OP_COPY(TYPE, PREFIX, SUFFIX, HI_TYPE, OP_TYPE, OP_HI_TYPE) \
-    TYPE PREFIX ## _ ## SUFFIX(HI_TYPE *p_hi, TYPE x, TYPE y) \
+// Define operations via intel intrinsics such as '_addcarry_u32' and '_subborrow_u32'
+#define DECL_OP_INTEL(TYPE, PREFIX, SUFFIX, BACKEND) \
+    TYPE PREFIX ## _ ## SUFFIX(unsigned char *p_hi, TYPE x, TYPE y) \
     { \
-        _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE) && sizeof(OP_HI_TYPE) == sizeof(HI_TYPE), ""); \
-        return (TYPE) SUFFIX((OP_HI_TYPE *) p_hi, (OP_TYPE) x, (OP_TYPE) y); \
+        TYPE res; \
+        *p_hi = BACKEND(*p_hi, x, y, &res); \
+        return res; \
+    }
+
+// Define operations via GCC intrinsics such as '__builtin_add_overflow' or '__builtin_sub_overflow'
+#define DECL_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
+    TYPE PREFIX ## _ ## SUFFIX(unsigned char *p_hi, TYPE x, TYPE y) \
+    { \
+        TYPE res; \
+        unsigned char hi = BACKEND(x, y, &res); \
+        *p_hi = hi + BACKEND(res, *p_hi, &res); \
+        return res; \
     }
 
 #define DECL_MUL_NARR(TYPE, PREFIX, OP_TYPE) \
@@ -218,12 +218,6 @@
         return cnt; \
     }
 
-#define DECL_BSR_GCC(TYPE, PREFIX, BACKEND) \
-    TYPE PREFIX ## _bsr(TYPE x) \
-    { \
-        return x ? bitsof(TYPE) - (TYPE) BACKEND(x) - 1 : umax(x); \
-    }
-
 #define DECL_BSR_WIDE(TYPE, PREFIX, OP_TYPE) \
     TYPE PREFIX ## _bsr(TYPE x) \
     { \
@@ -232,10 +226,10 @@
         return hi ? (TYPE) bsr(hi) + bitsof(OP_TYPE) : lo ? (TYPE) bsr(lo) : umax(x); \
     }
 
-#define DECL_BSF_GCC(TYPE, PREFIX, BACKEND) \
-    TYPE PREFIX ## _bsf(TYPE x) \
+#define DECL_BSR_GCC(TYPE, PREFIX, BACKEND) \
+    TYPE PREFIX ## _bsr(TYPE x) \
     { \
-        return  x ? (TYPE) BACKEND(x) : umax(x); \
+        return x ? bitsof(TYPE) - (TYPE) BACKEND(x) - 1 : umax(x); \
     }
 
 #define DECL_BSF_WIDE(TYPE, PREFIX, OP_TYPE) \
@@ -244,6 +238,12 @@
         _Static_assert(2 * sizeof(OP_TYPE) == sizeof(TYPE), ""); \
         OP_TYPE lo = (OP_TYPE) x, hi = (OP_TYPE) (x >> bitsof(OP_TYPE)); \
         return lo ? (TYPE) bsf(lo) : hi ? (TYPE) bsf(hi) + bitsof(OP_TYPE) : umax(x); \
+    }
+
+#define DECL_BSF_GCC(TYPE, PREFIX, BACKEND) \
+    TYPE PREFIX ## _bsf(TYPE x) \
+    { \
+        return  x ? (TYPE) BACKEND(x) : umax(x); \
     }
 
 #define DECL_BS_MSVC(TYPE, PREFIX, SUFFIX, BACKEND) \
@@ -380,27 +380,6 @@
         _mm_storeu_si64((void *) src, _mm_set_epi64x(0, (long long) val)); \
     }
 
-#define DECL_ATOMIC_OP_MSVC(TYPE, PREFIX, SUFFIX, BACKEND_TYPE, BACKEND) \
-    TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *dst, TYPE arg, enum atomic_mo mo) \
-    { \
-        (void) mo; \
-        _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
-        return (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) arg); \
-    }
-
-#define DECL_ATOMIC_OP_COPY(TYPE, PREFIX, SUFFIX, OP_TYPE) \
-    TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *dst, TYPE arg, enum atomic_mo mo) \
-    { \
-        _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
-        return (TYPE) atomic_ ## SUFFIX ## _mo((OP_TYPE volatile *) dst, (OP_TYPE) arg, mo); \
-    }
-
-#define DECL_ATOMIC_FETCH_SUB_MSVC(TYPE, PREFIX) \
-    TYPE PREFIX ## _atomic_fetch_sub_mo(TYPE volatile *dst, TYPE arg, enum atomic_mo mo) \
-    { \
-        return (TYPE) atomic_fetch_add_mo(dst, 0 - arg, mo); \
-    }
-
 #define DECL_ATOMIC_CMP_XCHG_GCC(TYPE, PREFIX) \
     bool PREFIX ## _atomic_cmp_xchg_mo(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail) \
     { \
@@ -441,10 +420,11 @@
         return 0; \
     }
 
-#define DECL_ATOMIC_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
-    TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *dst, TYPE arg, enum atomic_mo mo) \
+#define DECL_ATOMIC_OP_COPY(TYPE, PREFIX, SUFFIX, RET_TYPE, ARG_TYPE, OP_TYPE) \
+    RET_TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *dst, ARG_TYPE arg, enum atomic_mo mo) \
     { \
-        return BACKEND(dst, arg, mo); \
+        _Static_assert(sizeof(OP_TYPE) == sizeof(TYPE), ""); \
+        return (RET_TYPE) atomic_ ## SUFFIX ## _mo((OP_TYPE volatile *) dst, (OP_TYPE) arg, mo); \
     }
 
 #define DECL_ATOMIC_OP_WIDE(TYPE, PREFIX, SUFFIX, OP, ...) \
@@ -454,6 +434,26 @@
         TYPE probe = *mem; /* Warning! Non-atomic load is legitimate here! */ \
         while (!atomic_cmp_xchg(mem, &probe, (TYPE) OP(probe __VA_ARGS__ val))) probe = *mem; \
         return probe; \
+    }
+
+#define DECL_ATOMIC_OP_GCC(TYPE, PREFIX, SUFFIX, BACKEND) \
+    TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *dst, TYPE arg, enum atomic_mo mo) \
+    { \
+        return BACKEND(dst, arg, mo); \
+    }
+
+#define DECL_ATOMIC_OP_MSVC(TYPE, PREFIX, SUFFIX, BACKEND_TYPE, BACKEND) \
+    TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *dst, TYPE arg, enum atomic_mo mo) \
+    { \
+        (void) mo; \
+        _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
+        return (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) arg); \
+    }
+
+#define DECL_ATOMIC_FETCH_SUB_MSVC(TYPE, PREFIX) \
+    TYPE PREFIX ## _atomic_fetch_sub_mo(TYPE volatile *dst, TYPE arg, enum atomic_mo mo) \
+    { \
+        return (TYPE) atomic_fetch_add_mo(dst, 0 - arg, mo); \
     }
 
 #define DECL_ATOMIC_FETCH_ADD_SAT(TYPE, PREFIX) \
@@ -504,6 +504,14 @@
     void PREFIX ## _atomic_br_mo(TYPE volatile *arr, size_t bit, enum atomic_mo mo) \
     { \
         atomic_fetch_and_mo(arr + bit / bitsof(TYPE), ~((TYPE) 1 << bit % bitsof(TYPE)), mo); \
+    }
+
+#define DECL_ATOMIC_BT_MSVC(TYPE, PREFIX, SUFFIX, BACKEND_TYPE, BACKEND) \
+    bool PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *arr, size_t bit, enum atomic_mo mo) \
+    { \
+        (void) mo; \
+        _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
+        return BACKEND((BACKEND_TYPE volatile *) (arr + bit / bitsof(TYPE)), (BACKEND_TYPE) (bit % bitsof(TYPE))); \
     }
 
 #define DECL2(SUFFIX, ...) \
@@ -595,27 +603,27 @@ IF_MSVC(IF_X64(unsigned long long ullong_shr(unsigned long long *p_lo, unsigned 
 
 // Rotate left
 IF_GCC_LLVM(DECL_RO_GCC(unsigned char, uchar, rol, <<, >>))
-IF_MSVC(DECL_2(unsigned char, unsigned char, uchar, rol, _rotl8))
+IF_MSVC(DECL_2(unsigned char, uchar, rol, unsigned char, _rotl8))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned short, ushrt, rol, <<, >>))
-IF_MSVC(DECL_2(unsigned short, unsigned char, ushrt, rol, _rotl16))
+IF_MSVC(DECL_2(unsigned short, ushrt, rol, unsigned char, _rotl16))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned, uint, rol, <<, >>))
-IF_MSVC(DECL_2(unsigned, unsigned char, uint, rol, _rotl))
+IF_MSVC(DECL_2(unsigned, uint, rol, unsigned char, _rotl))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned long, ulong, rol, <<, >>))
-IF_MSVC(DECL_2_COPY(unsigned long, unsigned char, ulong, rol, unsigned))
+IF_MSVC(DECL_2_COPY(unsigned long, ulong, rol, unsigned char, unsigned))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned long long, ullong, rol, <<, >>))
-IF_MSVC(DECL_2(unsigned long long, unsigned char, ullong, rol, _rotl64))
+IF_MSVC(DECL_2(unsigned long long, ullong, rol, unsigned char, _rotl64))
 
 // Rotate right
 IF_GCC_LLVM(DECL_RO_GCC(unsigned char, uchar, ror, >>, <<))
-IF_MSVC(DECL_2(unsigned char, unsigned char, uchar, ror, _rotr8))
+IF_MSVC(DECL_2(unsigned char, uchar, ror, unsigned char, _rotr8))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned short, ushrt, ror, >>, <<))
-IF_MSVC(DECL_2(unsigned short, unsigned char, ushrt, ror, _rotr16))
+IF_MSVC(DECL_2(unsigned short, ushrt, ror, unsigned char, _rotr16))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned, uint, ror, >>, <<))
-IF_MSVC(DECL_2(unsigned, unsigned char, uint, ror, _rotr))
+IF_MSVC(DECL_2(unsigned, uint, ror, unsigned char, _rotr))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned long, ulong, ror, >>, <<))
-IF_MSVC(DECL_2_COPY(unsigned long, unsigned char, ulong, ror, unsigned))
+IF_MSVC(DECL_2_COPY(unsigned long, ulong, ror, unsigned char, unsigned))
 IF_GCC_LLVM(DECL_RO_GCC(unsigned long long, ullong, ror, >>, <<))
-IF_MSVC(DECL_2(unsigned long long, unsigned char, ullong, ror, _rotr64))
+IF_MSVC(DECL_2(unsigned long long, ullong, ror, unsigned char, _rotr64))
 
 // Saturated add
 DECL2(ADD_SAT, )
@@ -796,7 +804,7 @@ IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, fetch_and, char, _InterlockedA
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_and, __atomic_fetch_and))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, fetch_and, short, _InterlockedAnd16))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_and, __atomic_fetch_and))
-IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_and, unsigned long))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_and, unsigned, unsigned, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_and, __atomic_fetch_and))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_and, long, _InterlockedAnd))
 IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_and, , &)))
@@ -809,7 +817,7 @@ IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, fetch_or, char, _InterlockedOr
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_or, __atomic_fetch_or))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, fetch_or, short, _InterlockedOr16))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_or, __atomic_fetch_or))
-IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_or, unsigned long))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_or, unsigned, unsigned, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_or, __atomic_fetch_or))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_or, long, _InterlockedOr))
 IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_or, , |)))
@@ -822,7 +830,7 @@ IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, fetch_xor, char, _InterlockedX
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_xor, __atomic_fetch_xor))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, fetch_xor, short, _InterlockedXor16))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_xor, __atomic_fetch_xor))
-IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_xor, unsigned long))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_xor, unsigned, unsigned, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_xor, __atomic_fetch_xor))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_xor, long, _InterlockedXor))
 IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_xor, , ^)))
@@ -835,7 +843,7 @@ IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, fetch_add, char, _InterlockedE
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, fetch_add, __atomic_fetch_add))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, fetch_add, short, _InterlockedExchangeAdd16))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_add, __atomic_fetch_add))
-IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_add, unsigned long))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_add, unsigned, unsigned, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_add, __atomic_fetch_add))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_add, long, _InterlockedExchangeAdd))
 IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_add, , +)))
@@ -861,7 +869,7 @@ IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned char, uchar, xchg, char, _InterlockedExchan
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned short, ushrt, xchg, __atomic_exchange_n))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned short, ushrt, xchg, short, _InterlockedExchangeAdd16))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, xchg, __atomic_exchange_n))
-IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, xchg, unsigned long))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, xchg, unsigned, unsigned, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, xchg, __atomic_exchange_n))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, xchg, long, _InterlockedExchange))
 
@@ -884,10 +892,26 @@ DECL2(ATOMIC_FETCH_SUB_SAT, )
 DECL2(ATOMIC_BT, )
 
 // Atomic bit test and set
-DECL2(ATOMIC_BTS, )
+IF_GCC_LLVM_MSVC(DECL_ATOMIC_BTS(unsigned char, uchar))
+IF_GCC_LLVM_MSVC(DECL_ATOMIC_BTS(unsigned short, ushrt))
+IF_GCC_LLVM(DECL_ATOMIC_BTS(unsigned, uint))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, bts, bool, size_t, unsigned long))
+IF_GCC_LLVM(DECL_ATOMIC_BTS(unsigned long, ulong))
+IF_MSVC(DECL_ATOMIC_BT_MSVC(unsigned long, ulong, bts, long, _interlockedbittestandset))
+IF_GCC_LLVM(DECL_ATOMIC_BTS(unsigned long long, ullong))
+IF_MSVC(IF_X32(DECL_ATOMIC_BTS(unsigned long long, ullong)))
+IF_MSVC(IF_X64(DECL_ATOMIC_BT_MSVC(unsigned long long, ullong, bts, long long, _interlockedbittestandset64)))
 
 // Atomic bit test and reset
-DECL2(ATOMIC_BTR, )
+IF_GCC_LLVM_MSVC(DECL_ATOMIC_BTR(unsigned char, uchar))
+IF_GCC_LLVM_MSVC(DECL_ATOMIC_BTR(unsigned short, ushrt))
+IF_GCC_LLVM(DECL_ATOMIC_BTR(unsigned, uint))
+IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, btr, bool, size_t, unsigned long))
+IF_GCC_LLVM(DECL_ATOMIC_BTR(unsigned long, ulong))
+IF_MSVC(DECL_ATOMIC_BT_MSVC(unsigned long, ulong, btr, long, _interlockedbittestandreset))
+IF_GCC_LLVM(DECL_ATOMIC_BTR(unsigned long long, ullong))
+IF_MSVC(IF_X32(DECL_ATOMIC_BTR(unsigned long long, ullong)))
+IF_MSVC(IF_X64(DECL_ATOMIC_BT_MSVC(unsigned long long, ullong, btr, long long, _interlockedbittestandreset64)))
 
 // Atomic bit set
 DECL2(ATOMIC_BS, )
@@ -1017,8 +1041,8 @@ unsigned uint_ulog10(unsigned x, bool ceil)
     return LOG10_LEAF_8(unsigned, x, ceil, LOG10_LEAF_0(x, ceil), );
 }
 
-IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_2_COPY(unsigned long, bool, ulong, ulog10, unsigned)))
-IF_GCC_LLVM(IF_X64(DECL_2_COPY(unsigned long, bool, ulong, ulog10, unsigned long long)))
+IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_2_COPY(unsigned long, ulong, ulog10, bool, unsigned)))
+IF_GCC_LLVM(IF_X64(DECL_2_COPY(unsigned long, ulong, ulog10, bool, unsigned long long)))
 
 unsigned long long ullong_ulog10(unsigned long long x, bool ceil)
 {
