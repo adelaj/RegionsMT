@@ -17,7 +17,7 @@ enum atomic_mo {
 };
 
 GPUSH GWRN(pedantic)
-typedef IF_GCC_LLVM(IF_X64(unsigned __int128)) IF_MSVC_X32(struct { uint64_t qw[2]; }) Uint128_t;
+typedef IF_GCC_LLVM(IF_X64(unsigned __int128)) IF_MSVC_X32(struct { uint64_t v[2]; }) Uint128_t;
 GPOP
 typedef IF_X32(uint64_t) IF_X64(Uint128_t) Dsize_t;
 
@@ -26,13 +26,13 @@ _Static_assert(sizeof(Dsize_t) == 2 * sizeof(size_t), "");
 
 #define UINT128C(LO, HI) \
     IF_GCC_LLVM((IF_X64((Uint128_t) (LO) | ((Uint128_t) (HI) << (bitsof(Uint128_t) >> 1))))) \
-    IF_MSVC_X32(((Uint128_t) { .qw[0] = (LO), .qw[1] = (HI) }))
+    IF_MSVC_X32(((Uint128_t) { .v[0] = (LO), .v[1] = (HI) }))
 #define UINT128_LO(X) \
     IF_GCC_LLVM((IF_X64((uint64_t) (X)))) \
-    IF_MSVC_X32(((X).qw[0]))
+    IF_MSVC_X32(((X).v[0]))
 #define UINT128_HI(X) \
     IF_GCC_LLVM(((uint64_t) ((X) >> (bitsof(Uint128_t) >> 1)))) \
-    IF_MSVC_X32(((X).qw[1]))
+    IF_MSVC_X32(((X).v[1]))
 #define DSIZEC(LO, HI) \
     IF_X64((UINT128C((LO), (HI)))) \
     IF_X32(((Dsize_t) (LO) | (((Dsize_t) (HI)) << SIZE_BIT)))
