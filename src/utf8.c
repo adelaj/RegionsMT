@@ -172,7 +172,7 @@ bool utf8_decode_len(const char *restrict str, size_t len, size_t *restrict p_le
     size_t ind = 0;
     for (; ind < len; ind++)
     {
-        if (!utf8_decode(str[ind], &val, NULL, &ulen, &context)) break;
+        if (!utf8_decode((uint8_t) str[ind], &val, NULL, &ulen, &context)) break;
         if (context) continue;
         *p_len = ulen;
         return 1;
