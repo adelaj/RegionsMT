@@ -246,7 +246,7 @@
         return  x ? (TYPE) BACKEND(x) : umax(x); \
     }
 
-#define DECL_BS_MSVC(TYPE, PREFIX, SUFFIX, BACKEND) \
+#define DECL_BSZ_MSVC(TYPE, PREFIX, SUFFIX, BACKEND) \
     TYPE PREFIX ## _ ## SUFFIX(TYPE x) \
     { \
         unsigned long res; \
@@ -506,7 +506,7 @@
         atomic_fetch_and_mo(arr + bit / bitsof(TYPE), ~((TYPE) 1 << bit % bitsof(TYPE)), mo); \
     }
 
-#define DECL_ATOMIC_BT_MSVC(TYPE, PREFIX, SUFFIX, BACKEND_TYPE, BACKEND) \
+#define DECL_ATOMIC_BTZ_MSVC(TYPE, PREFIX, SUFFIX, BACKEND_TYPE, BACKEND) \
     bool PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *arr, size_t bit, enum atomic_mo mo) \
     { \
         (void) mo; \
@@ -670,10 +670,10 @@ IF_GCC_LLVM_MSVC(DECL_1_NARR(unsigned short, ushrt, bsr, unsigned))
 IF_GCC_LLVM(DECL_BSR_GCC(unsigned, uint, __builtin_clz))
 IF_MSVC(DECL_1_COPY(unsigned, uint, bsr, unsigned long))
 IF_GCC_LLVM(DECL_BSR_GCC(unsigned long, ulong, __builtin_clzl))
-IF_MSVC(DECL_BS_MSVC(unsigned long, ulong, bsr, _BitScanReverse))
+IF_MSVC(DECL_BSZ_MSVC(unsigned long, ulong, bsr, _BitScanReverse))
 IF_GCC_LLVM(IF_X64(DECL_BSR_GCC(unsigned long long, ullong, __builtin_clzll)))
 IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_BSR_WIDE(unsigned long long, ullong, unsigned)))
-IF_MSVC(IF_X64(DECL_BS_MSVC(unsigned long long, ullong, bsr, _BitScanReverse64)))
+IF_MSVC(IF_X64(DECL_BSZ_MSVC(unsigned long long, ullong, bsr, _BitScanReverse64)))
 
 // Bit scan forward
 unsigned char uchar_bsf(unsigned char x) 
@@ -685,10 +685,10 @@ IF_GCC_LLVM_MSVC(DECL_1_NARR(unsigned short, ushrt, bsf, unsigned))
 IF_GCC_LLVM(DECL_BSF_GCC(unsigned, uint, __builtin_ctz))
 IF_MSVC(DECL_1_COPY(unsigned, uint, bsf, unsigned long))
 IF_GCC_LLVM(DECL_BSF_GCC(unsigned long, ulong, __builtin_ctzl))
-IF_MSVC(DECL_BS_MSVC(unsigned long, ulong, bsf, _BitScanForward))
+IF_MSVC(DECL_BSZ_MSVC(unsigned long, ulong, bsf, _BitScanForward))
 IF_GCC_LLVM(IF_X64(DECL_BSF_GCC(unsigned long long, ullong, __builtin_ctzll)))
 IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_BSF_WIDE(unsigned long long, ullong, unsigned)))
-IF_MSVC(IF_X64(DECL_BS_MSVC(unsigned long long, ullong, bsf, _BitScanForward64)))
+IF_MSVC(IF_X64(DECL_BSZ_MSVC(unsigned long long, ullong, bsf, _BitScanForward64)))
 
 // Population count
 unsigned char uchar_pcnt(unsigned char x)
@@ -807,9 +807,9 @@ IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_and, __atomic_fetch_and))
 IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_and, unsigned, unsigned, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_and, __atomic_fetch_and))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_and, long, _InterlockedAnd))
-IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_and, , &)))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_and, , &)))
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_and, __atomic_fetch_and)))
-IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_and, long long, _InterlockedAnd64))
+IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_and, long long, _InterlockedAnd64)))
 
 // Atomic fetch-OR
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_or, __atomic_fetch_or))
@@ -820,9 +820,9 @@ IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_or, __atomic_fetch_or))
 IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_or, unsigned, unsigned, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_or, __atomic_fetch_or))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_or, long, _InterlockedOr))
-IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_or, , |)))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_or, , |)))
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_or, __atomic_fetch_or)))
-IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_or, long long, _InterlockedOr64))
+IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_or, long long, _InterlockedOr64)))
 
 // Atomic fetch-XOR
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_xor, __atomic_fetch_xor))
@@ -833,9 +833,9 @@ IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_xor, __atomic_fetch_xor))
 IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_xor, unsigned, unsigned, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_xor, __atomic_fetch_xor))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_xor, long, _InterlockedXor))
-IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_xor, , ^)))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_xor, , ^)))
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_xor, __atomic_fetch_xor)))
-IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_xor, long long, _InterlockedXor64))
+IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_xor, long long, _InterlockedXor64)))
 
 // Atomic fetch-add
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_add, __atomic_fetch_add))
@@ -846,9 +846,9 @@ IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, fetch_add, __atomic_fetch_add))
 IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, fetch_add, unsigned, unsigned, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, fetch_add, __atomic_fetch_add))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, fetch_add, long, _InterlockedExchangeAdd))
-IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_add, , +)))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, fetch_add, , +)))
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, fetch_add, __atomic_fetch_add)))
-IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_add, long long, _InterlockedExchangeAdd64))
+IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, fetch_add, long long, _InterlockedExchangeAdd64)))
 
 // Atomic fetch-subtract
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned char, uchar, fetch_sub, __atomic_fetch_sub))
@@ -872,13 +872,11 @@ IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned, uint, xchg, __atomic_exchange_n))
 IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, xchg, unsigned, unsigned, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(unsigned long, ulong, xchg, __atomic_exchange_n))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long, ulong, xchg, long, _InterlockedExchange))
-
 GPUSH GWRN(unused-value)
-IF_GCC_LLVM(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, xchg, , , )))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_ATOMIC_OP_WIDE(unsigned long long, ullong, xchg, , , )))
 GPOP
-
 IF_GCC_LLVM(IF_X64(DECL_ATOMIC_OP_GCC(unsigned long long, ullong, xchg, __atomic_exchange_n)))
-IF_MSVC(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, xchg, long long, _InterlockedExchange64))
+IF_MSVC(IF_X64(DECL_ATOMIC_OP_MSVC(unsigned long long, ullong, xchg, long long, _InterlockedExchange64)))
 IF_GCC_LLVM(DECL_ATOMIC_OP_GCC(void *, ptr, xchg, __atomic_exchange_n))
 IF_MSVC(DECL_ATOMIC_OP_MSVC(void *, ptr, xchg, void *, _InterlockedExchangePointer))
 
@@ -897,10 +895,10 @@ IF_GCC_LLVM_MSVC(DECL_ATOMIC_BTS(unsigned short, ushrt))
 IF_GCC_LLVM(DECL_ATOMIC_BTS(unsigned, uint))
 IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, bts, bool, size_t, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_BTS(unsigned long, ulong))
-IF_MSVC(DECL_ATOMIC_BT_MSVC(unsigned long, ulong, bts, long, _interlockedbittestandset))
+IF_MSVC(DECL_ATOMIC_BTZ_MSVC(unsigned long, ulong, bts, long, _interlockedbittestandset))
 IF_GCC_LLVM(DECL_ATOMIC_BTS(unsigned long long, ullong))
 IF_MSVC(IF_X32(DECL_ATOMIC_BTS(unsigned long long, ullong)))
-IF_MSVC(IF_X64(DECL_ATOMIC_BT_MSVC(unsigned long long, ullong, bts, long long, _interlockedbittestandset64)))
+IF_MSVC(IF_X64(DECL_ATOMIC_BTZ_MSVC(unsigned long long, ullong, bts, long long, _interlockedbittestandset64)))
 
 // Atomic bit test and reset
 IF_GCC_LLVM_MSVC(DECL_ATOMIC_BTR(unsigned char, uchar))
@@ -908,10 +906,10 @@ IF_GCC_LLVM_MSVC(DECL_ATOMIC_BTR(unsigned short, ushrt))
 IF_GCC_LLVM(DECL_ATOMIC_BTR(unsigned, uint))
 IF_MSVC(DECL_ATOMIC_OP_COPY(unsigned, uint, btr, bool, size_t, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_BTR(unsigned long, ulong))
-IF_MSVC(DECL_ATOMIC_BT_MSVC(unsigned long, ulong, btr, long, _interlockedbittestandreset))
+IF_MSVC(DECL_ATOMIC_BTZ_MSVC(unsigned long, ulong, btr, long, _interlockedbittestandreset))
 IF_GCC_LLVM(DECL_ATOMIC_BTR(unsigned long long, ullong))
 IF_MSVC(IF_X32(DECL_ATOMIC_BTR(unsigned long long, ullong)))
-IF_MSVC(IF_X64(DECL_ATOMIC_BT_MSVC(unsigned long long, ullong, btr, long long, _interlockedbittestandreset64)))
+IF_MSVC(IF_X64(DECL_ATOMIC_BTZ_MSVC(unsigned long long, ullong, btr, long long, _interlockedbittestandreset64)))
 
 // Atomic bit set
 DECL2(ATOMIC_BS, )
@@ -1051,46 +1049,16 @@ unsigned long long ullong_ulog10(unsigned long long x, bool ceil)
 }
 
 // Byte scan reverse for 128-bit SSE register 
-IF_X32(unsigned char m128i_b8sr(__m128i x)
+unsigned char m128i_b8sr(__m128i x)
 {
-    unsigned char p = (unsigned char) bsr((unsigned) _mm_extract_epi32(x, 3));
-    if (p != umax(p)) return (p >> 3) + 12;
-    p = (unsigned char) bsr((unsigned) _mm_extract_epi32(x, 2));
-    if (p != umax(p)) return (p >> 3) + 8;
-    p = (unsigned char) bsr((unsigned) _mm_extract_epi32(x, 1));
-    if (p != umax(p)) return (p >> 3) + 4;
-    p = (unsigned char) bsr((unsigned) _mm_cvtsi128_si32(x));
-    return p == umax(p) ? 16 : p >> 3;
-})
-
-IF_X64(unsigned char m128i_b8sr(__m128i x)
-{
-    unsigned char p = (unsigned char) bsr((unsigned long long) _mm_extract_epi64(x, 1));
-    if (p != umax(p)) return (p >> 3) + 8;
-    p = (unsigned char) bsr((unsigned long long) _mm_cvtsi128_si64(x));
-    return p == umax(p) ? 16 : p >> 3;
-})
+    return (unsigned char) _mm_cmpestri(_mm_set1_epi16(-255), sizeof(__m128i), x, sizeof(__m128i), _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_POSITIVE_POLARITY | _SIDD_MOST_SIGNIFICANT);
+}
 
 // Byte scan forward for 128-bit SSE register
-IF_X32(unsigned char m128i_b8sf(__m128i x)
+unsigned char m128i_b8sf(__m128i x)
 {
-    unsigned char p = (unsigned char) bsf((unsigned) _mm_cvtsi128_si32(x));
-    if (p != umax(p)) return (p >> 3);
-    p = (unsigned char) bsf((unsigned) _mm_extract_epi32(x, 1));
-    if (p != umax(p)) return (p >> 3) + 4;
-    p = (unsigned char) bsf((unsigned) _mm_extract_epi32(x, 2));
-    if (p != umax(p)) return (p >> 3) + 8;
-    p = (unsigned char) bsf((unsigned) _mm_extract_epi32(x, 3));
-    return p == umax(p) ? 16 : (p >> 3) + 12;
-})
-
-IF_X64(unsigned char m128i_b8sf(__m128i x)
-{
-    unsigned char p = (unsigned char) bsf((unsigned long long) _mm_cvtsi128_si64(x));
-    if (p != umax(p)) return p >> 3;
-    p = (unsigned char) bsf((unsigned long long) _mm_extract_epi64(x, 1));
-    return p == umax(p) ? 16 : (p >> 3) + 8;
-})
+    return (unsigned char) _mm_cmpestri(_mm_set1_epi16(-255), sizeof(__m128i), x, sizeof(__m128i), _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
+}
 
 // Correct sign of 64-bit float: 'return x == 0. ? 0 : 1 - 2 * signbit(x)'
 int flt64_sign(double x)

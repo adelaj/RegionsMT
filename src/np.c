@@ -308,9 +308,26 @@ size_t Strnlen(const char *str, size_t len)
 }
 
 // Similar to BSD 'strchrnul', but returns index instead of pointer. Index is set to length if character not found
+// Bonus: 'ch' may contain up to four characters simultaneously 
 size_t Strchrnull(const char *str, int ch)
 {
-    return strcspn(str, (const char [2]) { (char) ch });
+    int rest = (uintptr_t) str % alignof(__m128i);
+    __m128i msk = _mm_cvtsi32_si128(ch);
+    size_t off = 0;
+    if (rest)
+    {
+        // Loading residual part from the lower 16-byte boundary of the string
+        unsigned ind = uint_bsf((unsigned) _mm_cvtsi128_si32(_mm_cmpestrm(msk, sizeof(__m128i), _mm_load_si128((__m128i *) (str - rest)), sizeof(__m128i), _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_BIT_MASK)) >> rest);
+        if (ind != umax(ind)) return ind;
+        off = sizeof(__m128i) - rest;
+    }
+    for (;;)
+    {
+        // Loading aligned part of the string
+        int ind = _mm_cmpestri(msk, sizeof(__m128i), _mm_load_si128((__m128i *) (str + off)), sizeof(__m128i), _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
+        if (ind < sizeof(__m128i)) return off + ind;
+        off += sizeof(__m128i);
+    }
 }
 
 size_t Strlncpy(char *dst, char *src, size_t cnt)

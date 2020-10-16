@@ -30,10 +30,10 @@
 #ifdef __GNUC__
 #   define IF_GCC(...) __VA_ARGS__
 #   define IFN_GCC(...)
-#elif __clang__
+#elif defined __clang__
 #   define IF_LLVM(...) __VA_ARGS__
 #   define IFN_LLVM(...)
-#elif _MSC_BUILD
+#elif defined _MSC_BUILD
 #   define IF_MSVC(...) __VA_ARGS__
 #   define IFN_MSVC(...)
 #endif
@@ -46,10 +46,10 @@
 #ifdef  __unix__
 #   define IF_UNIX(...) __VA_ARGS__
 #   define IFN_UNIX(...)
-#elif __APPLE__
+#elif defined __APPLE__
 #   define IF_APPLE(...) __VA_ARGS__
 #   define IFN_APPLE(...)
-#elif _WIN32
+#elif defined _WIN32
 #   define IF_WIN(...) __VA_ARGS__
 #   define IFN_WIN(...)
 #endif
