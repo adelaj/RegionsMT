@@ -849,10 +849,16 @@ unsigned long long ullong_ulog10(unsigned long long, bool);
     unsigned long long: ullong_ulog10)((X), (C)))
 
 // Byte scan reverse for 128-bit SSE register 
-unsigned char m128i_b8sr(__m128i); // returns 16 if argument is zero 
+unsigned m128i_bsr8(__m128i); // Returns 'UINT_MAX' if argument is zero 
 
 // Byte scan forward for 128-bit SSE register
-unsigned char m128i_b8sf(__m128i); // returns 16 if argument is zero 
+unsigned m128i_bsf8(__m128i); // Returns 'UINT_MAX' if argument is zero 
 
 // Correct sign of 64-bit float
-int flt64_sign(double x);
+int flt64_sign(double);
+
+// Byte shift (positive -- right, negative -- left)
+__m128i m128_shz8(__m128i, int);
+
+// Byte rotate (positive -- right, negative -- left)
+__m128i m128_roz8(__m128i, int);

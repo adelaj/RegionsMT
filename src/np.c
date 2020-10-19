@@ -242,14 +242,14 @@ IF_WIN(int Stricmp(const char *a, const char *b)
     return _stricmp(a, b);
 })
 
-IF_UNIX_APPLE(int Strnicmp(const char *a, const char *b, size_t len)
+IF_UNIX_APPLE(int Strnicmp(const char *a, const char *b, size_t rlen)
 {
-    return strncasecmp(a, b, len);
+    return strncasecmp(a, b, rlen);
 })
 
-IF_WIN(int Strnicmp(const char *a, const char *b, size_t len)
+IF_WIN(int Strnicmp(const char *a, const char *b, size_t rlen)
 {
-    return _strnicmp(a, b, len);
+    return _strnicmp(a, b, rlen);
 })
 
 IF_UNIX_APPLE(size_t get_processor_count()
@@ -303,33 +303,81 @@ IF_WIN(uint64_t get_time()
 
 size_t Strnlen(const char *str, size_t len)
 {
-    char *end = memchr(str, '\0', len);
-    return end ? (size_t) (end - str) : len;
-}
-
-// Similar to BSD 'strchrnul', but returns index instead of pointer. Index is set to length if character not found
-// Bonus: 'ch' may contain up to four characters simultaneously 
-size_t Strchrnull(const char *str, int ch)
-{
     int rest = (uintptr_t) str % alignof(__m128i);
-    __m128i msk = _mm_cvtsi32_si128(ch);
     size_t off = 0;
     if (rest)
     {
-        // Loading residual part from the lower 16-byte boundary of the string
-        unsigned ind = uint_bsf((unsigned) _mm_cvtsi128_si32(_mm_cmpestrm(msk, sizeof(__m128i), _mm_load_si128((__m128i *) (str - rest)), sizeof(__m128i), _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_BIT_MASK)) >> rest);
-        if (ind != umax(ind)) return ind;
+        unsigned rlen = sizeof(__m128i) - rest, ind = bsf((unsigned) _mm_movemask_epi8(_mm_cmpeq_epi8(m128_shz8(_mm_load_si128((__m128i *) (str - rest)), rest), _mm_setzero_si128())));
+        if (ind < rlen) return MIN(len, ind);
+        off = rlen;
+    }
+    for (; off < len; off += sizeof(__m128i))
+    {
+        unsigned ind = bsf((unsigned) _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_load_si128((__m128i *) (str + off)), _mm_setzero_si128())));
+        if (ind == umax(ind)) continue;
+        off += ind;
+        return MIN(len, off);
+    }
+    return len;
+}
+
+// Similar to BSD 'strchrnul', but returns index instead of pointer. Index is set to length if character not found
+// Bonus: 'ch' may contain up to four characters simultaneously
+size_t Strchrnull(const char *str, int ch)
+{
+    return Strmsk(str, _mm_cvtsi32_si128(ch));
+}
+
+size_t Strnchrnull(const char *str, int ch, size_t len)
+{
+    return Strnchrnull(str, ch, SIZE_MAX);
+}
+
+// Returns position of any character from 'msk' if found, or the length of string otherwise
+size_t Strmsk(const char *str, __m128i msk)
+{
+    int rest = (uintptr_t) str % alignof(__m128i);
+    size_t off = 0;
+    if (rest)
+    {
+        // Processing residual part from the lower 16-byte boundary of the string
+        __m128i t = m128_shz8(_mm_load_si128((__m128i *) (str - rest)), rest);
+        int ind = _mm_cmpistri(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT),
+            zer = _mm_cmpistrz(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
+        if (zer || ind < sizeof(__m128i)) return ind < sizeof(__m128i) ? ind : m128i_bsr8(t) + 1u; // Do not change the condition: it makes possible to optimize two above lines into one instruction!
         off = sizeof(__m128i) - rest;
     }
-    for (;;)
+    for (;; off += sizeof(__m128i))
     {
-        // Loading aligned part of the string
-        int ind = _mm_cmpestri(msk, sizeof(__m128i), _mm_load_si128((__m128i *) (str + off)), sizeof(__m128i), _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
-        if (ind < sizeof(__m128i)) return off + ind;
-        off += sizeof(__m128i);
+        // Processing aligned part of the string
+        __m128i t = _mm_load_si128((__m128i *) (str + off));
+        int ind = _mm_cmpistri(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT),
+            zer = _mm_cmpistrz(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
+        if (zer || ind < sizeof(__m128i)) return off + (ind < sizeof(__m128i) ? ind : m128i_bsr8(t) + 1u);
     }
 }
 
+size_t Strnmsk(const char *str, __m128i msk, size_t len)
+{
+    int rest = (uintptr_t) str % alignof(__m128i);
+    //__m128i msk = _mm_cvtsi32_si128(ch);
+    size_t off = 0;
+    if (rest)
+    {
+        // Processing residual part from the lower 16-byte boundary of the string
+        unsigned rlen = sizeof(__m128i) - rest, ind = (unsigned) _mm_cmpestri(msk, sizeof(__m128i), m128_shz8(_mm_load_si128((__m128i *) (str - rest)), rest), rlen, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
+        if (ind < sizeof(__m128i)) return MIN(len, ind);
+        off = rlen;
+    }
+    for (; off < len; off += sizeof(__m128i))
+    {
+        // Processing aligned part of the string
+        unsigned ind = (unsigned) _mm_cmpestri(msk, sizeof(__m128i), _mm_load_si128((__m128i *) (str + off)), sizeof(__m128i), _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
+        if (ind == sizeof(__m128i)) continue;
+        off += ind;
+        return MIN(len, off);
+    }
+}
 size_t Strlncpy(char *dst, char *src, size_t cnt)
 {
     size_t len = Strnlen(src, cnt);
@@ -347,7 +395,7 @@ void *Memrchr(const void *Str, int ch, size_t cnt)
     {
         cnt -= sizeof(__m128i);
         __m128i a = _mm_cmpeq_epi8(_mm_load_si128((const __m128i *) (str + cnt)), msk);
-        if (!_mm_testz_si128(a, a)) return (void *) (str + cnt + m128i_b8sr(a));
+        if (!_mm_testz_si128(a, a)) return (void *) (str + cnt + m128i_bsr8(a));
     }
     while (cnt) if (str[--cnt] == ch) return (void *) (str + cnt);
     return NULL;
@@ -364,7 +412,7 @@ void *Memrchr2(const void *Str, int ch0, int ch1, size_t cnt)
         cnt -= sizeof(__m128i);
         __m128i tmp = _mm_load_si128((const __m128i *) (str + cnt));
         __m128i a = _mm_or_si128(_mm_cmpeq_epi8(tmp, msk0), _mm_cmpeq_epi8(tmp, msk1));
-        if (!_mm_testz_si128(a, a)) return ( void *) (str + cnt + m128i_b8sr(a));
+        if (!_mm_testz_si128(a, a)) return ( void *) (str + cnt + m128i_bsr8(a));
     }
     while (cnt) if (str[--cnt] == ch0 || str[cnt] == ch1) return ( void *) (str + cnt);
     return NULL;

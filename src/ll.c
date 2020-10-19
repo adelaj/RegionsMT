@@ -521,15 +521,6 @@
     DECL ## _ ## SUFFIX(unsigned long, ulong __VA_ARGS__) \
     DECL ## _ ## SUFFIX(unsigned long long, ullong __VA_ARGS__)
 
-#define XY1(X, Y) (X), (X) + (Y)
-#define XY2(X, Y) XY1((X), (Y)), XY1((X) + (Y), (Y))
-#define XY3(X, Y) XY2((X), (Y)), XY2((X) + (Y), (Y))
-#define XY4(X, Y) XY3((X), (Y)), XY3((X) + (Y), (Y))
-#define XY5(X, Y) XY4((X), (Y)), XY4((X) + (Y), (Y))
-#define XY6(X, Y) XY5((X), (Y)), XY5((X) + (Y), (Y))
-#define XY7(X, Y) XY6((X), (Y)), XY6((X) + (Y), (Y))
-#define XY8(X, Y) XY7((X), (Y)), XY7((X) + (Y), (Y))
-
 // Add with input/output carry
 IF_GCC_LLVM(DECL_OP_GCC(unsigned char, uchar, add, __builtin_add_overflow))
 IF_MSVC(DECL_OP_INTEL(unsigned char, uchar, add, _addcarry_u8))
@@ -659,9 +650,17 @@ DECL2(TEST_REP, , sum, 0, add)
 DECL2(TEST_REP, , prod, 1, mul)
 
 // Bit scan reverse
+#define X1(X) X, X
+#define X2(X) X1(X), X1(X)
+#define X3(X) X2(X), X2(X)
+#define X4(X) X3(X), X3(X)
+#define X5(X) X4(X), X4(X)
+#define X6(X) X5(X), X5(X)
+#define X7(X) X6(X), X6(X)
+
 unsigned char uchar_bsr(unsigned char x)
 {
-    static const unsigned char res[] = { umax(x), 0, XY1(1, 0), XY2(2, 0), XY3(3, 0), XY4(4, 0), XY5(5, 0), XY6(6, 0), XY7(7, 0) };
+    static const unsigned char res[] = { umax(x), 0, X1(1), X2(2), X3(3), X4(4), X5(5), X6(6), X7(7) };
     _Static_assert(countof(res) - 1 == umax(x), "");
     return res[x];
 }
@@ -676,9 +675,20 @@ IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_BSR_WIDE(unsigned long long, ullong, unsigned)
 IF_MSVC(IF_X64(DECL_BSZ_MSVC(unsigned long long, ullong, bsr, _BitScanReverse64)))
 
 // Bit scan forward
+#define XX1 0
+#define XX2 XX1, 1, XX1
+#define XX3 XX2, 2, XX2
+#define XX4 XX3, 3, XX3
+#define XX5 XX4, 4, XX4
+#define XX6 XX5, 5, XX5
+#define XX7 XX6, 6, XX6
+#define XX8 XX7, 7, XX7
+
 unsigned char uchar_bsf(unsigned char x) 
 { 
-    return bsr((unsigned char) (x & (0 - x))); 
+    static const unsigned char res[] = { umax(x), XX8 };
+    _Static_assert(countof(res) - 1 == umax(x), "");
+    return res[x];
 }
 
 IF_GCC_LLVM_MSVC(DECL_1_NARR(unsigned short, ushrt, bsf, unsigned))
@@ -691,9 +701,18 @@ IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_BSF_WIDE(unsigned long long, ullong, unsigned)
 IF_MSVC(IF_X64(DECL_BSZ_MSVC(unsigned long long, ullong, bsf, _BitScanForward64)))
 
 // Population count
+#define Y1(X) X, X + 1
+#define Y2(X) Y1(X), Y1(X + 1)
+#define Y3(X) Y2(X), Y2(X + 1)
+#define Y4(X) Y3(X), Y3(X + 1)
+#define Y5(X) Y4(X), Y4(X + 1)
+#define Y6(X) Y5(X), Y5(X + 1)
+#define Y7(X) Y6(X), Y6(X + 1)
+#define Y8(X) Y7(X), Y7(X + 1)
+
 unsigned char uchar_pcnt(unsigned char x)
 {
-    static const unsigned char res[] = { XY8(0, 1) };
+    static const unsigned char res[] = { Y8(0) };
     _Static_assert(countof(res) - 1 == umax(x), "");
     return res[x];
 }
@@ -1048,16 +1067,16 @@ unsigned long long ullong_ulog10(unsigned long long x, bool ceil)
     return LOG10_LEAF_16(unsigned long long, x, ceil);
 }
 
-// Byte scan reverse for 128-bit SSE register 
-unsigned char m128i_b8sr(__m128i x)
+// Byte scan reverse for 128-bit SSE register
+unsigned m128i_bsr8(__m128i x)
 {
-    return (unsigned char) _mm_cmpestri(_mm_set1_epi16(-255), sizeof(__m128i), x, sizeof(__m128i), _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_POSITIVE_POLARITY | _SIDD_MOST_SIGNIFICANT);
+    return bsr((unsigned) _mm_movemask_epi8(_mm_cmpgt_epi8(x, _mm_setzero_si128())));
 }
 
 // Byte scan forward for 128-bit SSE register
-unsigned char m128i_b8sf(__m128i x)
+unsigned m128i_bsf8(__m128i x)
 {
-    return (unsigned char) _mm_cmpestri(_mm_set1_epi16(-255), sizeof(__m128i), x, sizeof(__m128i), _SIDD_UBYTE_OPS | _SIDD_CMP_RANGES | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
+    return bsf((unsigned) _mm_movemask_epi8(_mm_cmpgt_epi8(x, _mm_setzero_si128())));
 }
 
 // Correct sign of 64-bit float: 'return x == 0. ? 0 : 1 - 2 * signbit(x)'
@@ -1066,4 +1085,25 @@ int flt64_sign(double x)
     int res = _mm_movemask_pd(_mm_castsi128_pd(_mm_cmpeq_epi64(
         _mm_and_si128(_mm_castpd_si128(_mm_loaddup_pd(&x)), _mm_set_epi64x(0x8000000000000000, 0x7fffffffffffffff)), _mm_setzero_si128())));
     return res & 1 ? 0 : res - 1;
+}
+
+// Byte shift (positive -- right, negative -- left)
+__m128i m128_shz8(__m128i x, int y)
+{
+    static const char shuf[] = {
+        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, // 15 times
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128 // 15 times
+    };
+    return (unsigned) (y + 15) <= 30u ? _mm_shuffle_epi8(x, _mm_loadu_si128((__m128i *) (&shuf[15] + y))) : _mm_setzero_si128();
+}
+
+// Byte rotate (positive -- right, negative -- left)
+__m128i m128_roz8(__m128i x, int y)
+{
+    static const char shuf[] = {
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
+    };
+    return _mm_shuffle_epi8(x, _mm_loadu_si128((__m128i *) (shuf + ((unsigned) y & 15u))));
 }

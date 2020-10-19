@@ -79,6 +79,7 @@ int Stricmp(const char *, const char *);
 int Strnicmp(const char *, const char *, size_t);
 size_t Strnlen(const char *, size_t);
 size_t Strchrnull(const char *, int);
+size_t Strnchrnull(const char *, int, size_t);
 size_t Strlncpy(char *, char *, size_t);
 void *Memrchr(void const *, int, size_t);
 void *Memrchr2(const void *, int, int, size_t);
