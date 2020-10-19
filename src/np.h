@@ -40,6 +40,7 @@
 #include <stdarg.h>
 #include <stdio.h>
 #include <time.h>
+#include <immintrin.h>
 
 typedef IF_UNIX_APPLE(int) IF_WIN(errno_t) Errno_t;
 #define Alloca(SIZE) IF_UNIX_APPLE((alloca((SIZE)))) IF_WIN((_alloca((SIZE))))
@@ -74,19 +75,27 @@ int Fclose(FILE *); // Tolerant to the 'NULL'
 Errno_t Strerror_s(char *, size_t, Errno_t);
 Errno_t Localtime_s(struct tm *result, const time_t *time);
 
-// Ordinary string processing functions
-int Stricmp(const char *, const char *);
-int Strnicmp(const char *, const char *, size_t);
-size_t Strnlen(const char *, size_t);
-size_t Strchrnull(const char *, int);
-size_t Strnchrnull(const char *, int, size_t);
-size_t Strlncpy(char *, char *, size_t);
-void *Memrchr(void const *, int, size_t);
-void *Memrchr2(const void *, int, int, size_t);
-
+// System info
 size_t get_processor_count(void);
 size_t get_page_size(void);
 size_t get_process_id(void);
 
 // Return UNIX time in microseconds
 uint64_t get_time(void);
+
+// Case-insensitive compare
+int Stricmp(const char *, const char *);
+int Strnicmp(const char *, const char *, size_t);
+
+// Length of bounded string
+size_t Strnlen(const char *, size_t);
+
+// Returns position of a character from 'msk' if found, or the length of the string otherwise
+size_t Strmsk(const char *, __m128i);
+
+// The same for explicitly bounded strings
+size_t Strnmsk(const char *, __m128i, size_t);
+
+size_t Strchrnull(const char *, int);
+size_t Strnchrnull(const char *, int, size_t);
+size_t Strlncpy(char *, char *, size_t);

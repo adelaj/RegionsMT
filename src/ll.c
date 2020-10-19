@@ -1019,6 +1019,13 @@ unsigned long long ullong_uhash_inv(unsigned long long x)
     return x;
 }
 
+size_t str_djb2a_hash(const char *str)
+{
+    size_t hash = 5381;
+    for (char ch = *str++; ch; ch = *str++) hash = ((hash << 5) + hash) ^ ch;
+    return hash;
+}
+
 // Base 10 integer logarithm (based on expanded binary search)
 #define EXP10(T, N) ((T) 1e ## N)
 #define LOG10_LEAF_0(X, C) \
@@ -1067,19 +1074,19 @@ unsigned long long ullong_ulog10(unsigned long long x, bool ceil)
     return LOG10_LEAF_16(unsigned long long, x, ceil);
 }
 
-// Byte scan reverse for 128-bit SSE register
-unsigned m128i_bsr8(__m128i x)
+// Zero byte scan reverse for 128-bit SSE register
+unsigned m128i_nbsr8(__m128i x)
 {
-    return bsr((unsigned) _mm_movemask_epi8(_mm_cmpgt_epi8(x, _mm_setzero_si128())));
+    return bsr((unsigned) _mm_movemask_epi8(_mm_cmpeq_epi8(x, _mm_setzero_si128())));
 }
 
-// Byte scan forward for 128-bit SSE register
-unsigned m128i_bsf8(__m128i x)
+// Zero byte scan forward for 128-bit SSE register
+unsigned m128i_nbsf8(__m128i x)
 {
-    return bsf((unsigned) _mm_movemask_epi8(_mm_cmpgt_epi8(x, _mm_setzero_si128())));
+    return bsf((unsigned) _mm_movemask_epi8(_mm_cmpeq_epi8(x, _mm_setzero_si128())));
 }
 
-// Correct sign of 64-bit float: 'return x == 0. ? 0 : 1 - 2 * signbit(x)'
+// Correct sign of the 64-bit float: 'return x == 0. ? 0 : 1 - 2 * signbit(x)'
 int flt64_sign(double x)
 {
     int res = _mm_movemask_pd(_mm_castsi128_pd(_mm_cmpeq_epi64(
@@ -1087,19 +1094,21 @@ int flt64_sign(double x)
     return res & 1 ? 0 : res - 1;
 }
 
-// Byte shift (positive -- right, negative -- left)
-__m128i m128_shz8(__m128i x, int y)
+// Byte shift (positive 'y' -- right; negative 'y' -- left; 'a' -- 'arithmetic' shift, which makes most significant byte 'sticky')
+__m128i m128i_szz8(__m128i x, int y, bool a)
 {
     static const char shuf[] = {
         -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, // 15 times
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128 // 15 times
+        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, // 15 times
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
+        15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 // 15 times
     };
-    return (unsigned) (y + 15) <= 30u ? _mm_shuffle_epi8(x, _mm_loadu_si128((__m128i *) (&shuf[15] + y))) : _mm_setzero_si128();
+    return (unsigned) (y + 15) <= 30u ? _mm_shuffle_epi8(x, _mm_loadu_si128((__m128i *) (&shuf[15 + (a << 5) - a] + y))) : _mm_setzero_si128();
 }
 
-// Byte rotate (positive -- right, negative -- left)
-__m128i m128_roz8(__m128i x, int y)
+// Byte rotate (positive 'y' -- right, negative 'y' -- left)
+__m128i m128i_roz8(__m128i x, int y)
 {
     static const char shuf[] = {
         0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,

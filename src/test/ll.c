@@ -10,7 +10,7 @@
 bool test_ll_generator_a(void *p_res, size_t *p_ind, struct log *log)
 {
     (void) log;
-    struct test_ll_a data[] = {
+    static const struct test_ll_a data[] = {
         { 1. , -1, -1, 0, -1 },
         { -1., 1, 1, 0, 1 },
         { 1., 0., -1, -1, -1 },
@@ -20,12 +20,9 @@ bool test_ll_generator_a(void *p_res, size_t *p_ind, struct log *log)
         { 1., 1., 0, 0, 0 },
         { 0., -1., -1, 1, -1 },
         { -1., -1., 0, 0, 0 },
-        { nan(__func__), 0., 0, 0, 1 },
-        { 0., nan(__func__), 0, 0, -1 },
-        { nan(__func__), nan(__func__), 0, 0, 0 },
-        { nan(__func__), nan("Test"), 0, 0, 0 },
-        { nan("Test"), nan(__func__), 0, 0, 0 },
-        { nan("Test"), nan("Test"), 0, 0, 0 },
+        { NAN, 0., 0, 0, 1 },
+        { 0., NAN, 0, 0, -1 },
+        { NAN, NAN, 0, 0, 0 },
         { DBL_MIN, DBL_MAX, 1, 1, 1 },
         { DBL_MAX, DBL_MIN, -1, -1, -1 },
         { 0, DBL_EPSILON, 1, 1, 1 },
@@ -126,7 +123,7 @@ unsigned test_ll_b(void *In, void *Context, void *Tls)
     return 1;
 }
 
-static int sign(double x) 
+static int flt64_sign_test(double x) 
 {
     return (0. < x) - (x < 0.);
 }
@@ -163,7 +160,7 @@ void test_ll_perf(struct log *log)
     {
         for (size_t i = 0; i < countof(in); i++)
         {
-            cnt += sign(in[i].a);
+            cnt += flt64_sign_test(in[i].a);
             //cnt += flt64_stable_cmp_dsc_nan_test(&in[i].a, &in[i].b, NULL);
         }
     }

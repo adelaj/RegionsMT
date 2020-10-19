@@ -8,46 +8,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-int char_cmp(const void *a, const void *b, void *context)
-{
-    (void) context;
-    return (int) *(const char *) a - (int) *(const char *) b;
-}
-
-int str_strl_stable_cmp(const void *Str, const void *Entry, void *p_Len)
-{
-    const struct strl *entry = Entry;
-    size_t len = *(size_t *) p_Len;
-    int res = strncmp((const char *) Str, entry->str, len);
-    return res ? res : len < entry->len ? INT_MIN : 0;
-}
-
-bool str_eq(const void *A, const void *B, void *context)
-{
-    (void) context;
-    return !strcmp((const char *) A, (const char *) B);
-}
-
-bool str_off_str_eq(const void *A, const void *B, void *Str)
-{
-    return str_eq((const char *) Str + *(size_t *) A, B, NULL);
-}
-
-bool str_off_eq(const void *A, const void *B, void *Str)
-{
-    return str_eq((const char *) Str + *(size_t *) A, (const char *) Str + *(size_t *) B, NULL);
-}
-
-int str_off_stable_cmp(const void *A, const void *B, void *Str)
-{
-    return strcmp((const char *) Str + *(size_t *) A, (const char *) Str + *(size_t *) B);
-}
-
-bool str_off_cmp(const void *A, const void *B, void *Str)
-{
-    return str_off_stable_cmp(A, B, Str) > 0;
-}
-
 bool empty_handler(const char *str, size_t len, void *Ptr, void *Context)
 {
     (void) str;
@@ -76,10 +36,9 @@ bool str_handler(const char *str, size_t len, void *Ptr, void *context)
     return 1;
 }
 
-
 // Warning! 'buff' may be not null-terminated
 #define DECL_STR_TO_UINT(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
-    enum cvt_result PREFIX ## _from_str(TYPE *restrict p_res; const char *restrict buff, size_t *p_len, bool hex) \
+    enum cvt_result PREFIX ## _cvt_step(TYPE *restrict p_res; const char *restrict buff, size_t *p_len, bool hex) \
     { \
         size_t len = *p_len, ind = 0; \
         if (!buff || !len || *buff == '\0') return CVT_EMPTY; \
@@ -221,15 +180,6 @@ void str_pool_close(struct str_pool *pool)
 {
     free(pool->buff.str);
     hash_table_close(&pool->tbl);
-}
-
-size_t str_x33_hash(const void *Key, void *context)
-{
-    (void) context;
-    const char *str = Key;
-    size_t hash = 5381;
-    for (char ch = *str++; ch; ch = *str++) hash = (hash << 5) + hash + ch;
-    return hash;
 }
 
 size_t str_off_x33_hash(const void *Off, void *Str)

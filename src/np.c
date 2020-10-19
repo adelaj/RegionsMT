@@ -4,7 +4,6 @@
 #include "memory.h"
 
 #include <string.h>
-#include <immintrin.h>
 
 #if TEST(IF_UNIX_APPLE)
 
@@ -232,26 +231,6 @@ IF_WIN(Errno_t Localtime_s(struct tm *tm, const time_t *t)
     return localtime_s(tm, t);
 })
 
-IF_UNIX_APPLE(int Stricmp(const char *a, const char *b)
-{
-    return strcasecmp(a, b);
-})
-
-IF_WIN(int Stricmp(const char *a, const char *b)
-{
-    return _stricmp(a, b);
-})
-
-IF_UNIX_APPLE(int Strnicmp(const char *a, const char *b, size_t rlen)
-{
-    return strncasecmp(a, b, rlen);
-})
-
-IF_WIN(int Strnicmp(const char *a, const char *b, size_t rlen)
-{
-    return _strnicmp(a, b, rlen);
-})
-
 IF_UNIX_APPLE(size_t get_processor_count()
 {
     return (size_t) sysconf(_SC_NPROCESSORS_CONF);
@@ -301,22 +280,96 @@ IF_WIN(uint64_t get_time()
     return t / 10 + !!(t % 10);
 })
 
+IF_UNIX_APPLE(int Stricmp(const char *a, const char *b)
+{
+    return strcasecmp(a, b);
+})
+
+IF_WIN(int Stricmp(const char *a, const char *b)
+{
+    return _stricmp(a, b);
+})
+
+IF_UNIX_APPLE(int Strnicmp(const char *a, const char *b, size_t rlen)
+{
+    return strncasecmp(a, b, rlen);
+})
+
+IF_WIN(int Strnicmp(const char *a, const char *b, size_t rlen)
+{
+    return _strnicmp(a, b, rlen);
+})
+
+// Length of bounded string
 size_t Strnlen(const char *str, size_t len)
 {
     int rest = (uintptr_t) str % alignof(__m128i);
     size_t off = 0;
     if (rest)
     {
-        unsigned rlen = sizeof(__m128i) - rest, ind = bsf((unsigned) _mm_movemask_epi8(_mm_cmpeq_epi8(m128_shz8(_mm_load_si128((__m128i *) (str - rest)), rest), _mm_setzero_si128())));
-        if (ind < rlen) return MIN(len, ind);
+        unsigned rlen = sizeof(__m128i) - rest, ind = m128i_nbsf8(m128i_szz8(_mm_load_si128((__m128i *) (str - rest)), rest, 1));
+        if (ind != umax(ind)) return MIN(len, ind);
         off = rlen;
     }
     for (; off < len; off += sizeof(__m128i))
     {
-        unsigned ind = bsf((unsigned) _mm_movemask_epi8(_mm_cmpeq_epi8(_mm_load_si128((__m128i *) (str + off)), _mm_setzero_si128())));
+        unsigned ind = m128i_nbsf8(_mm_load_si128((__m128i *) (str + off)));
         if (ind == umax(ind)) continue;
         off += ind;
         return MIN(len, off);
+    }
+    return len;
+}
+
+// Returns position of a character from 'msk' if found, or the length of the string otherwise
+#define pcmpistrz(msk, t, z) (_mm_cmpistr ## z(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT))
+
+size_t Strmsk(const char *str, __m128i msk)
+{
+    int rest = (uintptr_t) str % alignof(__m128i);
+    size_t off = 0;
+    if (rest)
+    {
+        // Processing residual part of the string from its lower 16-byte boundary
+        __m128i t = m128i_szz8(_mm_load_si128((__m128i *) (str - rest)), rest, 1);
+        unsigned ind = (unsigned) pcmpistrz(msk, t, i);
+        if (pcmpistrz(msk, t, z) || ind < sizeof(__m128i)) return ind < sizeof(__m128i) ? (unsigned) ind : m128i_nbsf8(t); // Do not change the condition: it makes possible to optimize two 'pcmpistr' invocations into one instruction!
+        off = sizeof(__m128i) - rest;
+    }
+    for (;; off += sizeof(__m128i))
+    {
+        // Processing aligned part of the string
+        __m128i t = _mm_load_si128((__m128i *) (str + off));
+        unsigned ind = (unsigned) pcmpistrz(msk, t, i);
+        if (pcmpistrz(msk, t, z) || ind < sizeof(__m128i)) return off + (ind < sizeof(__m128i) ? (unsigned) ind : m128i_nbsf8(t));
+    }
+}
+
+// The same for explicitly bounded strings
+size_t Strnmsk(const char *str, __m128i msk, size_t len)
+{
+    int rest = (uintptr_t) str % alignof(__m128i);
+    size_t off = 0;
+    if (rest && len) // When 'len' is zero no loads from 'str' are performed.
+    {
+        // Processing residual part of the string from its lower 16-byte boundary
+        __m128i t = m128i_szz8(_mm_load_si128((__m128i *) (str - rest)), rest, 1);
+        unsigned ind = (unsigned) pcmpistrz(msk, t, i);
+        if (pcmpistrz(msk, t, z) || ind < sizeof(__m128i))
+        {
+            unsigned res = ind < sizeof(__m128i) ? ind : m128i_nbsf8(t);
+            return MIN(len, res);
+        }
+        off = sizeof(__m128i) - rest;
+    }
+    for (; off < len; off += sizeof(__m128i))
+    {
+        // Processing aligned part of the string
+        __m128i t = _mm_load_si128((__m128i *) (str + off));
+        unsigned ind = (unsigned) pcmpistrz(msk, t, i);
+        if (!pcmpistrz(msk, t, z) && ind == sizeof(__m128i)) continue;
+        size_t res = off + (ind < sizeof(__m128i) ? ind : m128i_nbsf8(t));
+        return MIN(len, res);
     }
     return len;
 }
@@ -330,90 +383,12 @@ size_t Strchrnull(const char *str, int ch)
 
 size_t Strnchrnull(const char *str, int ch, size_t len)
 {
-    return Strnchrnull(str, ch, SIZE_MAX);
+    return Strnmsk(str, _mm_cvtsi32_si128(ch), len);
 }
 
-// Returns position of any character from 'msk' if found, or the length of string otherwise
-size_t Strmsk(const char *str, __m128i msk)
-{
-    int rest = (uintptr_t) str % alignof(__m128i);
-    size_t off = 0;
-    if (rest)
-    {
-        // Processing residual part from the lower 16-byte boundary of the string
-        __m128i t = m128_shz8(_mm_load_si128((__m128i *) (str - rest)), rest);
-        int ind = _mm_cmpistri(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT),
-            zer = _mm_cmpistrz(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
-        if (zer || ind < sizeof(__m128i)) return ind < sizeof(__m128i) ? ind : m128i_bsr8(t) + 1u; // Do not change the condition: it makes possible to optimize two above lines into one instruction!
-        off = sizeof(__m128i) - rest;
-    }
-    for (;; off += sizeof(__m128i))
-    {
-        // Processing aligned part of the string
-        __m128i t = _mm_load_si128((__m128i *) (str + off));
-        int ind = _mm_cmpistri(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT),
-            zer = _mm_cmpistrz(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
-        if (zer || ind < sizeof(__m128i)) return off + (ind < sizeof(__m128i) ? ind : m128i_bsr8(t) + 1u);
-    }
-}
-
-size_t Strnmsk(const char *str, __m128i msk, size_t len)
-{
-    int rest = (uintptr_t) str % alignof(__m128i);
-    //__m128i msk = _mm_cvtsi32_si128(ch);
-    size_t off = 0;
-    if (rest)
-    {
-        // Processing residual part from the lower 16-byte boundary of the string
-        unsigned rlen = sizeof(__m128i) - rest, ind = (unsigned) _mm_cmpestri(msk, sizeof(__m128i), m128_shz8(_mm_load_si128((__m128i *) (str - rest)), rest), rlen, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
-        if (ind < sizeof(__m128i)) return MIN(len, ind);
-        off = rlen;
-    }
-    for (; off < len; off += sizeof(__m128i))
-    {
-        // Processing aligned part of the string
-        unsigned ind = (unsigned) _mm_cmpestri(msk, sizeof(__m128i), _mm_load_si128((__m128i *) (str + off)), sizeof(__m128i), _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT);
-        if (ind == sizeof(__m128i)) continue;
-        off += ind;
-        return MIN(len, off);
-    }
-}
 size_t Strlncpy(char *dst, char *src, size_t cnt)
 {
     size_t len = Strnlen(src, cnt);
     memcpy(dst, src, len + (len < cnt));
     return len;
-}
-
-void *Memrchr(const void *Str, int ch, size_t cnt)
-{
-    const __m128i msk = _mm_set1_epi8((char) ch);
-    const char *str = (const char *) Str;
-    const size_t off = ((uintptr_t) Str + cnt) % alignof(__m128i), n = MIN(off, cnt);
-    for (size_t i = 0; i < n; i++) if (str[--cnt] == ch) return (void *) (str + cnt);
-    while (cnt >= sizeof(__m128i))
-    {
-        cnt -= sizeof(__m128i);
-        __m128i a = _mm_cmpeq_epi8(_mm_load_si128((const __m128i *) (str + cnt)), msk);
-        if (!_mm_testz_si128(a, a)) return (void *) (str + cnt + m128i_bsr8(a));
-    }
-    while (cnt) if (str[--cnt] == ch) return (void *) (str + cnt);
-    return NULL;
-}
-
-void *Memrchr2(const void *Str, int ch0, int ch1, size_t cnt)
-{
-    const __m128i msk0 = _mm_set1_epi8((char) ch0), msk1 = _mm_set1_epi8((char) ch1);
-    const char *str = (const char *) Str;
-    const size_t off = ((uintptr_t) Str + cnt) % alignof(__m128i), n = MIN(off, cnt);
-    for (size_t i = 0; i < n; i++) if (str[--cnt] == ch0 || str[cnt] == ch1) return ( void *) (str + cnt);
-    while (cnt >= sizeof(__m128i))
-    {
-        cnt -= sizeof(__m128i);
-        __m128i tmp = _mm_load_si128((const __m128i *) (str + cnt));
-        __m128i a = _mm_or_si128(_mm_cmpeq_epi8(tmp, msk0), _mm_cmpeq_epi8(tmp, msk1));
-        if (!_mm_testz_si128(a, a)) return ( void *) (str + cnt + m128i_bsr8(a));
-    }
-    while (cnt) if (str[--cnt] == ch0 || str[cnt] == ch1) return ( void *) (str + cnt);
-    return NULL;
 }

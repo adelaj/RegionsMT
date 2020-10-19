@@ -23,12 +23,27 @@ bool test_np_generator_a(void *p_res, size_t *p_ind, struct log *log)
     return 1;
 }
 
+static size_t Strchrnull_test(void const *Str, int ch)
+{
+    const char *str = Str;
+    for (size_t i = 0;; i++) if (!str[i] || str[i] == ch) return i;
+}
+
+static size_t Strnchrnull_test(void const *Str, int ch, size_t len)
+{
+    const char *str = Str;
+    for (size_t i = 0; i < len; i++) if (!str[i] || str[i] == ch) return i;
+    return len;
+}
+
+/*
 static void *Memrchr_test(void const *Str, int ch, size_t cnt)
 {
     const char *str = Str;
     while (cnt) if (str[--cnt] == ch) return (void *) (str + cnt);
     return NULL;
 }
+*/
 
 unsigned test_np_a(void *In, void *Context, void *Tls)
 {
@@ -37,10 +52,10 @@ unsigned test_np_a(void *In, void *Context, void *Tls)
     struct test_np_a *in = In;
     for (char i = 0; i < CHAR_MAX; i++) for (size_t cnt = in->cnt; cnt;)
     {
-        char *a = Memrchr(in->str, i, cnt);
-        if (a != Memrchr_test(in->str, i, cnt)) return 0;
+        size_t a = Strnchrnull(in->str, i, cnt);
+        if (a != Strnchrnull_test(in->str, i, cnt)) return 0;
         if (!a) break;
-        cnt = a - in->str;
+        cnt -= a;
     }
     return 1;
 }

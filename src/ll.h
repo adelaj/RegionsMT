@@ -831,6 +831,8 @@ unsigned long long ullong_uhash_inv(unsigned long long);
     unsigned long: ulong_uhash_inv, \
     unsigned long long: ullong_uhash_inv)(X))
 
+size_t str_djb2a_hash(const char *);
+
 // Base 2 integer logarithm
 #define ulog2(X, CEIL) (bsr(X) + ((CEIL) && (X) && ((X) & ((X) - 1))))
 
@@ -848,17 +850,17 @@ unsigned long long ullong_ulog10(unsigned long long, bool);
     unsigned long: ulong_ulog10, \
     unsigned long long: ullong_ulog10)((X), (C)))
 
-// Byte scan reverse for 128-bit SSE register 
-unsigned m128i_bsr8(__m128i); // Returns 'UINT_MAX' if argument is zero 
+// Zero byte scan reverse for 128-bit SSE register 
+unsigned m128i_nbsr8(__m128i); // Returns 'UINT_MAX' if argument is without zero bytes
 
-// Byte scan forward for 128-bit SSE register
-unsigned m128i_bsf8(__m128i); // Returns 'UINT_MAX' if argument is zero 
+// Zero byte scan forward for 128-bit SSE register
+unsigned m128i_nbsf8(__m128i); // Returns 'UINT_MAX' if argument is without zero bytes
 
 // Correct sign of 64-bit float
 int flt64_sign(double);
 
-// Byte shift (positive -- right, negative -- left)
-__m128i m128_shz8(__m128i, int);
+// Byte shift (positive 'y' -- right; negative 'y' -- left; 'a' -- 'arithmetic' shift, which makes most significant byte 'sticky')
+__m128i m128i_szz8(__m128i, int, bool);
 
-// Byte rotate (positive -- right, negative -- left)
-__m128i m128_roz8(__m128i, int);
+// Byte rotate (positive 'y' -- right, negative 'y' -- left)
+__m128i m128i_roz8(__m128i, int);

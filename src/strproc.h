@@ -9,32 +9,14 @@
 #include "sort.h"
 #include "utf8.h"
 
-struct strl {
-    char *str;
-    size_t len;
-};
-
 #define STRL(STRL) (STRL).str, (STRL).len
 #define STRNEQ(STRA, LENA, STR, LEN, BACKEND) (((LEN) == (LENA)) && !(BACKEND((STRA), (STR), (LENA))))
 #define STREQ(STRA, LENA, STR, BACKEND) STRNEQ((STRA), (LENA), (STR), lengthof(STR), (BACKEND)) // Do not replace '(STR), lengthof(STR)' with 'STRC(STR)'!
 #define STRLEQ(STRLA, STR, BACKEND) STREQ(STRL(STRLA), (STR), (BACKEND))
 #define STRLNEQ(STRLA, STR, LEN, BACKEND) STRNEQ(STRL(STRLA), (STR), (LEN), (BACKEND))
 
-struct text_metric {
-    struct strl path;
-    uint64_t byte;
-    size_t col, row;
-};
-
-bool str_eq(const void *, const void *, void *);
-bool str_off_str_eq(const void *, const void *, void *);
-bool str_off_eq(const void *, const void *, void *);
-
 // Functions to be used as 'stable_cmp_callback' and 'cmp_callback' (see sort.h)
-int char_cmp(const void *, const void *, void *);
-int str_strl_stable_cmp(const void *, const void *, void *);
-int str_off_stable_cmp(const void *, const void *, void *);
-bool str_off_cmp(const void *, const void *, void *);
+
 
 typedef bool (*read_callback)(const char *, size_t, void *, void *); // Functional type for read callbacks
 typedef bool (*write_callback)(char *, size_t *, void *, void *); // Functional type for write callbacks
