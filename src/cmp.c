@@ -94,7 +94,7 @@ int stro_stable_cmp(const void *A, const void *B, void *Str)
 
 bool stro_cmp(const void *A, const void *B, void *Str)
 {
-    return str_off_stable_cmp(A, B, Str) > 0;
+    return stro_stable_cmp(A, B, Str) > 0;
 }
 
 int str_strl_stable_cmp(const void *Str, const void *Strl, void *p_Len)

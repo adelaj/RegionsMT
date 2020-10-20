@@ -7,7 +7,7 @@
 
 #include "common.h"
 #include "log.h"
-#include "strproc.h"
+#include "cmp.h"
 
 enum par_mode {
     PAR_VALUED = 0,

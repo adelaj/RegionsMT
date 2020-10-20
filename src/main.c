@@ -29,6 +29,7 @@
 
 #   include "test.h"
 #   include "test/categorical.h"
+#   include "test/cmp.h"
 #   include "test/ll.h"
 #   include "test/np.h"
 #   include "test/sort.h"
@@ -38,25 +39,25 @@ static bool test_main(size_t thread_cnt, struct log *log)
 {
     const struct test_group groupl[] = {
         {
-            // Low level facilities A
-            test_ll_dispose_a,
+            // Compare functions A
+            test_cmp_dispose_a,
             CLII((struct test_generator []) {
-                FSTRL(test_ll_generator_a)
+                FSTRL(test_cmp_generator_a)
             }),
             CLII((struct test []) {
-                FSTRL(test_ll_a_1),
-                FSTRL(test_ll_a_2),
-                FSTRL(test_ll_a_3)
+                FSTRL(test_cmp_a_1),
+                FSTRL(test_cmp_a_2),
+                FSTRL(test_cmp_a_3)
             })
         },
         {
             // Low level facilities B
-            test_ll_dispose_b,
+            test_ll_dispose_a,
             CLII((struct test_generator []) {
-                FSTRL(test_ll_generator_b),
+                FSTRL(test_ll_generator_a),
             }),
             CLII((struct test []) {
-                FSTRL(test_ll_b),
+                FSTRL(test_ll_a),
             })
         },
         {

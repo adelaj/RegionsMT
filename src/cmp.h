@@ -1,5 +1,7 @@
 #pragma once
 
+#include "common.h"
+
 int size_stable_cmp_dsc(const void *, const void *, void *);
 int size_stable_cmp_asc(const void *, const void *, void *);
 
@@ -23,5 +25,10 @@ bool stro_eq(const void *, const void *, void *);
 
 int stro_stable_cmp(const void *, const void *, void *);
 bool stro_cmp(const void *, const void *, void *);
+
+struct strl {
+    char *str;
+    size_t len;
+};
 
 int str_strl_stable_cmp(const void *, const void *, void *);

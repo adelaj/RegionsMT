@@ -184,14 +184,3 @@ MWRN(4201) // "Nameless structure/union"
 MWRN(4221) // "Initialization by using the address of automatic variable"
 //MWRN(4090) // "'=': different 'const' qualifiers" -- gives some false-positives
 //MWRN(4706) // "Assignment within conditional expression"
-
-struct strl {
-    char *str;
-    size_t len;
-};
-
-struct text_metric {
-    struct strl path;
-    uint64_t byte;
-    size_t col, row;
-};

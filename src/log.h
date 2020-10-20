@@ -2,6 +2,7 @@
 
 #include "np.h"
 #include "common.h"
+#include "cmp.h"
 #include "strproc.h"
 #include "utf8.h"
 
@@ -129,6 +130,12 @@ struct style {
 
 struct ttl_style {
     struct env time_stamp, header[MESSAGE_CNT], code_metric;
+};
+
+struct text_metric {
+    struct strl path;
+    uint64_t byte;
+    size_t col, row;
 };
 
 struct code_metric {
