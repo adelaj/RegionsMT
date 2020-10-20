@@ -286,3 +286,16 @@ void *persistent_array_fetch(struct persistent_array *arr, size_t ind, size_t sz
     size_t ind1 = ind + 1, log2 = ulog2(ind1, 0), off = sub_sat(log2, arr->off);
     return (char *) arr->ptr[off] + (off ? ind1 - ((size_t) 1 << arr->off << off) : ind) * sz;
 }
+
+struct array_result buff_append(struct buff *buff, const char *str, size_t len, enum buff_flags flags)
+{
+    size_t pos = flags & BUFFER_DISCARD ? 0 : buff->len;
+    bool init = flags & BUFFER_INIT, term = flags & BUFFER_TERM;
+    struct array_result res = array_test(&buff->str, &buff->cap, sizeof(*buff->str), 0, 0, len, pos, init + term);
+    if (!res.status) return res;
+    memcpy(buff->str + pos + init, str, len * sizeof(*buff->str));
+    pos += len + init;
+    if (term) buff->str[pos] = '\0';
+    buff->len = pos;
+    return res;
+}

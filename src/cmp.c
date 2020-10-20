@@ -71,36 +71,36 @@ int char_cmp(const void *a, const void *b, void *context)
     return (int) *(const char *) a - (int) *(const char *) b;
 }
 
+bool str_eq(const void *A, const void *B, void *context)
+{
+    (void) context;
+    return !strcmp((const char *) A, (const char *) B);
+}
+
+bool stro_str_eq(const void *A, const void *B, void *Str)
+{
+    return str_eq((const char *) Str + *(size_t *) A, B, NULL);
+}
+
+bool stro_eq(const void *A, const void *B, void *Str)
+{
+    return str_eq((const char *) Str + *(size_t *) A, (const char *) Str + *(size_t *) B, NULL);
+}
+
+int stro_stable_cmp(const void *A, const void *B, void *Str)
+{
+    return strcmp((const char *) Str + *(size_t *) A, (const char *) Str + *(size_t *) B);
+}
+
+bool stro_cmp(const void *A, const void *B, void *Str)
+{
+    return str_off_stable_cmp(A, B, Str) > 0;
+}
+
 int str_strl_stable_cmp(const void *Str, const void *Strl, void *p_Len)
 {
     const struct strl *strl = Strl;
     size_t len = *(size_t *) p_Len;
     int res = strncmp((const char *) Str, strl->str, len);
     return res ? res : len < strl->len ? INT_MIN : 0;
-}
-
-bool str_cmp(const void *A, const void *B, void *context)
-{
-    (void) context;
-    return !strcmp((const char *) A, (const char *) B);
-}
-
-bool str_off_str_cmp(const void *A, const void *B, void *Str)
-{
-    return str_cmp((const char *) Str + *(size_t *) A, B, NULL);
-}
-
-bool str_off_cmp(const void *A, const void *B, void *Str)
-{
-    return str_cmp((const char *) Str + *(size_t *) A, (const char *) Str + *(size_t *) B, NULL);
-}
-
-int str_off_stable_cmp(const void *A, const void *B, void *Str)
-{
-    return strcmp((const char *) Str + *(size_t *) A, (const char *) Str + *(size_t *) B);
-}
-
-bool str_off_cmp(const void *A, const void *B, void *Str)
-{
-    return str_off_stable_cmp(A, B, Str) > 0;
 }

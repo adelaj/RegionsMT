@@ -1,5 +1,6 @@
 #include "ll.h"
 #include "mt.h"
+#include "cmp.h"
 #include "sort.h"
 #include "memory.h"
 #include "strproc.h"
@@ -9,7 +10,7 @@ struct array_result levels_from_phen_impl(size_t *lev, size_t *phen, char *buff,
 {
     uintptr_t *ptr = NULL;
     size_t cnt = *p_cnt;
-    struct array_result res = pointers(&ptr, phen, cnt, sizeof(*phen), str_off_cmp, buff);
+    struct array_result res = pointers(&ptr, phen, cnt, sizeof(*phen), stro_cmp, buff);
     if (!res.status) return res;
     size_t ucnt = 0, i = 0, ip = 0;
     for (; i < cnt; i++)
@@ -24,7 +25,7 @@ struct array_result levels_from_phen_impl(size_t *lev, size_t *phen, char *buff,
         if (bt(filter, jp))
         {
             size_t tmp = ucnt;
-            if (str_off_cmp((void *) ptr[j], (void *) ptr[i], buff)) ucnt++;
+            if (stro_cmp((void *) ptr[j], (void *) ptr[i], buff)) ucnt++;
             lev[ip] = bt(grouping, ip) ? tmp : SIZE_MAX;
             i = j;
             ip = jp;

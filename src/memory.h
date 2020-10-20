@@ -86,3 +86,16 @@ struct array_result persistent_array_init(struct persistent_array *, size_t, siz
 void persistent_array_close(struct persistent_array *);
 struct array_result persistent_array_test(struct persistent_array *, size_t, size_t, enum persistent_array_flags);
 void *persistent_array_fetch(struct persistent_array *, size_t, size_t);
+
+struct buff {
+    char *str;
+    size_t len, cap;
+};
+
+enum buff_flags {
+    BUFFER_INIT = 1, // Preserve null terminator at the end of the buffer (if it is present)
+    BUFFER_TERM = 2, // Zero character at the ending
+    BUFFER_DISCARD = 4 // Discards the contents of the buffer
+};
+
+struct array_result buff_append(struct buff *, const char *, size_t, enum buff_flags);

@@ -2,6 +2,7 @@
 #include "la.h"
 #include "ll.h"
 #include "lm.h"
+#include "cmp.h"
 #include "memory.h"
 #include "object.h"
 #include "sort.h"
@@ -646,7 +647,7 @@ bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t
             if (term[i].sort & COV_SORT_FLAG_STR)
             {
                 *level = cov->dim;
-                if (array_assert(log, CODE_METRIC, ranks_unique((size_t **) ptr, cov->off + ind * cov->dim, level, sizeof(*cov->off), str_off_cmp, cov->buff.str))) continue;
+                if (array_assert(log, CODE_METRIC, ranks_unique((size_t **) ptr, cov->off + ind * cov->dim, level, sizeof(*cov->off), stro_cmp, cov->buff.str))) continue;
             }
             else if (array_assert(log, CODE_METRIC, array_init(ptr, NULL, cov->dim, sizeof(double), 0, ARRAY_STRICT)))
             {

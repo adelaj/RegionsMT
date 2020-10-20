@@ -72,28 +72,4 @@ struct str_tbl_handler_context {
 // Here the second argument should be a definite number 
 bool str_tbl_handler(const char *, size_t, void *, void *);
 
-struct buff {
-    char *str;
-    size_t len, cap;
-};
 
-enum buff_flags {
-    BUFFER_INIT = 1, // Preserve null terminator at the end of the buffer (if it is present)
-    BUFFER_TERM = 2, // Zero character at the ending
-    BUFFER_DISCARD = 4 // Discards the contents of the buffer
-};
-
-struct array_result buff_append(struct buff *, const char *, size_t, enum buff_flags);
-
-struct str_pool {
-    struct buff buff;
-    struct hash_table tbl;
-};
-
-struct array_result str_pool_init(struct str_pool *, size_t, size_t, size_t);
-void str_pool_close(struct str_pool *);
-struct array_result str_pool_insert(struct str_pool *, const char *, size_t, size_t *, size_t, void *, void *restrict);
-bool str_pool_fetch(struct str_pool *, const char *, size_t, void *);
-
-size_t str_x33_hash(const void *, void *);
-size_t str_off_x33_hash(const void *, void *);

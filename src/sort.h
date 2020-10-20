@@ -41,6 +41,7 @@ enum binary_search_flags {
 
 bool binary_search(size_t *, const void *restrict, const void *restrict, size_t, size_t, stable_cmp_callback, void *, enum binary_search_flags);
 
+// Hash table (heavily based on the 'khash.h')
 struct hash_table {
     uint8_t *flags;
     size_t cnt, lcap, tot, hint;
@@ -57,7 +58,6 @@ enum hash_status {
     HASH_PRESENT = HASH_UNTOUCHED << 1,
 };
 
-// Heavily based on the 'khash.h'
 struct array_result hash_table_init(struct hash_table *, size_t, size_t, size_t);
 void hash_table_close(struct hash_table *);
 bool hash_table_search(struct hash_table *, size_t *, const void *, size_t, cmp_callback, void *);
@@ -66,3 +66,24 @@ void *hash_table_fetch_key(struct hash_table *, size_t, size_t);
 void *hash_table_fetch_val(struct hash_table *, size_t, size_t);
 struct array_result hash_table_alloc(struct hash_table *, size_t *, const void *, size_t, size_t, hash_callback, cmp_callback, void *, void *restrict, void *restrict);
 void hash_table_dealloc(struct hash_table *, size_t);
+
+// String pool
+struct str_pool {
+    struct buff buff;
+    struct hash_table tbl;
+};
+
+enum {
+    STR_POOL_FAILURE = HASH_FAILURE,
+    STR_POOL_SUCCESS = HASH_SUCCESS,
+    STR_POOL_UNTOUCHED = HASH_UNTOUCHED,
+    STR_POOL_PRESENT = HASH_PRESENT,
+};
+
+#define str_hash str_djb2a_hash
+size_t stro_hash(const void *, void *);
+
+struct array_result str_pool_init(struct str_pool *, size_t, size_t, size_t);
+void str_pool_close(struct str_pool *);
+struct array_result str_pool_insert(struct str_pool *, const char *, size_t, size_t *, size_t, void *, void *restrict);
+bool str_pool_fetch(struct str_pool *, const char *, size_t, void *);

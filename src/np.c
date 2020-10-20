@@ -327,21 +327,20 @@ size_t Strnlen(const char *str, size_t len)
 size_t Strmsk(const char *str, __m128i msk)
 {
     int rest = (uintptr_t) str % alignof(__m128i);
-    size_t off = 0;
+    size_t off;
     if (rest)
     {
         // Processing residual part of the string from its lower 16-byte boundary
         __m128i t = m128i_szz8(_mm_load_si128((__m128i *) (str - rest)), rest, 1);
-        unsigned ind = (unsigned) pcmpistrz(msk, t, i);
-        if (pcmpistrz(msk, t, z) || ind < sizeof(__m128i)) return ind < sizeof(__m128i) ? (unsigned) ind : m128i_nbsf8(t); // Do not change the condition: it makes possible to optimize two 'pcmpistr' invocations into one instruction!
+        if (!pcmpistrz(msk, t, a)) return pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t);
         off = sizeof(__m128i) - rest;
     }
+    else off = 0;
     for (;; off += sizeof(__m128i))
     {
         // Processing aligned part of the string
         __m128i t = _mm_load_si128((__m128i *) (str + off));
-        unsigned ind = (unsigned) pcmpistrz(msk, t, i);
-        if (pcmpistrz(msk, t, z) || ind < sizeof(__m128i)) return off + (ind < sizeof(__m128i) ? (unsigned) ind : m128i_nbsf8(t));
+        if (!pcmpistrz(msk, t, a)) return (pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t)) + off;
     }
 }
 
@@ -349,27 +348,28 @@ size_t Strmsk(const char *str, __m128i msk)
 size_t Strnmsk(const char *str, __m128i msk, size_t len)
 {
     int rest = (uintptr_t) str % alignof(__m128i);
-    size_t off = 0;
+    size_t off;
     if (rest && len) // When 'len' is zero no loads from 'str' are performed.
     {
         // Processing residual part of the string from its lower 16-byte boundary
         __m128i t = m128i_szz8(_mm_load_si128((__m128i *) (str - rest)), rest, 1);
-        unsigned ind = (unsigned) pcmpistrz(msk, t, i);
-        if (pcmpistrz(msk, t, z) || ind < sizeof(__m128i))
+        if (!pcmpistrz(msk, t, a))
         {
-            unsigned res = ind < sizeof(__m128i) ? ind : m128i_nbsf8(t);
+            size_t res = pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t);
             return MIN(len, res);
         }
         off = sizeof(__m128i) - rest;
     }
+    else off = 0;
     for (; off < len; off += sizeof(__m128i))
     {
         // Processing aligned part of the string
         __m128i t = _mm_load_si128((__m128i *) (str + off));
-        unsigned ind = (unsigned) pcmpistrz(msk, t, i);
-        if (!pcmpistrz(msk, t, z) && ind == sizeof(__m128i)) continue;
-        size_t res = off + (ind < sizeof(__m128i) ? ind : m128i_nbsf8(t));
-        return MIN(len, res);
+        if (!pcmpistrz(msk, t, a))
+        {
+            off += pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t);
+            return MIN(len, off);
+        }
     }
     return len;
 }
