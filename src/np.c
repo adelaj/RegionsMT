@@ -300,6 +300,24 @@ IF_WIN(int Strnicmp(const char *a, const char *b, size_t rlen)
     return _strnicmp(a, b, rlen);
 })
 
+// Length of unbounded string
+size_t Strlen(const char *str)
+{
+    int rest = (uintptr_t) str % alignof(__m128i);
+    size_t off = 0;
+    if (rest)
+    {
+        unsigned rlen = sizeof(__m128i) - rest, ind = m128i_nbsf8(m128i_szz8(_mm_load_si128((__m128i *) (str - rest)), rest, 1));
+        if (ind != umax(ind)) return ind;
+        off = rlen;
+    }
+    for (;; off += sizeof(__m128i))
+    {
+        unsigned ind = m128i_nbsf8(_mm_load_si128((__m128i *) (str + off)));
+        if (ind != umax(ind)) return off + ind;
+    }
+}
+
 // Length of bounded string
 size_t Strnlen(const char *str, size_t len)
 {
@@ -314,9 +332,7 @@ size_t Strnlen(const char *str, size_t len)
     for (; off < len; off += sizeof(__m128i))
     {
         unsigned ind = m128i_nbsf8(_mm_load_si128((__m128i *) (str + off)));
-        if (ind == umax(ind)) continue;
-        off += ind;
-        return MIN(len, off);
+        if (ind != umax(ind)) return off += ind, MIN(len, off);
     }
     return len;
 }
@@ -353,11 +369,7 @@ size_t Strnmsk(const char *str, __m128i msk, size_t len)
     {
         // Processing residual part of the string from its lower 16-byte boundary
         __m128i t = m128i_szz8(_mm_load_si128((__m128i *) (str - rest)), rest, 1);
-        if (!pcmpistrz(msk, t, a))
-        {
-            size_t res = pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t);
-            return MIN(len, res);
-        }
+        if (!pcmpistrz(msk, t, a)) return off = pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t), MIN(len, off);
         off = sizeof(__m128i) - rest;
     }
     else off = 0;
@@ -365,11 +377,7 @@ size_t Strnmsk(const char *str, __m128i msk, size_t len)
     {
         // Processing aligned part of the string
         __m128i t = _mm_load_si128((__m128i *) (str + off));
-        if (!pcmpistrz(msk, t, a))
-        {
-            off += pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t);
-            return MIN(len, off);
-        }
+        if (!pcmpistrz(msk, t, a)) return off += pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t), MIN(len, off);
     }
     return len;
 }

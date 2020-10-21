@@ -287,6 +287,7 @@ void *persistent_array_fetch(struct persistent_array *arr, size_t ind, size_t sz
     return (char *) arr->ptr[off] + (off ? ind1 - ((size_t) 1 << arr->off << off) : ind) * sz;
 }
 
+
 struct array_result buff_append(struct buff *buff, const char *str, size_t len, enum buff_flags flags)
 {
     size_t pos = flags & BUFFER_DISCARD ? 0 : buff->len;

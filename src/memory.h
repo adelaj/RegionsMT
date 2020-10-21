@@ -13,7 +13,8 @@ enum array_flags {
     ARRAY_REDUCE = 4,
     ARRAY_REALLOC = 8, // Default in 'array_test'
     ARRAY_FAILSAFE = 16, // Disables internal checks
-    ARRAY_ALIGN = 32
+    ARRAY_ALIGN = 32, // Aligns the array beginning to specified value
+    ARRAY_ALIGN_SIZE = 64 // Aligns the array size to specified value
 };
 
 struct array_result {

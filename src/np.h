@@ -87,13 +87,12 @@ uint64_t get_time(void);
 int Stricmp(const char *, const char *);
 int Strnicmp(const char *, const char *, size_t);
 
-// Length of bounded string
+// Length of string
+size_t Strlen(const char *);
 size_t Strnlen(const char *, size_t);
 
 // Returns position of a character from 'msk' if found, or the length of the string otherwise
 size_t Strmsk(const char *, __m128i);
-
-// The same for explicitly bounded strings
 size_t Strnmsk(const char *, __m128i, size_t);
 
 size_t Strchrnull(const char *, int);

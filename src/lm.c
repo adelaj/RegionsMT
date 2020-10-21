@@ -774,7 +774,7 @@ bool lm_expr_test(const char *phen_name, const char *expr, const char *path_phen
     struct text_metric metric = { .path = STRI(__FILE__) };
     struct base_context context = { .buff = &buff };
     struct lm_expr_arg arg = { 0 };
-    size_t len = strlen(expr);
+    size_t len = Strlen(expr);
     for (size_t i = 0; i <= len; i++)
     {
         if (lm_expr_impl(&arg, &context, (struct utf8) { .len = 1, .val = expr[i], .chr = { expr[i] } }, metric, log)) continue;

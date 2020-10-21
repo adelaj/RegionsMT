@@ -1031,7 +1031,7 @@ struct xml_object *xml_compile(const char *path, xml_node_selector_callback xml_
     size_t dep = 0;
     // Buffer should be able to store UTF_BOM + XML_DECL + whitespace
     char buff[MAX(BLOCK_READ, lengthof(UTF8_BOM) + countof(XML_DECL))] = { '\0' }, *buff0 = NULL;
-    struct text_metric metric = { .path = { .str =  path, .len = strlen(path) }, 0 }; // Text metrics        
+    struct text_metric metric = { .path = { .str =  path, .len = Strlen(path) }, 0 }; // Text metrics        
     struct xml_att xml_val = { 0 };
     struct xml_node xml_node = { 0 };
     

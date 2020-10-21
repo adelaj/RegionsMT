@@ -204,7 +204,7 @@ bool categorical_run_chisq(const char *phen_name, const char *path_phen, const c
     uint8_t *gen = NULL;
     size_t *phen = NULL;
     FILE *f = NULL;
-    size_t name_base_len = Strchrnull(phen_name, '|'), name_len = name_base_len + strlen(phen_name + name_base_len);
+    size_t name_base_len = Strchrnull(phen_name, '|'), name_len = name_base_len + Strlen(phen_name + name_base_len);
     struct phen_context phen_context = { .col_phen = SIZE_MAX, .col_filter = SIZE_MAX, .name = phen_name, .name_len = name_len, .name_base_len = name_base_len };
     size_t phen_skip = 0, phen_cnt = 0, phen_length = 0;
     if (!tbl_read(path_phen, 0, tbl_phen_selector, NULL, &phen_context, &phen, &phen_skip, &phen_cnt, &phen_length, ',', log)) goto error;
@@ -265,7 +265,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
     size_t *phen = NULL;
     FILE *f = NULL;
     struct top_hit *top_hit = NULL;
-    size_t name_base_len = Strchrnull(phen_name, '|'), name_len = name_base_len + strlen(phen_name + name_base_len);
+    size_t name_base_len = Strchrnull(phen_name, '|'), name_len = name_base_len + Strlen(phen_name + name_base_len);
     struct phen_context phen_context = { .col_phen = SIZE_MAX, .col_filter = SIZE_MAX, .name = phen_name, .name_len = name_len, .name_base_len = name_base_len };
     size_t top_hit_cap = 0;
     size_t top_hit_skip = 0, top_hit_cnt = 0, top_hit_length = 0;

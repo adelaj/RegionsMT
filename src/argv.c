@@ -72,7 +72,7 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                 capture = 0;
                 if (!(par.mode == PAR_VALUED_OPTION && hyph))
                 {
-                    size_t tmp = strlen(argv[i]);
+                    size_t tmp = Strlen(argv[i]);
                     if (par.handler && !par.handler(argv[i], tmp, par.ptr, par.context)) log_message_warning_argv_name_val(log, CODE_METRIC, i - 1, ARGV_UNHANDLED_PAR, shrt, str, len, argv[i], tmp);
                     continue;
                 }
@@ -91,13 +91,13 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                         {
                             if (par.mode == PAR_OPTION)
                             {
-                                if (str[len]) log_message_warning_argv_name_val(log, CODE_METRIC, i, ARGV_UNEXPECTED_VALUE, 0, str, len, str + len + 1, strlen(str + len + 1));
+                                if (str[len]) log_message_warning_argv_name_val(log, CODE_METRIC, i, ARGV_UNEXPECTED_VALUE, 0, str, len, str + len + 1, Strlen(str + len + 1));
                                 if (par.handler && !par.handler(NULL, 0, par.ptr, par.context)) log_message_warning_argv_name(log, CODE_METRIC, i, ARGV_UNHANDLED_OPT, 0, str, len);
                             }
                             else if (!str[len]) capture = 1;
                             else
                             {
-                                size_t tmp = strlen(str + len + 1);
+                                size_t tmp = Strlen(str + len + 1);
                                 if (par.handler && !par.handler(str + len + 1, tmp, par.ptr, par.context)) log_message_warning_argv_name_val(log, CODE_METRIC, i, ARGV_UNHANDLED_PAR, 0, str, len, str + len + 1, tmp);
                             }
                         }
@@ -106,7 +106,7 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                 }
                 else // Short mode
                 {
-                    size_t tot = strlen(argv[i] + 1);
+                    size_t tot = Strlen(argv[i] + 1);
                     for (size_t k = 1; argv[i][k];) // Inner loop for handling multiple option-like parameters
                     {
                         str = argv[i] + k;
@@ -121,7 +121,7 @@ bool argv_parse(par_selector_callback selector, void *context, void *res, char *
                                     if (!str[len]) capture = -1;
                                     else
                                     {
-                                        size_t tmp = strlen(str + len);
+                                        size_t tmp = Strlen(str + len);
                                         if (par.handler && !par.handler(str + len, tmp, par.ptr, par.context)) log_message_warning_argv_name_val(log, CODE_METRIC, i, ARGV_UNHANDLED_PAR, 1, str, len, str + len, tmp);
                                     }
                                     break; // Exiting from the inner loop
