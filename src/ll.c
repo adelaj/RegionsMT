@@ -150,24 +150,19 @@
 #define DECL_ADD_SAT(TYPE, PREFIX) \
     TYPE PREFIX ## _add_sat(TYPE x, TYPE y) \
     { \
-        unsigned char car = 0; \
-        TYPE res = add(&car, x, y); \
-        return car ? umax(x) : res; \
+        return test_add(&x, y) ? x : umax(x); \
     }
 
 #define DECL_SUB_SAT(TYPE, PREFIX) \
     TYPE PREFIX ## _sub_sat(TYPE x, TYPE y) \
     { \
-        unsigned char bor = 0; \
-        TYPE res = sub(&bor, x, y); \
-        return bor ? 0 : res; \
+        return test_sub(&x, y) ? x : 0; \
     }
 
 #define DECL_USIGN(TYPE, PREFIX) \
     int PREFIX ## _usign(TYPE x, TYPE y) \
     { \
-        unsigned char bor = 0; \
-        return sub(&bor, x, y) ? 1 - (int) (bor << 1) : 0; \
+        return test_sub(&x, y) ? !!x : -1; \
     }
 
 #define DECL_UDIST(TYPE, PREFIX) \
@@ -633,7 +628,7 @@ IF_GCC_LLVM(DECL2(TEST_OP_GCC, , add, __builtin_add_overflow))
 IF_MSVC(DECL2(TEST_OP, , add, unsigned char))
 
 // Non-destructive subtract with overflow test
-IF_GCC_LLVM(DECL2(TEST_OP_GCC, , sub, __builtin_add_overflow))
+IF_GCC_LLVM(DECL2(TEST_OP_GCC, , sub, __builtin_sub_overflow))
 IF_MSVC(DECL2(TEST_OP, , sub, unsigned char))
 
 // Non-destructive multiply with overflow test
