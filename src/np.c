@@ -182,8 +182,8 @@ IF_WIN(int64_t Ftelli64(FILE *file)
 bool Fisatty(FILE *f)
 {
     int fd = IO_POSIX(fileno)(f);
-#if TEST(IF_WIN)
     if (IO_POSIX(isatty)(fd)) return 1;
+#if TEST(IF_WIN)
     DWORD mode;
     HANDLE ho = (HANDLE) _get_osfhandle(fd);
     if (!ho || ho == INVALID_HANDLE_VALUE) return 0;
@@ -199,7 +199,7 @@ bool Fisatty(FILE *f)
     if (!tmp || (!WSTR_CMP(wstr, len, L"-from-master") && !WSTR_CMP(wstr, len, L"-to-master"))) return 0; // Skip suffix: L"-from-master" or L"-to-master"
     return !len;
 #else
-    return IO_POSIX(isatty)(fd);
+    return 0;
 #endif
 }
 
@@ -317,15 +317,15 @@ int Strcmp_unsafe(const char *a, const char *b)
 
 int Strncmp_unsafe(const char *a, const char *b, size_t len)
 {
-    if (len) return 0;
-    size_t end = len - 1;
     for (size_t off = 0; off < len; off += sizeof(__m128i))
     {
         __m128i ta = _mm_loadu_si128((__m128i *) (a + off)), tb = _mm_loadu_si128((__m128i *) (b + off));
-        if (!pcmpistrz(ta, tb, a)) return pcmpistrz(ta, tb, c) ? (off += (unsigned) pcmpistrz(ta, tb, i), off <= end ? a[off] - b[off] : 0) : 0;
+        if (!pcmpistrz(ta, tb, a)) return pcmpistrz(ta, tb, c) ? (off += (unsigned) pcmpistrz(ta, tb, i), off < len ? a[off] - b[off] : 0) : 0;
     }
-    return a[end] - b[end];
+    return len-- ? a[len] - b[len] : 0;
 }
+
+#undef pcmpistrz
 
 // Length of unbounded string
 size_t Strlen(const char *str)
@@ -365,7 +365,6 @@ size_t Strnlen(const char *str, size_t len)
 }
 
 // Returns position of a character from 'msk' if found, or the length of the string otherwise
-#undef pcmpistrz
 #define pcmpistrz(msk, t, z) (_mm_cmpistr ## z(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT))
 
 size_t Strmsk(const char *str, __m128i msk)
@@ -409,6 +408,8 @@ size_t Strnmsk(const char *str, __m128i msk, size_t len)
     }
     return len;
 }
+
+#undef pcmpistrz
 
 // Similar to BSD 'strchrnul', but returns index instead of pointer. Index is set to length if character not found
 // Bonus: 'ch' may contain up to four characters simultaneously
