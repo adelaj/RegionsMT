@@ -40,8 +40,7 @@ void array_broadcast(void *, size_t, size_t, void *);
 
 struct array_result matrix_init(void *, size_t *restrict, size_t, size_t, size_t, size_t, size_t, enum array_flags);
 struct array_result array_init_impl(void *, size_t *restrict, size_t, size_t, size_t, size_t, enum array_flags);
-struct array_result array_init(void *, size_t *restrict, size_t, size_t, size_t, enum array_flags);
-struct array_result array_test_impl(void *, size_t *restrict, size_t, size_t, enum array_flags, size_t *restrict, size_t);
+struct array_result Array_test_impl(void *, size_t *restrict, size_t, size_t, size_t, enum array_flags, size_t *restrict, size_t);
 
 // The correct values for 'cnt' and 'diff' used for structures with flexible array members
 #define fam_sizeof(T, FAM) \
@@ -54,8 +53,14 @@ struct array_result array_test_impl(void *, size_t *restrict, size_t, size_t, en
 #define is_failsafe(T, TC) \
     (sizeof(T) <= sizeof(TC) ? ARRAY_FAILSAFE : 0)
 
+#define array_init(ARR, P_CAP, CNT, SZ, DIFF, FLAGS) \
+    (array_init_impl((ARR), (P_CAP), 0, (CNT), (SZ), (DIFF), (FLAGS) & ~(enum array_flags) ARRAY_ALIGN))
+
+#define array_test_impl(ARR, P_CAP, AL, SZ, DIFF, FLAGS, ...) \
+    (Array_test_impl((ARR), (P_CAP), (AL), (SZ), (DIFF), (FLAGS), ARG(size_t, __VA_ARGS__)))
+
 #define array_test(ARR, P_CAP, SZ, DIFF, FLAGS, ...) \
-    (array_test_impl((ARR), (P_CAP), (SZ), (DIFF), (FLAGS), ARG(size_t, __VA_ARGS__)))
+    (array_test_impl((ARR), (P_CAP), 0, (SZ), (DIFF), (FLAGS) & ~(enum array_flags) ARRAY_ALIGN, __VA_ARGS__))
 
 struct queue {
     void *arr;

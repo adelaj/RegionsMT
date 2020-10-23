@@ -7,6 +7,9 @@
 
 #include "common.h"
 
+#include <stddef.h>
+#include <stdint.h>
+#include <limits.h>
 #include <immintrin.h>
 
 enum atomic_mo {
@@ -63,6 +66,8 @@ _Static_assert(sizeof(Dsize_t) == 2 * sizeof(size_t), "");
 #define SIZE_CNT(BIT) TYPE_CNT(BIT, SIZE_BIT)
 #define UINT32_BIT (bitsof(uint32_t))
 #define UINT64_BIT (bitsof(uint64_t))
+
+#define bitsof(X) (CHAR_BIT * sizeof(X))
 
 #define umax(X) (_Generic((X), \
     unsigned char: UCHAR_MAX, \

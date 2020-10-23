@@ -563,7 +563,7 @@ int main(int argc, char **argv)
 #   include <windows.h>
 
 // Determining total buffer length (with null-terminators) and performing error checking
-static bool wargv_cnt_impl(size_t argc, wchar_t **wargv, size_t *p_cnt)
+static bool wargv_cnt_impl(size_t argc, wchar_t **wargv, size_t *restrict p_cnt)
 {
     size_t cnt = argc; // Size of the null-terminators
     for (size_t i = 0; i < argc; i++)
@@ -572,8 +572,8 @@ static bool wargv_cnt_impl(size_t argc, wchar_t **wargv, size_t *p_cnt)
         uint8_t context = 0;
         for (wchar_t *word = wargv[i]; *word; word++)
         {
-            _Static_assert(sizeof(*word) == sizeof(uint16_t), "");
-            if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context, 0)) return 0;
+            _Static_assert(sizeof(*word) == sizeof(char16_t), "");
+            if (!utf16_decode((char16_t) *word, &val, NULL, NULL, &context, 0)) return 0;
             if (context) continue;
             if (!test_add(&cnt, utf8_len(val))) return 0;
         }
@@ -584,7 +584,7 @@ static bool wargv_cnt_impl(size_t argc, wchar_t **wargv, size_t *p_cnt)
 }
 
 // Performing translation from UTF-16LE to UTF-8
-static bool wargv_to_argv_impl(size_t argc, wchar_t **wargv, char *base, char **argv)
+static bool wargv_to_argv_impl(size_t argc, wchar_t **wargv, char *restrict base, char **restrict argv)
 {
     for (size_t i = 0; i < argc; i++)
     {
@@ -593,11 +593,11 @@ static bool wargv_to_argv_impl(size_t argc, wchar_t **wargv, char *base, char **
         uint8_t context = 0;
         for (wchar_t *word = wargv[i]; *word; word++)
         {
-            _Static_assert(sizeof(*word) == sizeof(uint16_t), "");
-            if (!utf16_decode((uint16_t) *word, &val, NULL, NULL, &context, 0)) return 0;
+            _Static_assert(sizeof(*word) == sizeof(char16_t), "");
+            if (!utf16_decode((char16_t) *word, &val, NULL, NULL, &context, 0)) return 0;
             if (context) continue;
             uint8_t len;
-            utf8_encode(val, (uint8_t *) base, &len);
+            utf8_encode(val, base, &len);
             base += len;
         }
         if (context) return 0;

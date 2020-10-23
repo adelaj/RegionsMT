@@ -4,8 +4,8 @@
 uint8_t utf8_len(uint32_t utf8_val)
 {
     uint8_t mode = (uint8_t) bsr(utf8_val);
-    if (mode <= 6 || mode == umax(mode)) return 1;
-    else return (mode + 4) / 5;
+    if (!utf8_val || mode <= 6) return 1;
+    return (mode + 4) / 5;
 }
 
 bool utf8_is_overlong(uint32_t utf8_val, uint8_t utf8_len)
@@ -105,20 +105,20 @@ bool utf8_is_xml_name_char_len(uint32_t utf8_val, uint8_t utf8_len)
     return 0;
 }
 
-void utf8_encode(uint32_t utf8_val, uint8_t *restrict utf8_byte, uint8_t *restrict p_utf8_len)
+void utf8_encode(uint32_t utf8_val, char *restrict utf8_ch, uint8_t *restrict p_utf8_len)
 {
     uint8_t mode = (uint8_t) bsr(utf8_val);
-    if (mode <= 6 || mode == umax(mode))
+    if (!utf8_val || mode <= 6)
     {
-        utf8_byte[0] = (uint8_t) utf8_val;
+        utf8_ch[0] = (char) utf8_val;
         if (p_utf8_len) *p_utf8_len = 1;
     }
     else
     {
         uint8_t utf8_len = (mode + 4) / 5;
         if (p_utf8_len) *p_utf8_len = utf8_len;
-        for (uint8_t i = utf8_len; i > 1; utf8_byte[--i] = 128 | (utf8_val & 63), utf8_val >>= 6);
-        utf8_byte[0] = (uint8_t) ((((1u << (utf8_len + 1)) - 1) << (8 - utf8_len)) | utf8_val);
+        for (uint8_t i = utf8_len; i > 1; utf8_ch[--i] = (char) (128 | (utf8_val & 63)), utf8_val >>= 6);
+        utf8_ch[0] = (char) ((((1u << (utf8_len + 1)) - 1) << (8 - utf8_len)) | utf8_val);
     }
 }
 
@@ -126,22 +126,22 @@ void utf8_encode(uint32_t utf8_val, uint8_t *restrict utf8_byte, uint8_t *restri
 // It should be called until '*p_context' becomes zero. Returns '0' on error. 
 // Warning: '*p_context' should be initialized with zero before the initial call
 // and should not be modified between sequential calls!
-bool utf8_decode(uint8_t byte, uint32_t *restrict p_utf8_val, uint8_t *restrict utf8_byte, uint8_t *restrict p_utf8_len, uint8_t *restrict p_utf8_context)
+bool utf8_decode(char ch, uint32_t *restrict p_utf8_val, char *restrict utf8_ch, uint8_t *restrict p_utf8_len, uint8_t *restrict p_utf8_context)
 {
     if (*p_utf8_context)
     {
-        if ((byte & 0xc0) == 0x80) // UTF-8 continuation byte
+        if (((uint8_t) ch & 0xc0) == 0x80) // UTF-8 continuation byte
         {
             *p_utf8_val <<= 6;
-            *p_utf8_val |= byte & 0x3f;
+            *p_utf8_val |= (uint8_t) ch & 0x3f;
             uint8_t utf8_context = (*p_utf8_context)--;
-            if (utf8_byte && p_utf8_len) utf8_byte[*p_utf8_len - utf8_context] = byte;
+            if (utf8_ch && p_utf8_len) utf8_ch[*p_utf8_len - utf8_context] = ch;
             return 1;
         }
     }
     else
     {
-        uint8_t mode = bsr((uint8_t) ~byte);
+        uint8_t mode = bsr((uint8_t) ~ch);
         switch (mode)
         {
         case UINT8_MAX: // Invalid UTF-8 bytes: '\xff'
@@ -150,15 +150,15 @@ bool utf8_decode(uint8_t byte, uint32_t *restrict p_utf8_val, uint8_t *restrict 
             break;
         case 7: // Single-byte UTF-8 character
             *p_utf8_context = 0;
-            *p_utf8_val = byte;
+            *p_utf8_val = (uint8_t) ch;
             if (p_utf8_len) *p_utf8_len = 1;
-            if (utf8_byte) utf8_byte[0] = byte;
+            if (utf8_ch) utf8_ch[0] = ch;
             return 1;
         default: // UTF-8 start byte (cases 1, 2, 3, 4, and 5)
             *p_utf8_context = 6 - mode;
-            *p_utf8_val = byte & ((1u << mode) - 1);
+            *p_utf8_val = (uint8_t) ch & ((1u << mode) - 1);
             if (p_utf8_len) *p_utf8_len = 7 - mode;
-            if (utf8_byte) utf8_byte[0] = byte;
+            if (utf8_ch) utf8_ch[0] = ch;
             return 1;
         }        
     }
@@ -172,7 +172,7 @@ bool utf8_decode_len(const char *restrict str, size_t len, size_t *restrict p_le
     size_t ind = 0;
     for (; ind < len; ind++)
     {
-        if (!utf8_decode((uint8_t) str[ind], &val, NULL, &ulen, &context)) break;
+        if (!utf8_decode(str[ind], &val, NULL, &ulen, &context)) break;
         if (context) continue;
         *p_len = ulen;
         return 1;
@@ -186,27 +186,27 @@ uint8_t utf16_len(uint32_t utf16_val)
     return 1 + (utf16_val >= 0x10000);
 }
 
-void utf16_encode(uint32_t utf16_val, uint16_t *restrict utf16_word, uint8_t *restrict p_utf16_len, bool be)
+void utf16_encode(uint32_t utf16_val, char16_t *restrict utf16_word, uint8_t *restrict p_utf16_len, bool be)
 {
     if (utf16_val < 0x10000)
     {
         if (p_utf16_len) *p_utf16_len = 1;
-        uint16_t w0 = (uint16_t) utf16_val;
+        char16_t w0 = (char16_t) utf16_val;
         utf16_word[0] = be ? rol(w0, 8) : w0;
     }
     else
     {
         if (p_utf16_len) *p_utf16_len = 2;
         utf16_val -= 0x10000;
-        uint16_t w0 = (uint16_t) (0xd800 | ((utf16_val >> 10) & 0x3ff)), w1 = (uint16_t) (0xdc00 | (utf16_val & 0x3ff));
+        char16_t w0 = (char16_t) (0xd800 | ((utf16_val >> 10) & 0x3ff)), w1 = (char16_t) (0xdc00 | (utf16_val & 0x3ff));
         if (be) utf16_word[0] = rol(w0, 8), utf16_word[1] = rol(w1, 8);
         else utf16_word[0] = w0, utf16_word[1] = w1;
     }
 }
 
-bool utf16_decode(uint16_t word, uint32_t *restrict p_utf16_val, uint16_t *restrict utf16_word, uint8_t *restrict p_utf16_len, uint8_t *restrict p_utf16_context, bool be)
+bool utf16_decode(char16_t word, uint32_t *restrict p_utf16_val, char16_t *restrict utf16_word, uint8_t *restrict p_utf16_len, uint8_t *restrict p_utf16_context, bool be)
 {
-    uint16_t wordle = be ? rol(word, 8) : word;
+    char16_t wordle = be ? rol(word, 8) : word;
     if (*p_utf16_context)
     {
         if (0xdc00 <= wordle && wordle <= 0xdfff)

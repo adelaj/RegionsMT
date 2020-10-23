@@ -2,6 +2,8 @@
 
 #include "common.h"
 
+#include <uchar.h>
+
 #define UTF8_COUNT 6
 #define UTF8_BOUND 0x110000
 #define UTF8_BOM "\xef\xbb\xbf"
@@ -25,16 +27,16 @@ bool utf8_is_xml_char_len(uint32_t, uint8_t);
 bool utf8_is_xml_name_start_char_len(uint32_t, uint8_t);
 bool utf8_is_xml_name_char_len(uint32_t, uint8_t);
 
-void utf8_encode(uint32_t, uint8_t *restrict, uint8_t *restrict);
-bool utf8_decode(uint8_t, uint32_t *restrict, uint8_t *restrict, uint8_t *restrict, uint8_t *restrict);
+void utf8_encode(uint32_t, char *restrict, uint8_t *restrict);
+bool utf8_decode(char, uint32_t *restrict, char *restrict, uint8_t *restrict, uint8_t *restrict);
 
 bool utf8_decode_len(const char *restrict, size_t, size_t *restrict);
 
 #define UTF16_COUNT 2
 
 uint8_t utf16_len(uint32_t);
-void utf16_encode(uint32_t, uint16_t *restrict, uint8_t *restrict, bool);
-bool utf16_decode(uint16_t, uint32_t *restrict, uint16_t *restrict, uint8_t *restrict, uint8_t *restrict, bool);
+void utf16_encode(uint32_t, char16_t *restrict, uint8_t *restrict, bool);
+bool utf16_decode(uint16_t, uint32_t *restrict, char16_t *restrict, uint8_t *restrict, uint8_t *restrict, bool);
 
 struct utf8 {
     union {

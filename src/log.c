@@ -544,9 +544,10 @@ static void fmt_execute_utf(uint32_t val, enum fmt_arg_mode mode, char *buff, si
     if (mode == ARG_DEFAULT) return;
     if (mode == ARG_FETCH) val = uint32_arg_fetch(p_arg, flags & FMT_EXE_FLAG_PTR);
     if (flags & FMT_EXE_FLAG_PHONY) return;
-    uint8_t str[UTF8_COUNT], len;
+    char str[UTF8_COUNT];
+    uint8_t len;
     utf8_encode(val, str, &len);
-    print(buff, p_cnt, (char *) str, len, 0);
+    print(buff, p_cnt, str, len, 0);
 }
 
 static DECL_ARG_FETCH(fmt_callback, fmt_callback, fmt_callback)
@@ -1006,7 +1007,7 @@ static struct message_result fmt_execute_wstr(char *buff, size_t *p_cnt, void *p
     if (flags & FMT_EXE_FLAG_PHONY) return MESSAGE_SUCCESS;
     uint32_t val;
     uint8_t context = 0;
-    uint8_t str[UTF8_COUNT];
+    char str[UTF8_COUNT];
     size_t len = 0, cnt = *p_cnt;
     for (size_t i = 0; i < wlen; i++)
     {
@@ -1015,7 +1016,7 @@ static struct message_result fmt_execute_wstr(char *buff, size_t *p_cnt, void *p
         uint8_t ulen;
         utf8_encode(val, str, &ulen);
         size_t tmp = cnt;
-        print(buff + len, &tmp, (char *) str, ulen, 0);
+        print(buff + len, &tmp, str, ulen, 0);
         len = add_sat(len, tmp);
         cnt = sub_sat(cnt, tmp);
         if (!cnt) break;

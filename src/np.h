@@ -11,8 +11,8 @@
 #if TEST(IF_UNIX_APPLE)
 
 // Required for some POSIX only functions
-#   define _DEFAULT_SOURCE
 #   define _POSIX_C_SOURCE 200112L
+#   define _DEFAULT_SOURCE
 #   define _DARWIN_C_SOURCE
 
 // Required for the 'fseeko' and 'ftello' functions
@@ -38,6 +38,8 @@
 #endif
 
 #include <stdarg.h>
+#include <stddef.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <time.h>
 #include <immintrin.h>
@@ -86,6 +88,10 @@ uint64_t get_time(void);
 // Case-insensitive compare
 int Stricmp(const char *, const char *);
 int Strnicmp(const char *, const char *, size_t);
+
+// Unsafe string
+int Strcmp_unsafe(const char *, const char *);
+int Strncmp_unsafe(const char *, const char *, size_t);
 
 // Length of string
 size_t Strlen(const char *);

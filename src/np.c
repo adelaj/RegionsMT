@@ -18,6 +18,7 @@
 #elif TEST(IF_WIN)
 
 #   include <windows.h>
+#   include <uchar.h>
 #   include <wchar.h>
 #   include <io.h>
 #   include <sys/stat.h>
@@ -46,8 +47,8 @@ static bool utf8_str_to_wstr(const char *restrict str, wchar_t **p_wstr, size_t 
         utf8_decode(str[i], &val, NULL, NULL, &context); // No checks are required
         if (context) continue;
         uint8_t tmp;
-        _Static_assert(sizeof(*wstr) == sizeof(uint16_t), "");
-        utf16_encode(val, (uint16_t *) wstr + j, &tmp, 0);
+        _Static_assert(sizeof(*wstr) == sizeof(char16_t), "");
+        utf16_encode(val, (char16_t *) wstr + j, &tmp, 0);
         j += tmp;
     }
     wstr[wcnt - 1] = L'\0';
@@ -181,8 +182,8 @@ IF_WIN(int64_t Ftelli64(FILE *file)
 bool Fisatty(FILE *f)
 {
     int fd = IO_POSIX(fileno)(f);
-    if (IO_POSIX(isatty)(fd)) return 1;
 #if TEST(IF_WIN)
+    if (IO_POSIX(isatty)(fd)) return 1;
     DWORD mode;
     HANDLE ho = (HANDLE) _get_osfhandle(fd);
     if (!ho || ho == INVALID_HANDLE_VALUE) return 0;
@@ -197,6 +198,8 @@ bool Fisatty(FILE *f)
     for (tmp = 0; len && iswdigit(*wstr); tmp++, wstr++, len--); // Skip at least one digit
     if (!tmp || (!WSTR_CMP(wstr, len, L"-from-master") && !WSTR_CMP(wstr, len, L"-to-master"))) return 0; // Skip suffix: L"-from-master" or L"-to-master"
     return !len;
+#else
+    return IO_POSIX(isatty)(fd);
 #endif
 }
 
@@ -300,6 +303,30 @@ IF_WIN(int Strnicmp(const char *a, const char *b, size_t rlen)
     return _strnicmp(a, b, rlen);
 })
 
+// Unsafe string compare (strings are assumed either to be aligned, or to have proper padding at the end)
+#define pcmpistrz(msk, t, z) (_mm_cmpistr ## z(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_EACH | _SIDD_NEGATIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT))
+
+int Strcmp_unsafe(const char *a, const char *b)
+{
+    for (size_t off = 0;; off += sizeof(__m128i))
+    {
+        __m128i ta = _mm_loadu_si128((__m128i *) (a + off)), tb = _mm_loadu_si128((__m128i *) (b + off));
+        if (!pcmpistrz(ta, tb, a)) return pcmpistrz(ta, tb, c) ? (off += (unsigned) pcmpistrz(ta, tb, i), a[off] - b[off]) : 0;
+    }
+}
+
+int Strncmp_unsafe(const char *a, const char *b, size_t len)
+{
+    if (len) return 0;
+    size_t end = len - 1;
+    for (size_t off = 0; off < len; off += sizeof(__m128i))
+    {
+        __m128i ta = _mm_loadu_si128((__m128i *) (a + off)), tb = _mm_loadu_si128((__m128i *) (b + off));
+        if (!pcmpistrz(ta, tb, a)) return pcmpistrz(ta, tb, c) ? (off += (unsigned) pcmpistrz(ta, tb, i), off <= end ? a[off] - b[off] : 0) : 0;
+    }
+    return a[end] - b[end];
+}
+
 // Length of unbounded string
 size_t Strlen(const char *str)
 {
@@ -338,6 +365,7 @@ size_t Strnlen(const char *str, size_t len)
 }
 
 // Returns position of a character from 'msk' if found, or the length of the string otherwise
+#undef pcmpistrz
 #define pcmpistrz(msk, t, z) (_mm_cmpistr ## z(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_ANY | _SIDD_POSITIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT))
 
 size_t Strmsk(const char *str, __m128i msk)
@@ -348,7 +376,7 @@ size_t Strmsk(const char *str, __m128i msk)
     {
         // Processing residual part of the string from its lower 16-byte boundary
         __m128i t = m128i_szz8(_mm_load_si128((__m128i *) (str - rest)), rest, 1);
-        if (!pcmpistrz(msk, t, a)) return pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t);
+        if (!pcmpistrz(msk, t, a)) return pcmpistrz(msk, t, c) ? (unsigned) pcmpistrz(msk, t, i) : m128i_nbsf8(t);
         off = sizeof(__m128i) - rest;
     }
     else off = 0;
@@ -356,7 +384,7 @@ size_t Strmsk(const char *str, __m128i msk)
     {
         // Processing aligned part of the string
         __m128i t = _mm_load_si128((__m128i *) (str + off));
-        if (!pcmpistrz(msk, t, a)) return (pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t)) + off;
+        if (!pcmpistrz(msk, t, a)) return (pcmpistrz(msk, t, c) ? (unsigned) pcmpistrz(msk, t, i) : m128i_nbsf8(t)) + off;
     }
 }
 
@@ -369,7 +397,7 @@ size_t Strnmsk(const char *str, __m128i msk, size_t len)
     {
         // Processing residual part of the string from its lower 16-byte boundary
         __m128i t = m128i_szz8(_mm_load_si128((__m128i *) (str - rest)), rest, 1);
-        if (!pcmpistrz(msk, t, a)) return off = pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t), MIN(len, off);
+        if (!pcmpistrz(msk, t, a)) return off = pcmpistrz(msk, t, c) ? (unsigned) pcmpistrz(msk, t, i) : m128i_nbsf8(t), MIN(len, off);
         off = sizeof(__m128i) - rest;
     }
     else off = 0;
@@ -377,7 +405,7 @@ size_t Strnmsk(const char *str, __m128i msk, size_t len)
     {
         // Processing aligned part of the string
         __m128i t = _mm_load_si128((__m128i *) (str + off));
-        if (!pcmpistrz(msk, t, a)) return off += pcmpistrz(msk, t, c) ? pcmpistrz(msk, t, i) : m128i_nbsf8(t), MIN(len, off);
+        if (!pcmpistrz(msk, t, a)) return off += pcmpistrz(msk, t, c) ? (unsigned) pcmpistrz(msk, t, i) : m128i_nbsf8(t), MIN(len, off);
     }
     return len;
 }

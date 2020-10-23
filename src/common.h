@@ -1,10 +1,8 @@
 #pragma once
 
+// Warning! Do not include <stdint.h> and <limits.h> here!
 #include <stdalign.h>
-#include <limits.h>
 #include <stdbool.h>
-#include <stdint.h>
-#include <stddef.h>
 
 #define TEST_IMPL_0(X) 0 ## X
 #define TEST_IMPL_1(X) TEST_IMPL_0(X)
@@ -43,7 +41,7 @@
 #   define IFN_MINGW(...)
 #endif
 
-#ifdef  __unix__
+#ifdef __unix__
 #   define IF_UNIX(...) __VA_ARGS__
 #   define IFN_UNIX(...)
 #elif defined __APPLE__
@@ -129,8 +127,6 @@
     ((x) >= (a) ? (x) <= (b) ? (x) : (b) : (a))
 #define SIGN(x, y) \
     ((x) > (y) ? 1 : (x) < (y) ? -1 : 0)
-
-#define bitsof(X) (CHAR_BIT * sizeof(X))
 
 // Number of elements of array
 #define countof(ARR) (sizeof(ARR) / sizeof((ARR)[0]))

@@ -44,7 +44,8 @@ static void *Aligned_realloc_impl(void *ptr, size_t *restrict p_cap, size_t al, 
 // 'p_cap' -- pointer to initial capacity
 // 'cnt' -- desired capacity
 // On error 'p_Src' and 'p_cap' are untouched
-// Warning! 'ARRAY_ALIGNED | ARRAY_REALLOC' will yield an error on most platforms when 'p_cap' is not specified!
+// Warning! 1. 'ARRAY_ALIGNED | ARRAY_REALLOC' will yield an error on most platforms when 'p_cap' is not specified!
+//          2. 'al' must be a (positive) power of two
 struct array_result array_init_impl(void *p_Src, size_t *restrict p_cap, size_t al, size_t cnt, size_t sz, size_t diff, enum array_flags flags)
 {
     void **restrict p_src = p_Src, *src = *p_src;
@@ -56,6 +57,11 @@ struct array_result array_init_impl(void *p_Src, size_t *restrict p_cap, size_t 
         {
             if (!(flags & ARRAY_REDUCE)) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
             size_t tot = cnt * sz + diff; // No checks for overflows
+            if (flags & ARRAY_ALIGN_SIZE)
+            {
+                size_t rest = tot & (al - 1);
+                if (rest) tot += al - rest;
+            }
             void *res = flags & ARRAY_ALIGN ? Aligned_realloc_impl(src, p_cap, al, tot) : Realloc(src, tot); // Array shrinking; when 'tot' is zero memory is released
             if (tot && !res) return (struct array_result) { .error = ARRAY_OUT_OF_MEMORY, .tot = tot };
             *p_cap = cnt;
@@ -72,6 +78,15 @@ struct array_result array_init_impl(void *p_Src, size_t *restrict p_cap, size_t 
     size_t tot = cnt;
     if ((flags & ARRAY_STRICT) && (flags & ARRAY_FAILSAFE)) tot *= sz, tot += diff;
     else if (!test_ma(&tot, sz, diff)) return (struct array_result) { .error = ARRAY_OVERFLOW };
+    if (flags & ARRAY_ALIGN_SIZE)
+    {
+        size_t rest = tot & (al - 1);
+        if (rest)
+        {
+            if (flags & ARRAY_FAILSAFE) tot += al - rest;
+            else if (!test_add(&tot, al - rest)) return (struct array_result) { .error = ARRAY_OVERFLOW };
+        }
+    }
     void *res;
     if (src && (flags & ARRAY_REALLOC))
     {
@@ -91,15 +106,10 @@ struct array_result array_init_impl(void *p_Src, size_t *restrict p_cap, size_t 
     return (struct array_result) { .status = ARRAY_SUCCESS, .tot = tot };
 }
 
-struct array_result array_init(void *p_Src, size_t *restrict p_cap, size_t cnt, size_t sz, size_t diff, enum array_flags flags)
-{
-    return array_init_impl(p_Src, p_cap, 0, cnt, sz, diff, flags & ~(enum array_flags) ARRAY_ALIGN);
-}
-
-struct array_result array_test_impl(void *p_Arr, size_t *restrict p_cap, size_t sz, size_t diff, enum array_flags flags, size_t *restrict cntl, size_t cnt)
+struct array_result Array_test_impl(void *p_Arr, size_t *restrict p_cap, size_t al, size_t sz, size_t diff, enum array_flags flags, size_t *restrict cntl, size_t cnt)
 {
     size_t sum;
-    return test_sum(&sum, cntl, cnt) == cnt ? array_init(p_Arr, p_cap, sum, sz, diff, flags | ARRAY_REALLOC) : (struct array_result) { .error = ARRAY_OVERFLOW };
+    return test_sum(&sum, cntl, cnt) == cnt ? array_init_impl(p_Arr, p_cap, al, sum, sz, diff, flags | ARRAY_REALLOC) : (struct array_result) { .error = ARRAY_OVERFLOW };
 }
 
 struct array_result queue_init(struct queue *queue, size_t cnt, size_t sz)
