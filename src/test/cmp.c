@@ -35,22 +35,22 @@ bool test_cmp_generator_a(void *p_res, size_t *p_ind, struct log *log)
     return 1;
 }
 
-static int flt64_stable_cmp_dsc_test(double *p_a, double *p_b, void *context)
+static int fp64_stable_cmp_dsc_test(double *p_a, double *p_b, void *context)
 {
     (void) context;
     double a = *p_a, b = *p_b;
     return a < b ? 1 : b < a ? -1 : 0;
 }
 
-static int flt64_stable_cmp_dsc_abs_test(double *p_a, double *p_b, void *context)
+static int fp64_stable_cmp_dsc_abs_test(double *p_a, double *p_b, void *context)
 {
-    return flt64_stable_cmp_dsc_test(&(double) { fabs(*p_a) }, &(double) { fabs(*p_b) }, context);
+    return fp64_stable_cmp_dsc_test(&(double) { fabs(*p_a) }, &(double) { fabs(*p_b) }, context);
 }
 
-static int flt64_stable_cmp_dsc_nan_test(double *p_a, double *p_b, void *context)
+static int fp64_stable_cmp_dsc_nan_test(double *p_a, double *p_b, void *context)
 {
     double a = *p_a, b = *p_b;
-    return isnan(a) ? (isnan(b) ? 0 : 1) : isnan(b) ? -1 : flt64_stable_cmp_dsc_test(&a, &b, context);
+    return isnan(a) ? (isnan(b) ? 0 : 1) : isnan(b) ? -1 : fp64_stable_cmp_dsc_test(&a, &b, context);
 }
 
 unsigned test_cmp_a_1(void *In, void *Context, void *Tls)
@@ -58,8 +58,8 @@ unsigned test_cmp_a_1(void *In, void *Context, void *Tls)
     (void) Context;
     (void) Tls;
     struct test_cmp_a *in = In;
-    int res = flt64_stable_cmp_dsc(&in->a, &in->b, NULL);
-    return res == in->res_dsc && flt64_stable_cmp_dsc_test(&in->a, &in->b, NULL) == res;
+    int res = fp64_stable_cmp_dsc(&in->a, &in->b, NULL);
+    return res == in->res_dsc && fp64_stable_cmp_dsc_test(&in->a, &in->b, NULL) == res;
 }
 
 unsigned test_cmp_a_2(void *In, void *Context, void *Tls)
@@ -67,8 +67,8 @@ unsigned test_cmp_a_2(void *In, void *Context, void *Tls)
     (void) Context;
     (void) Tls;
     struct test_cmp_a *in = In;
-    int res = flt64_stable_cmp_dsc_abs(&in->a, &in->b, NULL);
-    return res == in->res_dsc_abs && flt64_stable_cmp_dsc_abs_test(&in->a, &in->b, NULL) == res;
+    int res = fp64_stable_cmp_dsc_abs(&in->a, &in->b, NULL);
+    return res == in->res_dsc_abs && fp64_stable_cmp_dsc_abs_test(&in->a, &in->b, NULL) == res;
 }
 
 unsigned test_cmp_a_3(void *In, void *Context, void *Tls)
@@ -76,6 +76,6 @@ unsigned test_cmp_a_3(void *In, void *Context, void *Tls)
     (void) Context;
     (void) Tls;
     struct test_cmp_a *in = In;
-    int res = flt64_stable_cmp_dsc_nan(&in->a, &in->b, NULL);
-    return res == in->res_dsc_nan && flt64_stable_cmp_dsc_nan_test(&in->a, &in->b, NULL) == res;
+    int res = fp64_stable_cmp_dsc_nan(&in->a, &in->b, NULL);
+    return res == in->res_dsc_nan && fp64_stable_cmp_dsc_nan_test(&in->a, &in->b, NULL) == res;
 }

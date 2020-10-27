@@ -655,7 +655,7 @@ bool cov_querry(struct cov *cov, struct buff *buff, struct lm_term *term, size_t
                 {
                     double res;
                     const char *str = cov->buff.str + cov->off[j + cov->dim * ind];
-                    if (!flt64_handler(str, 0, &res, NULL)) log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Unable to interpret string %\"~s as decimal number for covariate %\"~s. Sample no. %~uz excluded from analysis!\n", str, name, j);
+                    if (!fp64_handler(str, 0, &res, NULL)) log_message_fmt(log, CODE_METRIC, MESSAGE_WARNING, "Unable to interpret string %\"~s as decimal number for covariate %\"~s. Sample no. %~uz excluded from analysis!\n", str, name, j);
                     {
                         bs(filter, j);
                         (*(double **) ptr)[j] = res;

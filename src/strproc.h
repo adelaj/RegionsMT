@@ -44,7 +44,7 @@ unsigned str_to_uint32_hex(const char *, const char **, uint32_t *);
 unsigned str_to_uint16_hex(const char *, const char **, uint16_t *);
 unsigned str_to_uint8_hex(const char *, const char **, uint8_t *);
 unsigned str_to_size_hex(const char *, const char **, size_t *);
-unsigned str_to_flt64(const char *, const char **, double *);
+unsigned str_to_fp64(const char *, const char **, double *);
 
 struct bool_handler_context {
     size_t bit_pos;
@@ -62,7 +62,7 @@ bool uint32_handler(const char *, size_t, void *, void *);
 bool uint16_handler(const char *, size_t, void *, void *);
 bool uint8_handler(const char *, size_t, void *, void *);
 bool size_handler(const char *, size_t, void *, void *);
-bool flt64_handler(const char *, size_t, void *, void *);
+bool fp64_handler(const char *, size_t, void *, void *);
 
 struct str_tbl_handler_context {
     char *str;

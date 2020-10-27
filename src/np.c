@@ -304,25 +304,32 @@ IF_WIN(int Strnicmp(const char *a, const char *b, size_t rlen)
 })
 
 // Unsafe string compare (strings are assumed either to be aligned, or to have proper padding at the end)
-#define pcmpistrz(msk, t, z) (_mm_cmpistr ## z(msk, t, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_EACH | _SIDD_NEGATIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT))
+#define pcmpistrz(a, b, z) (_mm_cmpistr ## z(a, b, _SIDD_UBYTE_OPS | _SIDD_CMP_EQUAL_EACH | _SIDD_NEGATIVE_POLARITY | _SIDD_LEAST_SIGNIFICANT))
 
 int Strcmp_unsafe(const char *a, const char *b)
 {
-    for (size_t off = 0;; off += sizeof(__m128i))
+    for (size_t off = 0;;)
     {
-        __m128i ta = _mm_loadu_si128((__m128i *) (a + off)), tb = _mm_loadu_si128((__m128i *) (b + off));
-        if (!pcmpistrz(ta, tb, a)) return pcmpistrz(ta, tb, c) ? (off += (unsigned) pcmpistrz(ta, tb, i), a[off] - b[off]) : 0;
+        // Increment should be at the beginning of the loop iteration, 
+        // otherwise most of compilers (gcc, msvc, icc) missoptimize the last line of the loop body
+        off += sizeof(__m128i);
+        __m128i ta = _mm_loadu_si128((__m128i *) (a + off - sizeof(__m128i))), tb = _mm_loadu_si128((__m128i *) (b + off - sizeof(__m128i)));
+        if (pcmpistrz(ta, tb, a)) continue;
+        return pcmpistrz(ta, tb, c) ? (off -= sizeof(__m128i) - pcmpistrz(ta, tb, i), a[off] - b[off]) : 0;
     }
 }
 
 int Strncmp_unsafe(const char *a, const char *b, size_t len)
 {
-    for (size_t off = 0; off < len; off += sizeof(__m128i))
+    if (!len) return 0;
+    for (size_t off = 0;;)
     {
-        __m128i ta = _mm_loadu_si128((__m128i *) (a + off)), tb = _mm_loadu_si128((__m128i *) (b + off));
-        if (!pcmpistrz(ta, tb, a)) return pcmpistrz(ta, tb, c) ? (off += (unsigned) pcmpistrz(ta, tb, i), off < len ? a[off] - b[off] : 0) : 0;
+        if (off >= len) return a[len] - b[len];
+        off += sizeof(__m128i);
+        __m128i ta = _mm_loadu_si128((__m128i *) (a + off - sizeof(__m128i))), tb = _mm_loadu_si128((__m128i *) (b + off - sizeof(__m128i)));
+        if (pcmpistrz(ta, tb, a)) continue;
+        return pcmpistrz(ta, tb, c) ? (off -= sizeof(__m128i) - pcmpistrz(ta, tb, i), off < len ? a[off] - b[off] : 0) : 0;
     }
-    return len-- ? a[len] - b[len] : 0;
 }
 
 #undef pcmpistrz
@@ -379,11 +386,13 @@ size_t Strmsk(const char *str, __m128i msk)
         off = sizeof(__m128i) - rest;
     }
     else off = 0;
-    for (;; off += sizeof(__m128i))
+    for (;;)
     {
         // Processing aligned part of the string
-        __m128i t = _mm_load_si128((__m128i *) (str + off));
-        if (!pcmpistrz(msk, t, a)) return (pcmpistrz(msk, t, c) ? (unsigned) pcmpistrz(msk, t, i) : m128i_nbsf8(t)) + off;
+        off += sizeof(__m128i);
+        __m128i t = _mm_load_si128((__m128i *) (str + off - sizeof(__m128i)));
+        if (pcmpistrz(msk, t, a)) continue; // Do not fuse this line with the next one!
+        return (pcmpistrz(msk, t, c) ? (unsigned) pcmpistrz(msk, t, i) : m128i_nbsf8(t)) + off - sizeof(__m128i);
     }
 }
 
@@ -400,13 +409,16 @@ size_t Strnmsk(const char *str, __m128i msk, size_t len)
         off = sizeof(__m128i) - rest;
     }
     else off = 0;
-    for (; off < len; off += sizeof(__m128i))
+    for (;;)
     {
         // Processing aligned part of the string
-        __m128i t = _mm_load_si128((__m128i *) (str + off));
-        if (!pcmpistrz(msk, t, a)) return off += pcmpistrz(msk, t, c) ? (unsigned) pcmpistrz(msk, t, i) : m128i_nbsf8(t), MIN(len, off);
+        if (off >= len) return len;
+        off += sizeof(__m128i);
+        __m128i t = _mm_load_si128((__m128i *) (str + off - sizeof(__m128i)));
+        if (pcmpistrz(msk, t, a)) continue;
+        off -= sizeof(__m128i) - (pcmpistrz(msk, t, c) ? (unsigned) pcmpistrz(msk, t, i) : m128i_nbsf8(t));
+        return MIN(len, off);
     }
-    return len;
 }
 
 #undef pcmpistrz

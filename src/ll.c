@@ -129,7 +129,7 @@
         return (TYPE) (val >> bitsof(TYPE)); \
     }
 
-#define DECL_SH_SSE(TYPE, PREFIX, SUFFIX, SHL, SHR) \
+#define DECL_SHZ_SSE(TYPE, PREFIX, SUFFIX, SHL, SHR) \
     TYPE PREFIX ## _ ## SUFFIX(TYPE *p_hl, TYPE x, unsigned char y) \
     { \
         _Static_assert(2 * sizeof(TYPE) == sizeof(__m128i), ""); \
@@ -141,7 +141,7 @@
         return res; \
     }
 
-#define DECL_RO_GCC(TYPE, PREFIX, SUFFIX, SHL, SHR) \
+#define DECL_ROZ_GCC(TYPE, PREFIX, SUFFIX, SHL, SHR) \
     TYPE PREFIX ## _ ## SUFFIX(TYPE x, unsigned char y) \
     { \
         return (x SHL y % bitsof(TYPE)) | (x SHR (0 - y) % bitsof(TYPE)); \
@@ -388,7 +388,7 @@
     bool PREFIX ## _atomic_cmp_xchg_mo(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail) \
     { \
         (void) weak, (void) mo_succ, (void) mo_fail; \
-        TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not join these two lines! */ \
+        TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not fuse this line with the next one! */ \
         TYPE res = __sync_val_compare_and_swap(dst, cmp, xchg); \
         if (res == cmp) return 1; \
         *p_cmp = res; \
@@ -408,7 +408,7 @@
     { \
         (void) weak, (void) mo_succ, (void) mo_fail; \
         _Static_assert(sizeof(BACKEND_TYPE) == sizeof(TYPE), ""); \
-        TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not join these two lines! */ \
+        TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not fuse this line with the next one! */ \
         TYPE res = (TYPE) BACKEND((BACKEND_TYPE volatile *) dst, (BACKEND_TYPE) xchg, (BACKEND_TYPE) cmp); \
         if (res == cmp) return 1; \
         *p_cmp = res; \
@@ -454,18 +454,16 @@
 #define DECL_ATOMIC_FETCH_ADD_SAT(TYPE, PREFIX) \
     TYPE PREFIX ## _atomic_fetch_add_sat_mo(TYPE volatile *mem, TYPE val, enum atomic_mo mo) \
     { \
-        (void) mo; /* Only 'ATOMIC_ACQ_REL' memory order is supported! */ \
         TYPE probe = atomic_load(mem); \
-        while (probe < umax(probe) && !atomic_cmp_xchg(mem, &probe, add_sat(probe, val))) probe = atomic_load(mem); \
+        while (probe < umax(probe) && !atomic_cmp_xchg_mo(mem, &probe, add_sat(probe, val), 1, mo, ATOMIC_RELAXED)) probe = atomic_load(mem); \
         return probe; \
     }
 
 #define DECL_ATOMIC_FETCH_SUB_SAT(TYPE, PREFIX) \
     TYPE PREFIX ## _atomic_fetch_sub_sat(TYPE volatile *mem, TYPE val, enum atomic_mo mo) \
     { \
-        (void) mo; /* Only 'ATOMIC_ACQ_REL' memory order is supported! */ \
         TYPE probe = atomic_load(mem); \
-        while (probe && !atomic_cmp_xchg(mem, &probe, sub_sat(probe, val))) probe = atomic_load(mem); \
+        while (probe && !atomic_cmp_xchg_mo(mem, &probe, sub_sat(probe, val), 1, mo, ATOMIC_RELAXED)) probe = atomic_load(mem); \
         return probe; \
     }
 
@@ -562,7 +560,7 @@ IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHL_NARR(unsigned, uint, unsigned long long)))
 IF_GCC_LLVM(IF_X64(DECL_SHL_NARR(unsigned, uint, unsigned long)))
 IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHL_NARR(unsigned long, ulong, unsigned long long)))
 IF_GCC_LLVM(IF_X64(DECL_SHL_NARR(unsigned long, ulong, Uint128_t)))
-IF_GCC_LLVM_MSVC(IF_X32(DECL_SH_SSE(unsigned long long, ullong, shl, _mm_slli_epi64, _mm_srli_epi64)))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_SHZ_SSE(unsigned long long, ullong, shl, _mm_slli_epi64, _mm_srli_epi64)))
 IF_GCC_LLVM(IF_X64(DECL_SHL_NARR(unsigned long long, ullong, Uint128_t)))
 
 IF_MSVC(IF_X64(unsigned long long ullong_shl(unsigned long long *p_hi, unsigned long long x, unsigned char y)
@@ -578,7 +576,7 @@ IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHR_NARR(unsigned, uint, unsigned long long)))
 IF_GCC_LLVM(IF_X64(DECL_SHR_NARR(unsigned, uint, unsigned long)))
 IF_GCC_LLVM_MSVC(IF_MSVC_X32(DECL_SHR_NARR(unsigned long, ulong, unsigned long long)))
 IF_GCC_LLVM(IF_X64(DECL_SHR_NARR(unsigned long, ulong, Uint128_t)))
-IF_GCC_LLVM_MSVC(IF_X32(DECL_SH_SSE(unsigned long long, ullong, shr, _mm_srli_epi64, _mm_slli_epi64)))
+IF_GCC_LLVM_MSVC(IF_X32(DECL_SHZ_SSE(unsigned long long, ullong, shr, _mm_srli_epi64, _mm_slli_epi64)))
 IF_GCC_LLVM(IF_X64(DECL_SHR_NARR(unsigned long long, ullong, Uint128_t)))
 
 IF_MSVC(IF_X64(unsigned long long ullong_shr(unsigned long long *p_lo, unsigned long long x, unsigned char y)
@@ -588,27 +586,27 @@ IF_MSVC(IF_X64(unsigned long long ullong_shr(unsigned long long *p_lo, unsigned 
 }))
 
 // Rotate left
-IF_GCC_LLVM(DECL_RO_GCC(unsigned char, uchar, rol, <<, >>))
+IF_GCC_LLVM(DECL_ROZ_GCC(unsigned char, uchar, rol, <<, >>))
 IF_MSVC(DECL_2(unsigned char, uchar, rol, unsigned char, _rotl8))
-IF_GCC_LLVM(DECL_RO_GCC(unsigned short, ushrt, rol, <<, >>))
+IF_GCC_LLVM(DECL_ROZ_GCC(unsigned short, ushrt, rol, <<, >>))
 IF_MSVC(DECL_2(unsigned short, ushrt, rol, unsigned char, _rotl16))
-IF_GCC_LLVM(DECL_RO_GCC(unsigned, uint, rol, <<, >>))
+IF_GCC_LLVM(DECL_ROZ_GCC(unsigned, uint, rol, <<, >>))
 IF_MSVC(DECL_2(unsigned, uint, rol, unsigned char, _rotl))
-IF_GCC_LLVM(DECL_RO_GCC(unsigned long, ulong, rol, <<, >>))
+IF_GCC_LLVM(DECL_ROZ_GCC(unsigned long, ulong, rol, <<, >>))
 IF_MSVC(DECL_2_COPY(unsigned long, ulong, rol, unsigned char, unsigned))
-IF_GCC_LLVM(DECL_RO_GCC(unsigned long long, ullong, rol, <<, >>))
+IF_GCC_LLVM(DECL_ROZ_GCC(unsigned long long, ullong, rol, <<, >>))
 IF_MSVC(DECL_2(unsigned long long, ullong, rol, unsigned char, _rotl64))
 
 // Rotate right
-IF_GCC_LLVM(DECL_RO_GCC(unsigned char, uchar, ror, >>, <<))
+IF_GCC_LLVM(DECL_ROZ_GCC(unsigned char, uchar, ror, >>, <<))
 IF_MSVC(DECL_2(unsigned char, uchar, ror, unsigned char, _rotr8))
-IF_GCC_LLVM(DECL_RO_GCC(unsigned short, ushrt, ror, >>, <<))
+IF_GCC_LLVM(DECL_ROZ_GCC(unsigned short, ushrt, ror, >>, <<))
 IF_MSVC(DECL_2(unsigned short, ushrt, ror, unsigned char, _rotr16))
-IF_GCC_LLVM(DECL_RO_GCC(unsigned, uint, ror, >>, <<))
+IF_GCC_LLVM(DECL_ROZ_GCC(unsigned, uint, ror, >>, <<))
 IF_MSVC(DECL_2(unsigned, uint, ror, unsigned char, _rotr))
-IF_GCC_LLVM(DECL_RO_GCC(unsigned long, ulong, ror, >>, <<))
+IF_GCC_LLVM(DECL_ROZ_GCC(unsigned long, ulong, ror, >>, <<))
 IF_MSVC(DECL_2_COPY(unsigned long, ulong, ror, unsigned char, unsigned))
-IF_GCC_LLVM(DECL_RO_GCC(unsigned long long, ullong, ror, >>, <<))
+IF_GCC_LLVM(DECL_ROZ_GCC(unsigned long long, ullong, ror, >>, <<))
 IF_MSVC(DECL_2(unsigned long long, ullong, ror, unsigned char, _rotr64))
 
 // Saturated add
@@ -1082,7 +1080,7 @@ unsigned m128i_nbsf8(__m128i x)
 }
 
 // Correct sign of the 64-bit float: 'return x == 0. ? 0 : 1 - 2 * signbit(x)'
-int flt64_sign(double x)
+int fp64_sign(double x)
 {
     int res = _mm_movemask_pd(_mm_castsi128_pd(_mm_cmpeq_epi64(
         _mm_and_si128(_mm_castpd_si128(_mm_loaddup_pd(&x)), _mm_set_epi64x(0x8000000000000000, 0x7fffffffffffffff)), _mm_setzero_si128())));
@@ -1090,24 +1088,19 @@ int flt64_sign(double x)
 }
 
 // Byte shift (positive 'y' -- right; negative 'y' -- left; 'a' -- 'arithmetic' shift, which makes most significant byte 'sticky')
+#define C15(X) X, X1(X), X2(X), X3(X)
+#define R15 0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
+#define R16 R15, 15
+
 __m128i m128i_szz8(__m128i x, int y, bool a)
 {
-    static const char shuf[] = {
-        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, // 15 times
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-        -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, -128, // 15 times
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-        15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15, 15 // 15 times
-    };
+    static const char shuf[] = { C15(-128), R16, C15(-128), R16, C15(15) };
     return (unsigned) (y + 15) <= 30u ? _mm_shuffle_epi8(x, _mm_loadu_si128((__m128i *) (&shuf[15 + (a << 5) - a] + y))) : _mm_setzero_si128();
 }
 
 // Byte rotate (positive 'y' -- right, negative 'y' -- left)
 __m128i m128i_roz8(__m128i x, int y)
 {
-    static const char shuf[] = {
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15,
-        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14
-    };
+    static const char shuf[] = { R16, R15 };
     return _mm_shuffle_epi8(x, _mm_loadu_si128((__m128i *) (shuf + ((unsigned) y & 15u))));
 }

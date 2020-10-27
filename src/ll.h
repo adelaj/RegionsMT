@@ -862,7 +862,7 @@ unsigned m128i_nbsr8(__m128i); // Returns 'UINT_MAX' if argument is without zero
 unsigned m128i_nbsf8(__m128i); // Returns 'UINT_MAX' if argument is without zero bytes
 
 // Correct sign of 64-bit float
-int flt64_sign(double);
+int fp64_sign(double);
 
 // Byte shift (positive 'y' -- right; negative 'y' -- left; 'a' -- 'arithmetic' shift, which makes most significant byte 'sticky')
 __m128i m128i_szz8(__m128i, int, bool);

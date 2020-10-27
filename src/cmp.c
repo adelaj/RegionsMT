@@ -1,3 +1,4 @@
+#include "np.h"
 #include "ll.h"
 #include "cmp.h"
 
@@ -18,7 +19,7 @@
 
 // Warning! The approach from the 'DECL_STABLE_CMP_ASC' marcro doesn't work here
 #define DECL_FLT64_STABLE_CMP_NAN(INFIX, DIR) \
-    int flt64_stable_cmp ## INFIX ## _nan(const void *a, const void *b, void *thunk) \
+    int fp64_stable_cmp ## INFIX ## _nan(const void *a, const void *b, void *thunk) \
     { \
         (void) thunk; \
         __m128d ab = _mm_loadh_pd(_mm_load_sd(a), b); \
@@ -42,7 +43,7 @@ bool size_cmp_dsc(const void *A, const void *B, void *thunk)
 
 DECL_CMP_ASC(size, )
 
-int flt64_stable_cmp_dsc(const void *a, const void *b, void *thunk)
+int fp64_stable_cmp_dsc(const void *a, const void *b, void *thunk)
 {
     (void) thunk;
     __m128d ab = _mm_loadh_pd(_mm_load_sd(a), b);
@@ -50,9 +51,9 @@ int flt64_stable_cmp_dsc(const void *a, const void *b, void *thunk)
     return _mm_extract_epi32(res, 2) - _mm_cvtsi128_si32(res);
 }
 
-DECL_STABLE_CMP_ASC(flt64, )
+DECL_STABLE_CMP_ASC(fp64, )
 
-int flt64_stable_cmp_dsc_abs(const void *a, const void *b, void *thunk)
+int fp64_stable_cmp_dsc_abs(const void *a, const void *b, void *thunk)
 {
     (void) thunk;
     __m128d ab = _mm_and_pd(_mm_loadh_pd(_mm_load_sd(a), b), _mm_castsi128_pd(_mm_set1_epi64x(0x7fffffffffffffff)));
@@ -60,7 +61,7 @@ int flt64_stable_cmp_dsc_abs(const void *a, const void *b, void *thunk)
     return _mm_extract_epi32(res, 2) - _mm_cvtsi128_si32(res);
 }
 
-DECL_STABLE_CMP_ASC(flt64, _abs)
+DECL_STABLE_CMP_ASC(fp64, _abs)
 
 DECL_FLT64_STABLE_CMP_NAN(_dsc, _CMP_NLE_UQ)
 DECL_FLT64_STABLE_CMP_NAN(_asc, _CMP_NGE_UQ)
@@ -71,20 +72,20 @@ int char_cmp(const void *a, const void *b, void *context)
     return (int) *(const char *) a - (int) *(const char *) b;
 }
 
-bool str_eq(const void *A, const void *B, void *context)
+bool str_eq_unsafe(const void *A, const void *B, void *context)
 {
     (void) context;
-    return !strcmp((const char *) A, (const char *) B);
+    return !Strcmp_unsafe((const char *) A, (const char *) B);
 }
 
-bool stro_str_eq(const void *A, const void *B, void *Str)
+bool stro_str_eq_unsafe(const void *A, const void *B, void *Str)
 {
-    return str_eq((const char *) Str + *(size_t *) A, B, NULL);
+    return str_eq_unsafe((const char *) Str + *(size_t *) A, B, NULL);
 }
 
-bool stro_eq(const void *A, const void *B, void *Str)
+bool stro_eq_unsafe(const void *A, const void *B, void *Str)
 {
-    return str_eq((const char *) Str + *(size_t *) A, (const char *) Str + *(size_t *) B, NULL);
+    return str_eq_unsafe((const char *) Str + *(size_t *) A, (const char *) Str + *(size_t *) B, NULL);
 }
 
 int stro_stable_cmp(const void *A, const void *B, void *Str)

@@ -14,7 +14,6 @@ enum array_flags {
     ARRAY_REALLOC = 8, // Default in 'array_test'
     ARRAY_FAILSAFE = 16, // Disables internal checks
     ARRAY_ALIGN = 32, // Aligns the array beginning to specified value
-    ARRAY_ALIGN_SIZE = 64 // Aligns the array size to specified value
 };
 
 struct array_result {
@@ -101,7 +100,8 @@ struct buff {
 enum buff_flags {
     BUFFER_INIT = 1, // Preserve null terminator at the end of the buffer (if it is present)
     BUFFER_TERM = 2, // Zero character at the ending
-    BUFFER_DISCARD = 4 // Discards the contents of the buffer
+    BUFFER_DISCARD = 4, // Discards the contents of the buffer
+    BUFFER_UNSAFE_AWARE = 8 // Provides that size of each new allocation chunck divides by 16, which is required by functions like 'Strcmp_unsafe'
 };
 
 struct array_result buff_append(struct buff *, const char *, size_t, enum buff_flags);

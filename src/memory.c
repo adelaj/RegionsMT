@@ -7,6 +7,7 @@
 #include <string.h>
 #include <limits.h>
 #include <errno.h>
+#include <immintrin.h>
 
 void array_broadcast(void *arr, size_t cnt, size_t sz, void *val)
 {
@@ -57,11 +58,6 @@ struct array_result array_init_impl(void *p_Src, size_t *restrict p_cap, size_t 
         {
             if (!(flags & ARRAY_REDUCE)) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
             size_t tot = cnt * sz + diff; // No checks for overflows
-            if (flags & ARRAY_ALIGN_SIZE)
-            {
-                size_t rest = tot & (al - 1);
-                if (rest) tot += al - rest;
-            }
             void *res = flags & ARRAY_ALIGN ? Aligned_realloc_impl(src, p_cap, al, tot) : Realloc(src, tot); // Array shrinking; when 'tot' is zero memory is released
             if (tot && !res) return (struct array_result) { .error = ARRAY_OUT_OF_MEMORY, .tot = tot };
             *p_cap = cnt;
@@ -78,15 +74,6 @@ struct array_result array_init_impl(void *p_Src, size_t *restrict p_cap, size_t 
     size_t tot = cnt;
     if ((flags & ARRAY_STRICT) && (flags & ARRAY_FAILSAFE)) tot *= sz, tot += diff;
     else if (!test_ma(&tot, sz, diff)) return (struct array_result) { .error = ARRAY_OVERFLOW };
-    if (flags & ARRAY_ALIGN_SIZE)
-    {
-        size_t rest = tot & (al - 1);
-        if (rest)
-        {
-            if (flags & ARRAY_FAILSAFE) tot += al - rest;
-            else if (!test_add(&tot, al - rest)) return (struct array_result) { .error = ARRAY_OVERFLOW };
-        }
-    }
     void *res;
     if (src && (flags & ARRAY_REALLOC))
     {
@@ -297,12 +284,11 @@ void *persistent_array_fetch(struct persistent_array *arr, size_t ind, size_t sz
     return (char *) arr->ptr[off] + (off ? ind1 - ((size_t) 1 << arr->off << off) : ind) * sz;
 }
 
-
 struct array_result buff_append(struct buff *buff, const char *str, size_t len, enum buff_flags flags)
 {
     size_t pos = flags & BUFFER_DISCARD ? 0 : buff->len;
     bool init = flags & BUFFER_INIT, term = flags & BUFFER_TERM;
-    struct array_result res = array_test(&buff->str, &buff->cap, sizeof(*buff->str), 0, 0, len, pos, init + term);
+    struct array_result res = array_test(&buff->str, &buff->cap, 0, sizeof(*buff->str), 0, 0, len, pos, init + term, flags & BUFFER_UNSAFE_AWARE ? (0 - len - term) % alignof(__m128i) : 0);
     if (!res.status) return res;
     memcpy(buff->str + pos + init, str, len * sizeof(*buff->str));
     pos += len + init;

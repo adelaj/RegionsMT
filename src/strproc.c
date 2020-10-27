@@ -85,7 +85,7 @@ DECL_STR_TO_UINT(size_t, size_hex, SIZE_MAX, unsigned long, strtoul, 16)
 #endif
 */
 
-unsigned str_to_flt64(const char *str, const char **ptr, double *p_res)
+unsigned str_to_fp64(const char *str, const char **ptr, double *p_res)
 {
     errno = 0;
     *p_res = strtod(str, (char **) ptr);
@@ -134,7 +134,7 @@ DECL_INT_HANDLER(uint32_t, uint32, str_to_uint32)
 DECL_INT_HANDLER(uint16_t, uint16, str_to_uint16)
 DECL_INT_HANDLER(uint8_t, uint8, str_to_uint8)
 DECL_INT_HANDLER(size_t, size, str_to_size)
-DECL_INT_HANDLER(double, flt64, str_to_flt64)
+DECL_INT_HANDLER(double, fp64, str_to_fp64)
 
 bool str_tbl_handler(const char *str, size_t len, void *p_Off, void *Context)
 {

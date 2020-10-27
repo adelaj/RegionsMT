@@ -720,7 +720,7 @@ void str_pool_close(struct str_pool *pool)
 struct array_result str_pool_insert(struct str_pool *pool, const char *key, size_t len, size_t *p_off, size_t szv, void *p_val, void *restrict swpv)
 {
     size_t h = str_hash(key), cnt = pool->tbl.cnt, swpk;
-    struct array_result res0 = hash_table_alloc(&pool->tbl, &h, key, sizeof(size_t), szv, stro_hash, stro_str_eq, pool->buff.str, &swpk, swpv);
+    struct array_result res0 = hash_table_alloc(&pool->tbl, &h, key, sizeof(size_t), szv, stro_hash, stro_str_eq_unsafe, pool->buff.str, &swpk, swpv);
     if (!res0.status) return res0;
     if (res0.status & HASH_PRESENT)
     {
@@ -730,7 +730,7 @@ struct array_result str_pool_insert(struct str_pool *pool, const char *key, size
     }
     // Position should be saved before the buffer update
     size_t off = pool->buff.len + (len && cnt);
-    struct array_result res1 = buff_append(&pool->buff, key, len, cnt ? BUFFER_INIT | BUFFER_TERM : BUFFER_TERM);
+    struct array_result res1 = buff_append(&pool->buff, key, len, (cnt ? BUFFER_INIT | BUFFER_TERM : BUFFER_TERM) | BUFFER_UNSAFE_AWARE);
     if (!res1.status)
     {
         hash_table_dealloc(&pool->tbl, h);
@@ -745,7 +745,7 @@ struct array_result str_pool_insert(struct str_pool *pool, const char *key, size
 bool str_pool_fetch(struct str_pool *pool, const char *str, size_t szv, void *p_val)
 {
     size_t h = str_hash(str);
-    if (!hash_table_search(&pool->tbl, &h, str, sizeof(size_t), stro_str_eq, pool->buff.str)) return 0;
+    if (!hash_table_search(&pool->tbl, &h, str, sizeof(size_t), stro_str_eq_unsafe, pool->buff.str)) return 0;
     if (p_val) *(void **) p_val = hash_table_fetch_val(&pool->tbl, h, szv);
     return 1;
 }
