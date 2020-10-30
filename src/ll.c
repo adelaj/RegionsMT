@@ -643,13 +643,13 @@ DECL2(TEST_REP, , sum, 0, add)
 DECL2(TEST_REP, , prod, 1, mul)
 
 // Bit scan reverse
-#define X1(X) X, X
-#define X2(X) X1(X), X1(X)
-#define X3(X) X2(X), X2(X)
-#define X4(X) X3(X), X3(X)
-#define X5(X) X4(X), X4(X)
-#define X6(X) X5(X), X5(X)
-#define X7(X) X6(X), X6(X)
+#define X1(...) __VA_ARGS__, __VA_ARGS__
+#define X2(...) X1(__VA_ARGS__, __VA_ARGS__)
+#define X3(...) X2(__VA_ARGS__, __VA_ARGS__)
+#define X4(...) X3(__VA_ARGS__, __VA_ARGS__)
+#define X5(...) X4(__VA_ARGS__, __VA_ARGS__)
+#define X6(...) X5(__VA_ARGS__, __VA_ARGS__)
+#define X7(...) X6(__VA_ARGS__, __VA_ARGS__)
 
 unsigned char uchar_bsr(unsigned char x)
 {
@@ -1094,7 +1094,7 @@ int fp64_sign(double x)
 
 __m128i m128i_szz8(__m128i x, int y, bool a)
 {
-    static const char shuf[] = { C15(-128), R16, C15(-128), R16, C15(15) };
+    static const char shuf[] = { X1(C15(-128), R16), C15(15) };
     return (unsigned) (y + 15) <= 30u ? _mm_shuffle_epi8(x, _mm_loadu_si128((__m128i *) (&shuf[15 + (a << 5) - a] + y))) : _mm_setzero_si128();
 }
 
