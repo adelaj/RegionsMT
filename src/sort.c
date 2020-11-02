@@ -539,7 +539,7 @@ struct array_result hash_table_init(struct hash_table *tbl, size_t cnt, size_t s
 
 void hash_table_close(struct hash_table *tbl)
 {
-    free(tbl->flags);
+    free(tbl->bits);
     free(tbl->val);
     free(tbl->key);
 }
@@ -547,14 +547,13 @@ void hash_table_close(struct hash_table *tbl)
 bool hash_table_search(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, cmp_callback eq, void *context)
 {
     if (!tbl->cnt) return 0;
-    size_t msk = ((size_t) 1 << tbl->lcap) - 1, h = *p_h & msk;
-    for (size_t i = 0, j = h;;)
+    size_t msk = ((size_t) 1 << tbl->lcap) - 1, h = uhash(*p_h) & msk;
+    for (size_t i = h;;)
     {
-        uint8_t flags = bt_burst(tbl->flags, h, 2);
-        if (!(flags & FLAG_NOT_EMPTY)) return 0;
-        if (!(flags & FLAG_REMOVED) && eq((char *) tbl->key + h * szk, key, context)) break;
-        h = (h + ++i) & msk;
-        if (h == j) return 0;
+        if (!bt(tbl->bits, h)) return 0;
+        if (eq((char *) tbl->key + h * szk, key, context)) break;
+        h = (h + 1) & msk;
+        if (h == i) return 0;
     }
     *p_h = h;
     return 1;
