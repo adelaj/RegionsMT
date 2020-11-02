@@ -310,8 +310,8 @@ int Strcmp_unsafe(const char *a, const char *b)
 {
     for (size_t off = 0;;)
     {
-        // Increment should be at the beginning of the loop iteration, 
-        // otherwise most of compilers (gcc, msvc, icc) missoptimize the last line of the loop body
+        // Increment should be at the beginning of loop iteration, 
+        // otherwise most compilers (gcc, msvc, icc) missoptimize the last line of the loop body
         off += sizeof(__m128i);
         __m128i ta = _mm_loadu_si128((__m128i *) (a + off - sizeof(__m128i))), tb = _mm_loadu_si128((__m128i *) (b + off - sizeof(__m128i)));
         if (pcmpistrz(ta, tb, a)) continue;

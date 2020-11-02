@@ -119,16 +119,15 @@ struct array_result queue_test(struct queue *queue, size_t diff, size_t sz)
     size_t cap = queue->cap;
     struct array_result res = array_test(&queue->arr, &cap, sz, 0, 0, queue->cnt, diff);
     if (!res.status || (res.status & ARRAY_UNTOUCHED)) return res;
-    unsigned char bor = 0;
-    size_t rem = sub(&bor, queue->begin, queue->cap - queue->cnt);
-    if (!bor && rem) // queue->begin > queue->cap - queue->cnt
+    size_t rem = queue->begin;
+    if (test_sub(&rem, queue->cap - queue->cnt) && rem) // queue->begin > queue->cap - queue->cnt
     {
-        size_t off = sub(&bor, rem, cap - queue->cap);
-        if (!bor && off) // queue->begin > cap - queue->cnt
+        size_t off = rem;
+        if (test_sub(&off, cap - queue->cap) && off) // queue->begin > cap - queue->cnt
         {
             size_t tot = off * sz;
             memcpy((char *) queue->arr + queue->cap * sz, queue->arr, tot);
-            memmove(queue->arr, (char *) queue->arr + tot, (rem - off) * sz);
+            memmove(queue->arr, (char *) queue->arr + tot, rem * sz - tot);
         }
         else memcpy((char *) queue->arr + queue->cap * sz, queue->arr, rem * sz);
     }
@@ -136,22 +135,19 @@ struct array_result queue_test(struct queue *queue, size_t diff, size_t sz)
     return res;
 }
 
-void *queue_fetch(struct queue *queue, size_t offset, size_t sz)
+void *queue_fetch(struct queue *queue, size_t off, size_t sz)
 {
-    size_t diff = queue->begin;
-    return (char *) queue->arr + (test_sub(&diff, queue->cap - offset) ? diff : diff + offset) * sz;
+    size_t ind = queue->begin;
+    return (char *) queue->arr + (test_sub(&ind, queue->cap - off) ? ind : ind + off) * sz;
 }
 
 // This function should be called ONLY if 'queue_test' succeeds
 static void queue_enqueue_lo(struct queue *restrict queue, generator_callback generator, void *restrict arrco, size_t cnt, size_t sz)
 {
-    unsigned char bor = 0;
-    size_t left = sub(&bor, queue->begin, queue->cap - queue->cnt);
-    if (bor) left += queue->cap;
-    size_t diff = queue->cap - left; // Never overflows
-    unsigned char bor2 = 0;
-    size_t diff2 = sub(&bor2, cnt, diff);
-    if (!bor2 && diff2) // cnt > queue->cap - left
+    size_t left = queue->begin;
+    if (!test_sub(&left, queue->cap - queue->cnt)) left += queue->cnt;
+    size_t rem = cnt, diff = queue->cap - left; // Never overflows
+    if (test_sub(&rem, diff) && rem) // cnt > queue->cap - left
     {
         if (generator)
         {
@@ -163,7 +159,7 @@ static void queue_enqueue_lo(struct queue *restrict queue, generator_callback ge
         {
             size_t tot = diff * sz;
             memcpy((char *) queue->arr + left * sz, arrco, tot);
-            memcpy(queue->arr, (char *) arrco + tot, diff2 * sz);
+            memcpy(queue->arr, (char *) arrco + tot, rem * sz);
         }
     }
     else if (generator) for (size_t i = left * sz, ind = 0; ind < cnt; i += sz, ind++) generator((char *) queue->arr + i, ind, arrco);
@@ -211,18 +207,11 @@ struct array_result queue_enqueue(struct queue *restrict queue, bool hi, generat
     return res;
 }
 
-void queue_dequeue(struct queue *queue, size_t offset, size_t sz)
+void queue_dequeue(struct queue *queue, size_t off, size_t sz)
 {
-    if (offset)
-    {
-        unsigned char bor = 0;
-        size_t ind = sub(&bor, queue->begin, queue->cap - offset);
-        if (bor) ind += queue->cap;
-        memcpy((char *) queue->arr + ind * sz, (char *) queue->arr + queue->begin * sz, sz);
-    }
+    if (off) memcpy(queue_fetch(queue, off, sz), (char *) queue->arr + queue->begin * sz, sz);
     queue->cnt--;
-    queue->begin++;
-    if (queue->begin == queue->cap) queue->begin = 0;
+    if (++queue->begin == queue->cap) queue->begin = 0;
 }
 
 struct array_result persistent_array_init(struct persistent_array *arr, size_t cnt, size_t sz, enum persistent_array_flags flags)

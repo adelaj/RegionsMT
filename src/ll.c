@@ -372,27 +372,13 @@
         (void) mo; \
         _Static_assert(2 * sizeof(TYPE) == sizeof(__m128i), ""); \
         _Static_assert(sizeof(TYPE) == sizeof(long long), ""); \
-        _mm_storeu_si64((void *) src, _mm_set_epi64x(0, (long long) val)); \
+        _mm_storeu_si64((void *) src, _mm_set_epi64x(0, (long long) val)); /* '_mm_cvtsi64_si128' is not univerally supported under 'i386' */ \
     }
 
 #define DECL_ATOMIC_CMP_XCHG_GCC(TYPE, PREFIX) \
     bool PREFIX ## _atomic_cmp_xchg_mo(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail) \
     { \
         return __atomic_compare_exchange_n((TYPE volatile *) dst, p_cmp, xchg, weak, mo_succ, mo_fail); \
-    }
-
-// This should be used to force compiler to emit 'cmpxchg16b'/'cmpxchg8b' instuctions when:
-// 1) gcc is targeted to 'x86_64', even if '-mcx16' flag set (see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84522);
-// 2) clang is targeted to 'i386'.
-#define DECL_ATOMIC_CMP_XCHG_SYNC(TYPE, PREFIX) \
-    bool PREFIX ## _atomic_cmp_xchg_mo(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail) \
-    { \
-        (void) weak, (void) mo_succ, (void) mo_fail; \
-        TYPE cmp = *p_cmp; /* Warning! 'TYPE' may be a pointer type: do not fuse this line with the next one! */ \
-        TYPE res = __sync_val_compare_and_swap(dst, cmp, xchg); \
-        if (res == cmp) return 1; \
-        *p_cmp = res; \
-        return 0; \
     }
 
 #define DECL_ATOMIC_CMP_XCHG_COPY(TYPE, PREFIX, OP_TYPE) \
@@ -402,8 +388,11 @@
         return atomic_cmp_xchg_mo((OP_TYPE volatile *) dst, (OP_TYPE *) p_cmp, (OP_TYPE) xchg, weak, mo_succ, mo_fail); \
     }
 
-// See https://stackoverflow.com/questions/41572808/interlockedcompareexchange-optimization
-#define DECL_ATOMIC_CMP_XCHG_MSVC(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
+// This should be used to force compiler to emit 'cmpxchg16b'/'cmpxchg8b' instuctions when:
+// 1) gcc is targeted to 'x86_64', even if '-mcx16' flag set (see https://gcc.gnu.org/bugzilla/show_bug.cgi?id=84522);
+// 2) clang is targeted to 'i386';
+// 3) MSVC is used (see also https://stackoverflow.com/questions/41572808/interlockedcompareexchange-optimization).
+#define DECL_ATOMIC_CMP_XCHG(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
     bool PREFIX ## _atomic_cmp_xchg_mo(TYPE volatile *dst, TYPE *p_cmp, TYPE xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail) \
     { \
         (void) weak, (void) mo_succ, (void) mo_fail; \
@@ -425,9 +414,8 @@
 #define DECL_ATOMIC_OP_WIDE(TYPE, PREFIX, SUFFIX, OP, ...) \
     TYPE PREFIX ## _atomic_ ## SUFFIX ## _mo(TYPE volatile *mem, TYPE val, enum atomic_mo mo) \
     { \
-        (void) mo; /* Only 'ATOMIC_ACQ_REL' memory order is supported! */ \
         TYPE probe = *mem; /* Warning! Non-atomic load is legitimate here! */ \
-        while (!atomic_cmp_xchg(mem, &probe, (TYPE) OP(probe __VA_ARGS__ val))) probe = *mem; \
+        while (!atomic_cmp_xchg_mo(mem, &probe, (TYPE) OP(probe __VA_ARGS__ val), 1, mo, ATOMIC_RELAXED)) probe = *mem; \
         return probe; \
     }
 
@@ -644,12 +632,12 @@ DECL2(TEST_REP, , prod, 1, mul)
 
 // Bit scan reverse
 #define X1(...) __VA_ARGS__, __VA_ARGS__
-#define X2(...) X1(__VA_ARGS__, __VA_ARGS__)
-#define X3(...) X2(__VA_ARGS__, __VA_ARGS__)
-#define X4(...) X3(__VA_ARGS__, __VA_ARGS__)
-#define X5(...) X4(__VA_ARGS__, __VA_ARGS__)
-#define X6(...) X5(__VA_ARGS__, __VA_ARGS__)
-#define X7(...) X6(__VA_ARGS__, __VA_ARGS__)
+#define X2(...) X1(X1(__VA_ARGS__))
+#define X3(...) X2(X1(__VA_ARGS__))
+#define X4(...) X3(X1(__VA_ARGS__))
+#define X5(...) X4(X1(__VA_ARGS__))
+#define X6(...) X5(X1(__VA_ARGS__))
+#define X7(...) X6(X1(__VA_ARGS__))
 
 unsigned char uchar_bsr(unsigned char x)
 {
@@ -785,27 +773,27 @@ IF_GCC_LLVM(DECL_ATOMIC_STORE_GCC(void *, ptr))
 IF_MSVC(DECL_ATOMIC_STORE_MSVC(void *, ptr))
 
 // Atomic compare and swap
+#define sync_val_compare_and_swap(DST, XCHG, CMP) __sync_val_compare_and_swap(DST, CMP, XCHG)
+
 IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(unsigned char, uchar))
-IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(unsigned char, uchar, char, _InterlockedCompareExchange8))
+IF_MSVC(DECL_ATOMIC_CMP_XCHG(unsigned char, uchar, char, _InterlockedCompareExchange8))
 IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(unsigned short, ushrt))
-IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(unsigned short, ushrt, short, _InterlockedCompareExchange16))
+IF_MSVC(DECL_ATOMIC_CMP_XCHG(unsigned short, ushrt, short, _InterlockedCompareExchange16))
 IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(unsigned, uint))
 IF_MSVC(DECL_ATOMIC_CMP_XCHG_COPY(unsigned, uint, unsigned long))
 IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(unsigned long, ulong))
-IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(unsigned long, ulong, long, _InterlockedCompareExchange))
+IF_MSVC(DECL_ATOMIC_CMP_XCHG(unsigned long, ulong, long, _InterlockedCompareExchange))
 IF_GCC(IF_X32(DECL_ATOMIC_CMP_XCHG_GCC(unsigned long long, ullong)))
-IF_LLVM(IF_X32(DECL_ATOMIC_CMP_XCHG_SYNC(unsigned long long, ullong)))
-IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(unsigned long long, ullong, long long, _InterlockedCompareExchange64))
+IF_LLVM(IF_X32(DECL_ATOMIC_CMP_XCHG(unsigned long long, ullong, unsigned long long, sync_val_compare_and_swap)))
+IF_MSVC(DECL_ATOMIC_CMP_XCHG(unsigned long long, ullong, long long, _InterlockedCompareExchange64))
 IF_GCC_LLVM(DECL_ATOMIC_CMP_XCHG_GCC(void *, ptr))
-IF_MSVC(DECL_ATOMIC_CMP_XCHG_MSVC(void *, ptr, void *, _InterlockedCompareExchangePointer))
-IF_GCC(IF_X64(DECL_ATOMIC_CMP_XCHG_SYNC(Uint128_t, Uint128)))
+IF_MSVC(DECL_ATOMIC_CMP_XCHG(void *, ptr, void *, _InterlockedCompareExchangePointer))
+IF_GCC(IF_X64(DECL_ATOMIC_CMP_XCHG(Uint128_t, Uint128, Uint128_t, sync_val_compare_and_swap)))
 IF_LLVM(IF_X64(DECL_ATOMIC_CMP_XCHG_GCC(Uint128_t, Uint128)))
 
 IF_MSVC(IF_X64(bool Uint128_atomic_cmp_xchg_mo(volatile Uint128_t *dst, Uint128_t *p_cmp, Uint128_t xchg, bool weak, enum atomic_mo mo_succ, enum atomic_mo mo_fail)
 {
-    (void) weak;
-    (void) mo_succ;
-    (void) mo_fail;
+    (void) weak, (void) mo_succ, (void) mo_fail;
     _Static_assert(sizeof(dst->qw) == 2 * sizeof(long long), "");
     return _InterlockedCompareExchange128((volatile long long *) dst->qw, UINT128_HI(xchg), UINT128_LO(xchg), (long long *) p_cmp->qw);
 }))
