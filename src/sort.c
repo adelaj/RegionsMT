@@ -559,17 +559,20 @@ bool hash_table_search(struct hash_table *tbl, size_t *p_h, const void *key, siz
     return 1;
 }
 
-void hash_table_dealloc(struct hash_table *tbl, size_t h)
+void hash_table_dealloc(struct hash_table *tbl, size_t h, size_t szk, size_t szv, hash_callback hash, void *context)
 {
-    bs_burst(tbl->flags, h, 2, FLAG_REMOVED);
+    if (!tbl->cnt) return;
+    size_t msk = ((size_t) 1 << tbl->lcap) - 1;
+    for (size_t i = (h + 1) & msk; i != h && bt(tbl->bits, i); i = (i + 1) & msk)
+    {
+        size_t j = uhash(hash((char *) tbl->key + i * szk, context)) & msk;
+        if (i > h ? h < j && j <= i : j <= i || h < j) continue;
+        memcpy((char *) tbl->key + h * szk, (char *) tbl->key + i * szk, szk);
+        memcpy((char *) tbl->val + h * szv, (char *) tbl->val + i * szv, szv);
+        h = i;
+    }
+    br(tbl->bits, h);
     tbl->cnt--;
-}
-
-bool hash_table_remove(struct hash_table *tbl, size_t h, const void *key, size_t szk, cmp_callback eq, void *context)
-{
-    if (!(hash_table_search(tbl, &h, key, szk, eq, context))) return 0;
-    hash_table_dealloc(tbl, h);
-    return 1;
 }
 
 void *hash_table_fetch_key(struct hash_table *tbl, size_t h, size_t szk)
@@ -616,78 +619,67 @@ static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt
     return res;
 }
 
+#define HASH_LOAD_FACTOR(X) (((X) >> 1) + ((X) >> 2))
+
 struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, size_t szv, hash_callback hash, cmp_callback eq, void *context, void *restrict swpk, void *restrict swpv)
 {
     struct array_result res = { .status = 1 };
-    size_t cap = (size_t) 1 << tbl->lcap;
-    if (tbl->tot >= tbl->hint)
+    size_t cnt = tbl->cnt, cap = (size_t) 1 << (tbl->lcap - 1) << 1; // 'tbl->lcap' may be equal to the 'bitsof(size_t)'
+    if (cnt >= HASH_LOAD_FACTOR(cap)) // Extend when the load factor of .75 is reached
     {
-        size_t lcnt;
-        if ((cap >> 1) <= tbl->cnt)
-        {
-            size_t cap1 = add_sat(cap, 1);
-            lcnt = ulog2(cap1, 1);
-            if (lcnt == SIZE_BIT) return (struct array_result) { .error = ARRAY_OVERFLOW };
-        }
-        else lcnt = cap > 5 ? ulog2(cap - 1, 1) : 2;
-        size_t cnt = (size_t) 1 << lcnt;
-        if (tbl->cnt >= (size_t) ((double) cnt * .77 + .5) || cap == cnt) res.status |= HASH_UNTOUCHED; // Magic constants from the 'khash.h'
-        else
-        {
-            if (cap < cnt)
-            {
-                res = array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC);
-                if (!res.status) return res;
+        size_t lcap1 = tbl->lcap + 1;
+        if (lcap1 >= bitsof(lcap1)) return (struct array_result) { .error = ARRAY_OVERFLOW };
+        lcap1 = MAX(2, lcap1);
+        size_t cap1 = (size_t) 1 << lcap1;
+        
+        res = array_init(&tbl->key, NULL, cap1, szk, 0, ARRAY_STRICT | ARRAY_REALLOC);
+        if (!res.status) return res;
 
-                size_t tot = res.tot;
-                res = array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC);
-                res.tot = add_sat(tot, res.tot);
-                if (!res.status) return res;
-                
-                tot = res.tot;
-                res = hash_table_rehash(tbl, lcnt, szk, szv, hash, context, swpk, swpv);
-                res.tot = add_sat(tot, res.tot);
-                if (!res.status) return res;                
-            }
-            else
-            {
-                res = hash_table_rehash(tbl, lcnt, szk, szv, hash, context, swpk, swpv);
-                if (!res.status) return res;
-                
-                size_t tot = res.tot;
-                res = array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
-                res.tot = add_sat(tot, res.tot);
-                if (!res.status) return res;
-                
-                tot = res.tot;
-                res = array_init(&tbl->val, NULL, cnt, szv, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
-                res.tot = add_sat(tot, res.tot);
-                if (!res.status) return res;
-            }
-            cap = cnt; // Update capacity after rehashing
-        }
+        size_t tot = res.tot;
+        res = array_init(&tbl->val, NULL, cap1, szv, 0, ARRAY_STRICT | ARRAY_REALLOC);
+        res.tot = add_sat(tot, res.tot);
+        if (!res.status) return res;
+
+        tot = res.tot;
+        res = hash_table_rehash(tbl, lcap1, szk, szv, hash, context, swpk, swpv);
+        res.tot = add_sat(tot, res.tot);
+        if (!res.status) return res;
+        cap = cap1;
+    }
+    else if ((cap >> 1) > cnt && cap > 4) // Shrink when at least half of the space remains unused
+    {
+        size_t lcap1 = ulog2(cnt + 1, 1), cap1 = (size_t) 1 << lcap1;
+        if (cnt >= HASH_LOAD_FACTOR(cap1)) lcap1++, cap1 <<= 1;
+
+        res = hash_table_rehash(tbl, lcap1, szk, szv, hash, context, swpk, swpv);
+        if (!res.status) return res;
+
+        size_t tot = res.tot;
+        res = array_init(&tbl->key, NULL, lcap1, szk, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
+        res.tot = add_sat(tot, res.tot);
+        if (!res.status) return res;
+
+        tot = res.tot;
+        res = array_init(&tbl->val, NULL, lcap1, szv, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
+        res.tot = add_sat(tot, res.tot);
+        if (!res.status) return res;
+        cap = cap1;
     }
     else res.status |= HASH_UNTOUCHED;
-    size_t msk = cap - 1, h = *p_h & msk;
-    for (size_t i = 0, j = h, tmp = cap;;)
+    size_t msk = cap - 1, h = uhash(*p_h) & msk;
+    for (;; h = (h + 1) & msk)
     {
-        uint8_t flags = bt_burst(tbl->flags, h, 2);
-        if (!(flags & FLAG_NOT_EMPTY)) break;
-        if (flags & FLAG_REMOVED) tmp = h;
+        if (!bts(tbl->bits, h))
+        {
+            tbl->cnt++;
+            break;
+        }
         else if (eq((char *) tbl->key + h * szk, key, context))
         {
-            *p_h = h;
             res.status |= HASH_PRESENT;
-            return res;
+            break;
         }
-        h = (h + ++i) & msk;
-        if (h != j) continue;
-        if (tmp != cap) h = tmp;        
-        break;
     }
-    if (!btr_burst(tbl->flags, h, 2, FLAG_REMOVED)) tbl->tot++;
-    bs_burst(tbl->flags, h, 2, FLAG_NOT_EMPTY);
-    tbl->cnt++;
     *p_h = h;
     return res;
 }

@@ -41,7 +41,8 @@ enum binary_search_flags {
 
 bool binary_search(size_t *, const void *restrict, const void *restrict, size_t, size_t, stable_cmp_callback, void *, enum binary_search_flags);
 
-// Hash table (heavily based on the 'khash.h' and 'khashl.h')
+// Hash table
+// Heavily based on the 'khash.h' and 'khashl.h': https://github.com/attractivechaos/klib
 struct hash_table {
     uint8_t *bits;
     uint8_t *flags;

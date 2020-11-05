@@ -347,7 +347,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
             print_na(f, x.pv[j], "\n");
         }
         
-        int len = snprintf(buff, sizeof(buff), "[CD] %.16e; [R] %.16e; [D] %.16e; [A] %.16e.", x.pv[0], x.pv[1], x.pv[2], x.pv[3]);
+        int len = snprintf(buff, sizeof(buff), "[A] %.16e; [CD] %.16e; [D] %.16e; [R] %.16e.", x.pv[0], x.pv[1], x.pv[2], x.pv[3]);
         log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value computation for window %~uz:%~uz took %~T.\n    Results: %s*\n", top_hit[i].interval.left, top_hit[i].interval.right, t0, t1, buff, len);
         fflush(f);
     }
