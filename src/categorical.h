@@ -30,5 +30,5 @@ struct mt_result categorical_impl(struct categorical_supp *, uint8_t *, size_t *
 void categorical_close(struct categorical_supp *);
 
 struct array_result categorical_adj_average_init(struct categorical_adj_average_supp *, size_t, size_t, size_t);
-struct adj_result categorical_adj_average(struct categorical_adj_average_supp *, uint8_t *, size_t *, size_t, size_t, size_t, size_t, size_t, gsl_rng *, enum mt_flags);
+struct adj_result categorical_adj_average(struct categorical_adj_average_supp *, uint8_t *, size_t *, size_t, size_t, size_t, size_t, size_t, gsl_rng *, enum mt_flags, double);
 void maver_adj_close(struct categorical_adj_average_supp *);

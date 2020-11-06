@@ -432,7 +432,7 @@ struct mt_result categorical_impl(struct categorical_supp *supp, uint8_t *gen, s
     return res;
 }
 
-struct adj_result categorical_adj_average(struct categorical_adj_average_supp *supp, uint8_t *gen, size_t *phen, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt, size_t rpl, size_t k, gsl_rng *rng, enum mt_flags flags)
+struct adj_result categorical_adj_average(struct categorical_adj_average_supp *supp, uint8_t *gen, size_t *phen, size_t snp_cnt, size_t phen_cnt, size_t phen_ucnt, size_t rpl, size_t k, gsl_rng *rng, enum mt_flags flags, double tol)
 {
     size_t table_disp = GEN_CNT * phen_ucnt;
     memset(supp->snp_data, 0, snp_cnt * sizeof(*supp->snp_data));
@@ -486,6 +486,7 @@ struct adj_result categorical_adj_average(struct categorical_adj_average_supp *s
     for (enum mt_alt i = 0; i < ALT_CNT; i++, flags >>= 1) alt[i] = (flags & 1) && isfinite(density[i] /= (double) density_cnt[i]);
 
     // Simulations
+    tol += 1.;
     size_t qc[ALT_CNT] = { 0 }, qt[ALT_CNT] = { 0 };
     for (size_t r = 0; r < rpl; r++)
     {
@@ -537,7 +538,7 @@ struct adj_result categorical_adj_average(struct categorical_adj_average_supp *s
 
         for (enum mt_alt i = 0; i < ALT_CNT; i++) if (alt_rpl[i])
         {
-            if (density_perm[i] >= density[i] * (double) density_perm_cnt[i]) qc[i]++; // >
+            if (density_perm[i] * tol >= density[i] * (double) density_perm_cnt[i]) qc[i]++;
             qt[i]++;
         }
     }

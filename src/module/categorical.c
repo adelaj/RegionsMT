@@ -334,7 +334,7 @@ bool categorical_run_adj(const char *phen_name, const char *path_phen, const cha
         if (left > right || right >= snp_cnt) continue;
 
         uint64_t t0 = get_time();
-        struct adj_result x = categorical_adj_average(&supp, gen + left * phen_cnt, phen, right - left + 1, phen_cnt, phen_ucnt, rpl, 10, rng, top_hit[i].bits);
+        struct adj_result x = categorical_adj_average(&supp, gen + left * phen_cnt, phen, right - left + 1, phen_cnt, phen_ucnt, rpl, 10, rng, top_hit[i].bits, 1e-9);
         //log_message_fmt(log, CODE_METRIC, MESSAGE_INFO, "Adjusted P-value for window %uz:%uz no. %uz: "
         //    "[%s] %f, %uz; [%s] %f, %uz; [%s] %f, %uz; [%s] %f, %uz.\n",
         //    left + 1, right + 1, i + 1,
