@@ -566,7 +566,7 @@ void hash_table_dealloc(struct hash_table *tbl, size_t h, size_t szk, size_t szv
     for (size_t i = (h + 1) & msk; i != h && bt(tbl->bits, i); i = (i + 1) & msk)
     {
         size_t j = uhash(hash((char *) tbl->key + i * szk, context)) & msk;
-        if (i > h ? h < j && j <= i : j <= i || h < j) continue;
+        if (h < i ? h < j && j <= i : j <= i || h < j) continue;
         memcpy((char *) tbl->key + h * szk, (char *) tbl->key + i * szk, szk);
         memcpy((char *) tbl->val + h * szv, (char *) tbl->val + i * szv, szv);
         h = i;
