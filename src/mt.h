@@ -1,5 +1,8 @@
 #pragma once
 
+#include <stddef.h>
+#include <stdint.h>
+
 ///////////////////////////////////////////////////////////////////////////////
 //
 //  Common structures and routines for multiple testing

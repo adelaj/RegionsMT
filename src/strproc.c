@@ -37,6 +37,7 @@ bool str_handler(const char *str, size_t len, void *Ptr, void *context)
 }
 
 // Warning! 'buff' may be not null-terminated
+/*
 #define DECL_STR_TO_UINT(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
     enum cvt_result PREFIX ## _cvt_step(TYPE *restrict p_res; const char *restrict buff, size_t *p_len, bool hex) \
     { \
@@ -54,8 +55,14 @@ bool str_handler(const char *str, size_t len, void *Ptr, void *context)
             } \
             else break; \
         } \
+    }
+*/
+
+#define DECL_STR_TO_UINT(TYPE, SUFFIX, LIMIT, BACKEND_RETURN, BACKEND, RADIX) \
+    unsigned str_to_ ## SUFFIX(const char *str, const char **ptr, TYPE *p_res) \
+    { \
         errno = 0; \
-        BACKEND_TYPE res = BACKEND(str, (char **) ptr, (RADIX)); \
+        BACKEND_RETURN res = BACKEND(str, (char **) ptr, (RADIX)); \
         Errno_t err = errno; \
         if (res > (LIMIT)) \
         { \
@@ -66,7 +73,6 @@ bool str_handler(const char *str, size_t len, void *Ptr, void *context)
         return err ? err == ERANGE ? CVT_OUT_OF_RANGE : 0 : 1; \
     }
 
-/*
 DECL_STR_TO_UINT(uint64_t, uint64, UINT64_MAX, unsigned long long, strtoull, 10)
 DECL_STR_TO_UINT(uint32_t, uint32, UINT32_MAX, unsigned long, strtoul, 10)
 DECL_STR_TO_UINT(uint16_t, uint16, UINT16_MAX, unsigned long, strtoul, 10)
@@ -83,7 +89,7 @@ DECL_STR_TO_UINT(size_t, size_hex, SIZE_MAX, unsigned long long, strtoull, 16)
 DECL_STR_TO_UINT(size_t, size, SIZE_MAX, unsigned long, strtoul, 10)
 DECL_STR_TO_UINT(size_t, size_hex, SIZE_MAX, unsigned long, strtoul, 16)
 #endif
-*/
+
 
 unsigned str_to_fp64(const char *str, const char **ptr, double *p_res)
 {

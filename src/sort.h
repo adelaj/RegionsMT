@@ -45,8 +45,7 @@ bool binary_search(size_t *, const void *restrict, const void *restrict, size_t,
 // Heavily based on the 'khash.h' and 'khashl.h': https://github.com/attractivechaos/klib
 struct hash_table {
     uint8_t *bits;
-    uint8_t *flags;
-    size_t cnt, lcap, tot, hint;
+    size_t cnt, lcap;
     void *key, *val;
 };
 
@@ -63,11 +62,11 @@ enum hash_status {
 struct array_result hash_table_init(struct hash_table *, size_t, size_t, size_t);
 void hash_table_close(struct hash_table *);
 bool hash_table_search(struct hash_table *, size_t *, const void *, size_t, cmp_callback, void *);
-bool hash_table_remove(struct hash_table *, size_t, const void *, size_t, cmp_callback, void *);
+bool hash_table_remove(struct hash_table *, size_t, const void *, size_t, size_t, hash_callback, cmp_callback, void *);
 void *hash_table_fetch_key(struct hash_table *, size_t, size_t);
 void *hash_table_fetch_val(struct hash_table *, size_t, size_t);
 struct array_result hash_table_alloc(struct hash_table *, size_t *, const void *, size_t, size_t, hash_callback, cmp_callback, void *, void *restrict, void *restrict);
-void hash_table_dealloc(struct hash_table *, size_t);
+void hash_table_dealloc(struct hash_table *, size_t, size_t, size_t, hash_callback, void *);
 
 // String pool
 struct str_pool {

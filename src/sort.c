@@ -512,7 +512,12 @@ enum {
 
 struct array_result hash_table_init(struct hash_table *tbl, size_t cnt, size_t szk, size_t szv)
 {
-    size_t cnt3 = add_sat(cnt, 3), lcnt = ulog2(cnt3, 1);
+    if (!cnt)
+    {
+        *tbl = (struct hash_table) { .lcap = bitsof(tbl->lcap) };
+        return (struct array_result) { .error = ARRAY_UNTOUCHED };
+    }
+    size_t lcnt = ulog2(cnt, 1);
     if (lcnt == SIZE_BIT) return (struct array_result) { .error = ARRAY_OVERFLOW };
     cnt = (size_t) 1 << lcnt;
     struct array_result res = array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT);
@@ -523,10 +528,10 @@ struct array_result hash_table_init(struct hash_table *tbl, size_t cnt, size_t s
         if (res.status)
         {
             tot = add_sat(tot, res.tot);
-            res = array_init(&tbl->flags, NULL, NIBBLE_CNT(cnt), sizeof(*tbl->flags), 0, ARRAY_CLEAR | ARRAY_STRICT);
+            res = array_init(&tbl->bits, NULL, UINT8_CNT(cnt), sizeof(*tbl->bits), 0, ARRAY_CLEAR | ARRAY_STRICT);
             if (res.status)
             {
-                tbl->cnt = tbl->tot = tbl->hint = 0;
+                tbl->cnt = 0;
                 tbl->lcap = lcnt;
                 return (struct array_result) { .status = ARRAY_SUCCESS, .tot = add_sat(tot, res.tot) };
             }
@@ -575,6 +580,13 @@ void hash_table_dealloc(struct hash_table *tbl, size_t h, size_t szk, size_t szv
     tbl->cnt--;
 }
 
+bool hash_table_remove(struct hash_table *tbl, size_t h, const void *key, size_t szk, size_t szv, hash_callback hash, cmp_callback eq, void *context)
+{
+    if (!(hash_table_search(tbl, &h, key, szk, eq, context))) return 0;
+    hash_table_dealloc(tbl, h, szk, szv, hash, context);
+    return 1;
+}
+
 void *hash_table_fetch_key(struct hash_table *tbl, size_t h, size_t szk)
 {
     return (char *) tbl->key + h * szk;
@@ -587,35 +599,30 @@ void *hash_table_fetch_val(struct hash_table *tbl, size_t h, size_t szv)
 
 static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context, void *restrict swpk, void *restrict swpv)
 {
-    size_t cnt = (size_t) 1 << lcnt, msk = cnt - 1, cap = (size_t) 1 << tbl->lcap;
-    uint8_t *flags;
-    struct array_result res = array_init(&flags, NULL, NIBBLE_CNT(cnt), sizeof(*flags), 0, ARRAY_CLEAR | ARRAY_STRICT);
+    size_t cnt = (size_t) 1 << lcnt, msk = cnt - 1, cap = (size_t) 1 << (tbl->lcap - 1) << 1;
+    uint8_t *bits;
+    struct array_result res = array_init(&bits, NULL, UINT8_CNT(cnt), sizeof(*bits), 0, ARRAY_CLEAR | ARRAY_STRICT);
     if (!res.status) return res;
     for (size_t i = 0; i < cap; i++)
     {
-        if (bt_burst(tbl->flags, i, 2) != FLAG_NOT_EMPTY) continue;
-        bs_burst(tbl->flags, i, 2, FLAG_REMOVED);
+        if (!btr(tbl->bits, i)) continue;
         for (;;)
         {
-            size_t h = hash((char *) tbl->key + i * szk, context) & msk;
-            for (size_t j = 0; bts_burst(flags, h, 2, FLAG_NOT_EMPTY); h = (h + ++j) & msk);
-            if (i == h) break;
-            if (h >= cap || bt_burst(tbl->flags, h, 2) != FLAG_NOT_EMPTY)
+            size_t h = uhash(hash((char *) tbl->key + i * szk, context)) & msk;
+            for (; bts(bits, h); h = (h + 1) & msk);
+            if (h >= cap || !btr(bits, h))
             {
                 memcpy((char *) tbl->key + h * szk, (char *) tbl->key + i * szk, szk);
                 memcpy((char *) tbl->val + h * szv, (char *) tbl->val + i * szv, szv);
                 break;
-            }            
-            bs_burst(tbl->flags, h, 2, FLAG_REMOVED);
+            }
             swap((char *) tbl->key + i * szk, (char *) tbl->key + h * szk, swpk, szk);
             swap((char *) tbl->val + i * szv, (char *) tbl->val + h * szv, swpv, szv);
         }
     }
-    free(tbl->flags);
-    tbl->flags = flags;
+    free(tbl->bits);
+    tbl->bits = bits;
     tbl->lcap = lcnt;
-    tbl->tot = tbl->cnt;
-    tbl->hint = (size_t) ((double) cnt * .77 + .5); // Magic constants from the 'khash.h'
     return res;
 }
 
@@ -669,16 +676,10 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
     size_t msk = cap - 1, h = uhash(*p_h) & msk;
     for (;; h = (h + 1) & msk)
     {
-        if (!bts(tbl->bits, h))
-        {
-            tbl->cnt++;
-            break;
-        }
-        else if (eq((char *) tbl->key + h * szk, key, context))
-        {
-            res.status |= HASH_PRESENT;
-            break;
-        }
+        if (!bts(tbl->bits, h)) tbl->cnt++;
+        else if (eq((char *) tbl->key + h * szk, key, context)) res.status |= HASH_PRESENT;
+        else continue;
+        break;
     }
     *p_h = h;
     return res;
@@ -724,7 +725,7 @@ struct array_result str_pool_insert(struct str_pool *pool, const char *key, size
     struct array_result res1 = buff_append(&pool->buff, key, len, (cnt ? BUFFER_INIT | BUFFER_TERM : BUFFER_TERM) | BUFFER_UNSAFE_AWARE);
     if (!res1.status)
     {
-        hash_table_dealloc(&pool->tbl, h);
+        hash_table_dealloc(&pool->tbl, h, sizeof(size_t), szv, stro_hash, pool->buff.str);
         return res1;
     }
     *(size_t *) hash_table_fetch_key(&pool->tbl, h, sizeof(size_t)) = off;
