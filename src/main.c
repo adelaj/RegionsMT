@@ -38,7 +38,7 @@
 static bool test_main(size_t thread_cnt, struct log *log)
 {
     const struct test_group groupl[] = {
-        {
+        /*{
             // Compare functions A
             test_cmp_dispose_a,
             CLII((struct test_generator []) {
@@ -113,7 +113,17 @@ static bool test_main(size_t thread_cnt, struct log *log)
             CLII((struct test []) {
                 FSTRL(test_sort_d_1)
             })
-        },
+        },*/
+        {
+            // Hash tables
+            test_sort_dispose_e,
+            CLII((struct test_generator[]) {
+                FSTRL(test_sort_generator_e_1)
+            }),
+            CLII((struct test[]) {
+                FSTRL(test_sort_e_1)
+            })
+        },/*
         {
             // Unicode facilities
             test_utf8_dispose,
@@ -137,7 +147,7 @@ static bool test_main(size_t thread_cnt, struct log *log)
             CLII((struct test []) {
                 FSTRL(test_categorical_a),
             })
-        }
+        }*/
     };
     log_message_fmt(log, CODE_METRIC, MESSAGE_NOTE, "Test mode triggered.\n");
     return test(groupl, countof(groupl), thread_cnt, log);
@@ -452,9 +462,9 @@ static int Main(int argc, char **argv)
         {
             main_args = main_args_override(main_args, main_args_default());
             struct log log;
-            if (log_init(&log, main_args.log_path, BLOCK_WRITE, LOG_WRITE_LOCK, &ttl_style, &style, &fallback))
+            if (log_init(&log, main_args.log_path, 1, LOG_WRITE_LOCK, &ttl_style, &style, &fallback))
             {
-                wapi_assert(&log, CODE_METRIC, 0);
+                //wapi_assert(&log, CODE_METRIC, 0);
                 /*
                 if (bt(main_args.bits, MAIN_ARGS_BIT_POS_FANCY))
                 {

@@ -23,6 +23,8 @@ struct test_sort_d {
 // Maximal array size is '1 << TEST_SORT_EXP'
 #define TEST_SORT_EXP 25
 
+#define TEST_HASH_MAX 1599
+
 bool test_sort_generator_a_1(void *, size_t *, struct log *);
 bool test_sort_generator_a_2(void *, size_t *, struct log *);
 bool test_sort_generator_a_3(void *, size_t *, struct log *);
@@ -42,3 +44,7 @@ unsigned test_sort_c_2(void *, void *, void *);
 bool test_sort_generator_d_1(void *, size_t *, struct log *);
 unsigned test_sort_d_1(void *, void *, void *);
 #define test_sort_dispose_d test_dispose
+
+bool test_sort_generator_e_1(void *, size_t *, struct log *);
+unsigned test_sort_e_1(void *, void *, void *);
+void test_sort_dispose_e(void *);

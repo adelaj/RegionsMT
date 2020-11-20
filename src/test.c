@@ -108,7 +108,7 @@ static unsigned test_thread(void *Indl, void *Context, void *Tls)
     }
     if (context->groupl[w].dispose) context->groupl[w].dispose(storage->data);
     free(storage);
-    volatile size_t *ptr = (volatile size_t * []){ &context->fail, &context->succ }[res] ;
+    volatile size_t *ptr = (volatile size_t *[]){ &context->fail, &context->succ }[res];
     atomic_fetch_add_sat(ptr, 1);
     return res;
 }

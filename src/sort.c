@@ -514,11 +514,11 @@ struct array_result hash_table_init(struct hash_table *tbl, size_t cnt, size_t s
 {
     if (!cnt)
     {
-        *tbl = (struct hash_table) { .lcap = bitsof(tbl->lcap) };
-        return (struct array_result) { .error = ARRAY_UNTOUCHED };
+        *tbl = (struct hash_table) { .lcap = bitsof(tbl->lcap) - 1 };
+        return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
     }
     size_t lcnt = ulog2(cnt, 1);
-    if (lcnt == SIZE_BIT) return (struct array_result) { .error = ARRAY_OVERFLOW };
+    if (lcnt == SIZE_MAX) return (struct array_result) { .error = ARRAY_OVERFLOW };
     cnt = (size_t) 1 << lcnt;
     struct array_result res = array_init(&tbl->key, NULL, cnt, szk, 0, ARRAY_STRICT);
     if (res.status)
@@ -599,7 +599,7 @@ void *hash_table_fetch_val(struct hash_table *tbl, size_t h, size_t szv)
 
 static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context, void *restrict swpk, void *restrict swpv)
 {
-    size_t cnt = (size_t) 1 << lcnt, msk = cnt - 1, cap = (size_t) 1 << (tbl->lcap - 1) << 1;
+    size_t cnt = (size_t) 1 << lcnt, msk = cnt - 1, cap = (size_t) 1 << tbl->lcap;
     uint8_t *bits;
     struct array_result res = array_init(&bits, NULL, UINT8_CNT(cnt), sizeof(*bits), 0, ARRAY_CLEAR | ARRAY_STRICT);
     if (!res.status) return res;
@@ -610,7 +610,7 @@ static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt
         {
             size_t h = uhash(hash((char *) tbl->key + i * szk, context)) & msk;
             for (; bts(bits, h); h = (h + 1) & msk);
-            if (h >= cap || !btr(bits, h))
+            if (h >= cap || !btr(tbl->bits, h))
             {
                 memcpy((char *) tbl->key + h * szk, (char *) tbl->key + i * szk, szk);
                 memcpy((char *) tbl->val + h * szv, (char *) tbl->val + i * szv, szv);
@@ -631,7 +631,7 @@ static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt
 struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, size_t szv, hash_callback hash, cmp_callback eq, void *context, void *restrict swpk, void *restrict swpv)
 {
     struct array_result res = { .status = 1 };
-    size_t cnt = tbl->cnt, cap = (size_t) 1 << (tbl->lcap - 1) << 1; // 'tbl->lcap' may be equal to the 'bitsof(size_t)'
+    size_t cnt = tbl->cnt, cap = (size_t) 1 << tbl->lcap; // 'tbl->lcap' may be equal to the 'bitsof(size_t) - 1'
     if (cnt >= HASH_LOAD_FACTOR(cap)) // Extend when the load factor of .75 is reached
     {
         size_t lcap1 = tbl->lcap + 1;
@@ -657,20 +657,23 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
     {
         size_t lcap1 = ulog2(cnt + 1, 1), cap1 = (size_t) 1 << lcap1;
         if (cnt >= HASH_LOAD_FACTOR(cap1)) lcap1++, cap1 <<= 1;
+        if (cap1 < cap)
+        {
+            res = hash_table_rehash(tbl, lcap1, szk, szv, hash, context, swpk, swpv);
+            if (!res.status) return res;
 
-        res = hash_table_rehash(tbl, lcap1, szk, szv, hash, context, swpk, swpv);
-        if (!res.status) return res;
+            size_t tot = res.tot;
+            res = array_init(&tbl->key, NULL, lcap1, szk, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
+            res.tot = add_sat(tot, res.tot);
+            if (!res.status) return res;
 
-        size_t tot = res.tot;
-        res = array_init(&tbl->key, NULL, lcap1, szk, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
-        res.tot = add_sat(tot, res.tot);
-        if (!res.status) return res;
-
-        tot = res.tot;
-        res = array_init(&tbl->val, NULL, lcap1, szv, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
-        res.tot = add_sat(tot, res.tot);
-        if (!res.status) return res;
-        cap = cap1;
+            tot = res.tot;
+            res = array_init(&tbl->val, NULL, lcap1, szv, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
+            res.tot = add_sat(tot, res.tot);
+            if (!res.status) return res;
+            cap = cap1;
+        }
+        else res.status |= HASH_UNTOUCHED;
     }
     else res.status |= HASH_UNTOUCHED;
     size_t msk = cap - 1, h = uhash(*p_h) & msk;

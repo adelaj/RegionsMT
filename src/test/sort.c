@@ -78,7 +78,7 @@ bool test_sort_generator_a_3(void *p_res, size_t *p_ind, struct log *log)
     size_t ind = *p_ind, cnt = (size_t) 1 << ind;
     if (!p_res)
     {
-        if (ind < TEST_SORT_EXP)++ *p_ind;
+        if (ind < TEST_SORT_EXP) ++*p_ind;
         else *p_ind = 0;
         return 1;
     }
@@ -129,7 +129,7 @@ bool test_sort_generator_c_1(void *p_res, size_t *p_ind, struct log *log)
     size_t ind = *p_ind, cnt = ((size_t) 1 << ind) - 1;
     if (!p_res)
     {
-        if (ind < TEST_SORT_EXP)++ *p_ind;
+        if (ind < TEST_SORT_EXP) ++*p_ind;
         else *p_ind = 0;
         return 1;
     }
@@ -158,6 +158,34 @@ bool test_sort_generator_d_1(void *p_res, size_t *p_ind, struct log *log)
     res->cnt = cnt;
     for (size_t i = 0; i < cnt; i++) res->arr[i] = UINT64_C(1) << i;
     return 1;
+}
+
+bool test_sort_generator_e_1(void *p_res, size_t *p_ind, struct log *log)
+{
+    (void) log;
+    size_t cnt = *p_ind;
+    if (!p_res)
+    {
+        if (cnt < TEST_HASH_MAX) ++*p_ind;
+        else *p_ind = 0;
+        return 1;
+    }
+    struct hash_table *tbl;
+    if (!array_assert(log, CODE_METRIC, array_init(&tbl, NULL, 1, sizeof(*tbl), 0, ARRAY_STRICT))) return 0;
+    if (array_assert(log, CODE_METRIC, hash_table_init(tbl, cnt, sizeof(size_t), sizeof(size_t))))
+    {
+        *(void **) p_res = tbl;
+        return 1;
+    }
+    free(tbl);
+    return 0;
+}
+
+void test_sort_dispose_e(void *In)
+{
+    struct hash_table *tbl = In;
+    hash_table_close(tbl);
+    free(tbl);
 }
 
 struct size_cmp_asc_test {
@@ -287,4 +315,43 @@ unsigned test_sort_d_1(void *In, void *Context, void *Tls)
         if (!binary_search(&tmp, &y, in->arr, in->cnt, sizeof(*in->arr), uint64_stable_cmp_asc_test, NULL, BINARY_SEARCH_IMPRECISE) || tmp != res_y) return 0;
     }
     return 1;
+}
+
+static size_t size_hash(const void *Key, void *Context)
+{
+    (void) Context;
+    return *(size_t *) Key;
+}
+
+static bool size_eq(const void *A, const void *B, void *Context)
+{
+    (void) Context;
+    return *(size_t *) A == *(size_t *) B;
+}
+
+unsigned test_sort_e_1(void *In, void *Context, void *Tls)
+{
+    (void) Context;
+    struct hash_table *tbl = In;
+    struct test_tls *tls = Tls;
+    size_t cnt = tbl->cnt, i = 0;
+    for (; i < cnt; i++)
+    {
+        if (hash_table_search(&tbl, &(size_t) { i }, &i, sizeof(size_t), size_eq, NULL)) break;
+        
+        size_t h = i, swpk, swpv;
+        if (!array_assert(&tls->log, CODE_METRIC, hash_table_alloc(&tbl, &h, &i, sizeof(size_t), sizeof(size_t), size_hash, size_eq, NULL, &swpk, &swpv))) break;
+        *(size_t *) hash_table_fetch_key(&tbl, h, sizeof(size_t)) = i;
+        *(size_t *) hash_table_fetch_val(&tbl, h, sizeof(size_t)) = i;
+
+        // Test for the key presence
+        h = i;
+        if (!(hash_table_alloc(&tbl, &h, &i, sizeof(size_t), sizeof(size_t), size_hash, size_eq, NULL, &swpk, &swpv).status & HASH_PRESENT) ||
+            *(size_t *) hash_table_fetch_val(&tbl, h, sizeof(size_t)) != i) break;
+    }
+    if (i == cnt)
+    {
+
+    }
+    return i == cnt;
 }

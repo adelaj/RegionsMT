@@ -176,7 +176,7 @@
 #define DECL_TEST_OP(TYPE, PREFIX, SUFFIX, HI_TYPE) \
     bool PREFIX ## _test_ ## SUFFIX(TYPE *p_res, TYPE x) \
     { \
-        HI_TYPE hi; \
+        HI_TYPE hi = 0; \
         TYPE res = SUFFIX(&hi, *p_res, x); \
         if (hi) return 0; \
         *p_res = res; /* On failure '*p_res' is untouched */ \
@@ -198,7 +198,7 @@
 #define DECL_TEST_MA(TYPE, PREFIX) \
     bool PREFIX ## _test_ma(TYPE *p_res, TYPE x, TYPE y) \
     { \
-        if (test_mul(&x, *p_res) || test_add(&x, y)) return 0; \
+        if (!test_mul(&x, *p_res) || !test_add(&x, y)) return 0; \
         *p_res = x; /* On failure '*p_res' is untouched */ \
         return 1; \
     }
