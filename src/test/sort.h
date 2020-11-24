@@ -45,6 +45,9 @@ bool test_sort_generator_d_1(void *, size_t *, struct log *);
 unsigned test_sort_d_1(void *, void *, void *);
 #define test_sort_dispose_d test_dispose
 
+#define TEST_SORT_E_2_ROUNDS 5
+
 bool test_sort_generator_e_1(void *, size_t *, struct log *);
 unsigned test_sort_e_1(void *, void *, void *);
-void test_sort_dispose_e(void *);
+unsigned test_sort_e_2(void *, void *, void *);
+#define test_sort_dispose_e NULL

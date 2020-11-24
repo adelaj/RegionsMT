@@ -514,7 +514,7 @@ struct array_result hash_table_init(struct hash_table *tbl, size_t cnt, size_t s
 {
     if (!cnt)
     {
-        *tbl = (struct hash_table) { .lcap = bitsof(tbl->lcap) - 1 };
+        *tbl = (struct hash_table) { .lcap = umax(tbl->lcap) };
         return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
     }
     size_t lcnt = ulog2(cnt, 1);
@@ -599,7 +599,7 @@ void *hash_table_fetch_val(struct hash_table *tbl, size_t h, size_t szv)
 
 static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt, size_t szk, size_t szv, hash_callback hash, void *context, void *restrict swpk, void *restrict swpv)
 {
-    size_t cnt = (size_t) 1 << lcnt, msk = cnt - 1, cap = (size_t) 1 << tbl->lcap;
+    size_t cnt = (size_t) 1 << lcnt, msk = cnt - 1, lcap = tbl->lcap, cap = lcap < bitsof(lcap) ? (size_t) 1 << lcap : 0;
     uint8_t *bits;
     struct array_result res = array_init(&bits, NULL, UINT8_CNT(cnt), sizeof(*bits), 0, ARRAY_CLEAR | ARRAY_STRICT);
     if (!res.status) return res;
@@ -631,10 +631,10 @@ static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt
 struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, size_t szv, hash_callback hash, cmp_callback eq, void *context, void *restrict swpk, void *restrict swpv)
 {
     struct array_result res = { .status = 1 };
-    size_t cnt = tbl->cnt, cap = (size_t) 1 << tbl->lcap; // 'tbl->lcap' may be equal to the 'bitsof(size_t) - 1'
+    size_t cnt = tbl->cnt, lcap = tbl->lcap, cap = lcap < bitsof(lcap) ? (size_t) 1 << lcap : 0; // 'tbl->lcap' may be equal to -1
     if (cnt >= HASH_LOAD_FACTOR(cap)) // Extend when the load factor of .75 is reached
     {
-        size_t lcap1 = tbl->lcap + 1;
+        size_t lcap1 = lcap + 1;
         if (lcap1 >= bitsof(lcap1)) return (struct array_result) { .error = ARRAY_OVERFLOW };
         lcap1 = MAX(2, lcap1);
         size_t cap1 = (size_t) 1 << lcap1;
@@ -663,12 +663,12 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
             if (!res.status) return res;
 
             size_t tot = res.tot;
-            res = array_init(&tbl->key, NULL, lcap1, szk, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
+            res = array_init(&tbl->key, NULL, cap1, szk, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
             res.tot = add_sat(tot, res.tot);
             if (!res.status) return res;
 
             tot = res.tot;
-            res = array_init(&tbl->val, NULL, lcap1, szv, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
+            res = array_init(&tbl->val, NULL, cap1, szv, 0, ARRAY_STRICT | ARRAY_REALLOC | ARRAY_FAILSAFE);
             res.tot = add_sat(tot, res.tot);
             if (!res.status) return res;
             cap = cap1;

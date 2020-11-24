@@ -163,29 +163,15 @@ bool test_sort_generator_d_1(void *p_res, size_t *p_ind, struct log *log)
 bool test_sort_generator_e_1(void *p_res, size_t *p_ind, struct log *log)
 {
     (void) log;
-    size_t cnt = *p_ind;
-    if (!p_res)
-    {
-        if (cnt < TEST_HASH_MAX) ++*p_ind;
-        else *p_ind = 0;
-        return 1;
-    }
-    struct hash_table *tbl;
-    if (!array_assert(log, CODE_METRIC, array_init(&tbl, NULL, 1, sizeof(*tbl), 0, ARRAY_STRICT))) return 0;
-    if (array_assert(log, CODE_METRIC, hash_table_init(tbl, cnt, sizeof(size_t), sizeof(size_t))))
-    {
-        *(void **) p_res = tbl;
-        return 1;
-    }
-    free(tbl);
-    return 0;
-}
-
-void test_sort_dispose_e(void *In)
-{
-    struct hash_table *tbl = In;
-    hash_table_close(tbl);
-    free(tbl);
+    static const size_t data[] = {
+        0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 
+        10, 11, 16, 20, 24, 27, 40, 43, 60, 68, 75, 100, 250, 501, 625, 1025, 
+        2047, 4098, 10000, 100000, 512000, 1000000, 2500000, 5000000,
+        1u << 23, 1u << 24, 1u << 25
+    };
+    if (p_res) *(const size_t **) p_res = data + *p_ind;
+    else if (++*p_ind >= countof(data)) *p_ind = 0;
+    return 1;
 }
 
 struct size_cmp_asc_test {
@@ -332,26 +318,56 @@ static bool size_eq(const void *A, const void *B, void *Context)
 unsigned test_sort_e_1(void *In, void *Context, void *Tls)
 {
     (void) Context;
-    struct hash_table *tbl = In;
     struct test_tls *tls = Tls;
-    size_t cnt = tbl->cnt, i = 0;
+    size_t cnt = (*(const size_t *) In), i = 0;
+    struct hash_table tbl;
+    if (!array_assert(&tls->log, CODE_METRIC, hash_table_init(&tbl, cnt, sizeof(size_t), sizeof(size_t)))) return 0;
     for (; i < cnt; i++)
     {
         if (hash_table_search(&tbl, &(size_t) { i }, &i, sizeof(size_t), size_eq, NULL)) break;
-        
         size_t h = i, swpk, swpv;
         if (!array_assert(&tls->log, CODE_METRIC, hash_table_alloc(&tbl, &h, &i, sizeof(size_t), sizeof(size_t), size_hash, size_eq, NULL, &swpk, &swpv))) break;
-        *(size_t *) hash_table_fetch_key(&tbl, h, sizeof(size_t)) = i;
-        *(size_t *) hash_table_fetch_val(&tbl, h, sizeof(size_t)) = i;
-
+        *(size_t *) hash_table_fetch_key(&tbl, h, sizeof(size_t)) = *(size_t *) hash_table_fetch_val(&tbl, h, sizeof(size_t)) = i;
         // Test for the key presence
         h = i;
         if (!(hash_table_alloc(&tbl, &h, &i, sizeof(size_t), sizeof(size_t), size_hash, size_eq, NULL, &swpk, &swpv).status & HASH_PRESENT) ||
             *(size_t *) hash_table_fetch_val(&tbl, h, sizeof(size_t)) != i) break;
     }
-    if (i == cnt)
-    {
+    if (i == cnt) // Testing that all elements were successfuly added
+        for (size_t h = i = 0; i < cnt && 
+            hash_table_search(&tbl, &h, &i, sizeof(size_t), size_eq, NULL) && 
+            *(size_t *) hash_table_fetch_val(&tbl, h, sizeof(size_t)) == i; h = ++i);
+    if (i == cnt) // Removing elements
+        for (i = 0; i < cnt && 
+            hash_table_remove(&tbl, i, &i, sizeof(size_t), sizeof(size_t), size_hash, size_eq, NULL) &&
+            !hash_table_search(&tbl, &(size_t) { i }, &i, sizeof(size_t), size_eq, NULL); i++);
+    size_t zer = tbl.cnt;
+    hash_table_close(&tbl);
+    return i == cnt && !zer;
+}
 
+unsigned test_sort_e_2(void *In, void *Context, void *Tls)
+{
+    (void) Context;
+    struct test_tls *tls = Tls;
+    size_t cnt = (*(const size_t *) In);
+    struct hash_table tbl;
+    if (!array_assert(&tls->log, CODE_METRIC, hash_table_init(&tbl, 0, sizeof(size_t), sizeof(size_t)))) return 0;
+    size_t n = 0;
+    for (size_t i = cnt; n < TEST_SORT_E_2_ROUNDS; n++) for (size_t d = 0; d < cnt; i += i + 1)
+    {
+        size_t j = uhash(i) % cnt, h = j, swpk, swpv;
+        struct array_result res = hash_table_alloc(&tbl, &h, &j, sizeof(size_t), sizeof(size_t), size_hash, size_eq, NULL, &swpk, &swpv);
+        if (!array_assert(&tls->log, CODE_METRIC, res)) break;
+        if (res.status & HASH_PRESENT)
+        {
+            if (*(size_t *) hash_table_fetch_val(&tbl, h, sizeof(size_t)) != j) break;
+            hash_table_dealloc(&tbl, h, sizeof(size_t), sizeof(size_t), size_hash, NULL);
+            if (hash_table_search(&tbl, &(size_t) { j }, &j, sizeof(size_t), size_eq, NULL)) break;
+            d++;
+        }
+        else *(size_t *) hash_table_fetch_key(&tbl, h, sizeof(size_t)) = *(size_t *) hash_table_fetch_val(&tbl, h, sizeof(size_t)) = j;
     }
-    return i == cnt;
+    hash_table_close(&tbl);
+    return n == TEST_SORT_E_2_ROUNDS;
 }
