@@ -45,7 +45,7 @@ bool binary_search(size_t *, const void *restrict, const void *restrict, size_t,
 // Heavily based on the 'khash.h' and 'khashl.h': https://github.com/attractivechaos/klib
 struct hash_table {
     uint8_t *bits;
-    size_t cnt, lcap;
+    size_t cnt, lcap, lhint;
     void *key, *val;
 };
 

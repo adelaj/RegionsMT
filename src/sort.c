@@ -532,7 +532,7 @@ struct array_result hash_table_init(struct hash_table *tbl, size_t cnt, size_t s
             if (res.status)
             {
                 tbl->cnt = 0;
-                tbl->lcap = lcnt;
+                tbl->lcap = tbl->lhint = lcnt;
                 return (struct array_result) { .status = ARRAY_SUCCESS, .tot = add_sat(tot, res.tot) };
             }
             free(tbl->val);
@@ -636,7 +636,6 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
     {
         size_t lcap1 = lcap + 1;
         if (lcap1 >= bitsof(lcap1)) return (struct array_result) { .error = ARRAY_OVERFLOW };
-        lcap1 = MAX(2, lcap1);
         size_t cap1 = (size_t) 1 << lcap1;
         
         res = array_init(&tbl->key, NULL, cap1, szk, 0, ARRAY_STRICT | ARRAY_REALLOC);
@@ -653,11 +652,11 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
         if (!res.status) return res;
         cap = cap1;
     }
-    else if ((cap >> 1) > cnt && cap > 4) // Shrink when at least half of the space remains unused
+    else if ((cap >> 1) > cnt) // Shrink when at least half of the space remains unused
     {
         size_t lcap1 = ulog2(cnt + 1, 1), cap1 = (size_t) 1 << lcap1;
         if (cnt >= HASH_LOAD_FACTOR(cap1)) lcap1++, cap1 <<= 1;
-        if (cap1 < cap)
+        if (tbl->lhint <= lcap1 && cap1 < cap)
         {
             res = hash_table_rehash(tbl, lcap1, szk, szv, hash, context, swpk, swpv);
             if (!res.status) return res;

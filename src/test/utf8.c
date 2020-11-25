@@ -61,7 +61,7 @@ unsigned test_utf8_decode(void *In, void *Context, void *Tls)
     (void) Context;
     (void) Tls;
     const struct test_utf8 *restrict in = In;
-    uint8_t byte[UTF8_COUNT], context = 0, len = 0, ind = 0;
+    char byte[UTF8_COUNT], context = 0, len = 0, ind = 0;
     uint32_t val = 0;
     for (; ind < in->utf8_len; ind++)
         if (!utf8_decode(in->utf8[ind], &val, byte, &len, &context)) break;
