@@ -514,7 +514,7 @@ struct array_result hash_table_init(struct hash_table *tbl, size_t cnt, size_t s
 {
     if (!cnt)
     {
-        *tbl = (struct hash_table) { .lcap = umax(tbl->lcap) };
+        *tbl = (struct hash_table) { .lcap = umax(tbl->lcap), .lhint = umax(tbl->lcap) };
         return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED };
     }
     size_t lcnt = ulog2(cnt, 1);
@@ -631,7 +631,7 @@ static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt
 struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, size_t szv, hash_callback hash, cmp_callback eq, void *context, void *restrict swpk, void *restrict swpv)
 {
     struct array_result res = { .status = 1 };
-    size_t cnt = tbl->cnt, lcap = tbl->lcap, cap = lcap < bitsof(lcap) ? (size_t) 1 << lcap : 0; // 'tbl->lcap' may be equal to -1
+    size_t cnt = tbl->cnt, lcap = tbl->lcap, cap = lcap < bitsof(lcap) ? (size_t) 1 << lcap : 0; // 'lcap' may be equal to SIZE_MAX
     if (cnt >= HASH_LOAD_FACTOR(cap)) // Extend when the load factor of .75 is reached
     {
         size_t lcap1 = lcap + 1;
@@ -656,7 +656,7 @@ struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const 
     {
         size_t lcap1 = ulog2(cnt + 1, 1), cap1 = (size_t) 1 << lcap1;
         if (cnt >= HASH_LOAD_FACTOR(cap1)) lcap1++, cap1 <<= 1;
-        if (tbl->lhint <= lcap1 && cap1 < cap)
+        if ((tbl->lhint >= bitsof(tbl->lhint) || tbl->lhint <= lcap1) && cap1 < cap)
         {
             res = hash_table_rehash(tbl, lcap1, szk, szv, hash, context, swpk, swpv);
             if (!res.status) return res;
