@@ -626,7 +626,7 @@ static struct array_result hash_table_rehash(struct hash_table *tbl, size_t lcnt
     return res;
 }
 
-#define HASH_LOAD_FACTOR(X) (((X) >> 1) + ((X) >> 2))
+#define HASH_LOAD_FACTOR(X) (((X) >> 1) + ((X) >> 2)) // .75 * (X)
 
 struct array_result hash_table_alloc(struct hash_table *tbl, size_t *p_h, const void *key, size_t szk, size_t szv, hash_callback hash, cmp_callback eq, void *context, void *restrict swpk, void *restrict swpv)
 {
