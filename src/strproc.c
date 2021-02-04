@@ -37,26 +37,7 @@ bool str_handler(const char *str, size_t len, void *Ptr, void *context)
 }
 
 // Warning! 'buff' may be not null-terminated
-/*
-#define DECL_STR_TO_UINT(TYPE, PREFIX, BACKEND_TYPE, BACKEND) \
-    enum cvt_result PREFIX ## _cvt_step(TYPE *restrict p_res; const char *restrict buff, size_t *p_len, bool hex) \
-    { \
-        size_t len = *p_len, ind = 0; \
-        if (!buff || !len || *buff == '\0') return CVT_EMPTY; \
-        for (ind < len; ind++) \
-        { \
-            char ch = buff[ind]; \
-            if ('0' <= ch && ch <= '9') val -= '0'; \
-            else if (hex) \
-            { \
-                if ('A' <= ch && ch <= 'F') ch -= 'A' - 10; \
-                else if ('a' <= ch && ch <= 'f') ch -= 'a' - 10; \
-                else break; \
-            } \
-            else break; \
-        } \
-    }
-*/
+
 
 #define DECL_STR_TO_UINT(TYPE, SUFFIX, LIMIT, BACKEND_RETURN, BACKEND, RADIX) \
     unsigned str_to_ ## SUFFIX(const char *str, const char **ptr, TYPE *p_res) \

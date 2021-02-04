@@ -12,6 +12,13 @@
 #include <limits.h>
 #include <immintrin.h>
 
+#define DECL2(SUFFIX, ...) \
+    DECL ## _ ## SUFFIX(unsigned char, uchar __VA_ARGS__) \
+    DECL ## _ ## SUFFIX(unsigned short, ushrt __VA_ARGS__) \
+    DECL ## _ ## SUFFIX(unsigned, uint __VA_ARGS__) \
+    DECL ## _ ## SUFFIX(unsigned long, ulong __VA_ARGS__) \
+    DECL ## _ ## SUFFIX(unsigned long long, ullong __VA_ARGS__)
+
 enum atomic_mo {
     ATOMIC_RELAXED IF_GCC_LLVM(= __ATOMIC_RELAXED),
     ATOMIC_ACQUIRE IF_GCC_LLVM(= __ATOMIC_ACQUIRE),

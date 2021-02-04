@@ -495,13 +495,6 @@
         return BACKEND((BACKEND_TYPE volatile *) (arr + bit / bitsof(TYPE)), (BACKEND_TYPE) (bit % bitsof(TYPE))); \
     }
 
-#define DECL2(SUFFIX, ...) \
-    DECL ## _ ## SUFFIX(unsigned char, uchar __VA_ARGS__) \
-    DECL ## _ ## SUFFIX(unsigned short, ushrt __VA_ARGS__) \
-    DECL ## _ ## SUFFIX(unsigned, uint __VA_ARGS__) \
-    DECL ## _ ## SUFFIX(unsigned long, ulong __VA_ARGS__) \
-    DECL ## _ ## SUFFIX(unsigned long long, ullong __VA_ARGS__)
-
 // Add with input/output carry
 IF_GCC_LLVM(DECL_OP_GCC(unsigned char, uchar, add, __builtin_add_overflow))
 IF_MSVC(DECL_OP_INTEL(unsigned char, uchar, add, _addcarry_u8))
