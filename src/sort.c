@@ -378,7 +378,7 @@ Dsize_t quick_sort_partition(void *restrict arr, size_t a, size_t b, size_t sz, 
         a += stride;
         b -= stride;
     } while (a <= b);
-    return DSIZEC(a, b);
+    return Dsize_c(a, b);
 }
 
 static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t stride, size_t lin_cutoff, lin_sort_callback lin_sort, size_t log_cutoff, sort_callback log_sort)
@@ -388,7 +388,7 @@ static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callb
     for (;;)
     {
         Dsize_t prt = quick_sort_partition(arr, a, b, sz, cmp, context, swp, stride);
-        size_t pa = DSIZE_LO(prt), pb = DSIZE_HI(prt);
+        size_t pa = Dsize_lo(prt), pb = Dsize_hi(prt);
         if (pb - a < lin_cutoff)
         {
             size_t tmp = pb - a + stride;
@@ -399,8 +399,8 @@ static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callb
                 lin_sort((char *) arr + pa, tmp, sz, cmp, context, swp, stride, tmp);
                 if (!frm--) break;
                 Dsize_t pop = stk[frm];
-                a = DSIZE_LO(pop);
-                b = DSIZE_HI(pop);
+                a = Dsize_lo(pop);
+                b = Dsize_hi(pop);
             }
             else a = pa;
         }
@@ -414,13 +414,13 @@ static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callb
         {
             if (pb - a > b - pa)
             {
-                if (frm < log_cutoff) stk[frm++] = DSIZEC(a, pb);
+                if (frm < log_cutoff) stk[frm++] = Dsize_c(a, pb);
                 else log_sort((char *) arr + a, pb - a + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
                 a = pa;
             }
             else
             {
-                if (frm < log_cutoff) stk[frm++] = DSIZEC(pa, b);
+                if (frm < log_cutoff) stk[frm++] = Dsize_c(pa, b);
                 else log_sort((char *) arr + pa, b - pa + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
                 b = pb;
             }

@@ -93,8 +93,8 @@ static unsigned sort_thread(void *Ind, void *Data, void *tls)
         // Warning! Acquire semantic is provided by 'Dsize_interlocked_compare_exchange' in task condition
         // This operation need not to be atomic
         Dsize_t ran = data->ran[ind - 1];
-        a = DSIZE_LO(ran);
-        b = DSIZE_HI(ran);
+        a = Dsize_lo(ran);
+        b = Dsize_hi(ran);
     }
     else
     {

@@ -26,32 +26,68 @@ enum atomic_mo {
     ATOMIC_ACQ_REL IF_GCC_LLVM(= __ATOMIC_ACQ_REL),
 };
 
+#define assert_wide(PREFIX) _Static_assert(2 * sizeof(H ## PREFIX ## _t) == sizeof(PREFIX ## _t), "")
+#define assert_narr(PREFIX) _Static_assert(sizeof(D ## PREFIX ## _t) == 2 * sizeof(PREFIX ## _t), "")
+
+/*
+typedef unsigned char Uchar_t;
+typedef unsigned short DUchar_t;
+assert_wide(Uchar);
+
+typedef unsigned char HUshrt_t;
+typedef unsigned short Ushrt_t;
+typedef unsigned int DUshrt_t;
+assert_wide(Ushrt);
+assert_narr(Ushrt);
+
+typedef unsigned short HUint_t;
+typedef unsigned Uint_t;
+typedef IF_GCC_LLVM(IF_X64(unsigned long)) IF_MSVC_X32(unsigned long long) DUint_t;
+assert_wide(Uint);
+assert_narr(Uint);
+
+typedef IF_GCC_LLVM(IF_X64(unsigned)) IF_MSVC_X32(unsigned short) HUlong_t;
+typedef unsigned long Ulong_t
+typedef IF_GCC_LLVM(IF_X64(Uint128_t)) IF_MSVC_X32(unsigned long long) DUulong_t;
+typedef IF_GCC_LLVM(IF_X64(unsigned long long)) IF_MSVC_X32(unsigned) EUlong_t; // Equivalent type for 'unsigned long' 
+assert_wide(Ulong);
+assert_narr(Ulong);
+_Static_assert(sizeof(Ulong_t) == sizeof(EUlong_t), "");
+
+typedef unsigned HUllong_t;
+typedef unsigned long long Ullong_t;
+typedef Uint128_t DUllong_t;
+assert_wide(Ullong);
+assert_narr(Ullong);
+
+typedef unsigned long long HUint128_t;
 GPUSH GWRN(pedantic)
-typedef IF_GCC_LLVM(IF_X64(unsigned __int128)) IF_MSVC_X32(struct { uint64_t v[2]; }) Uint128_t;
+typedef IF_GCC_LLVM(IF_X64(unsigned __int128)) IF_MSVC_X32(struct { unsigned long long v[2]; }) Uint128_t;
 GPOP
-typedef IF_X32(uint64_t) IF_X64(Uint128_t) Dsize_t;
+assert_narr(Uint128);
 
-_Static_assert(sizeof(Uint128_t) == 2 * sizeof(uint64_t), "");
-_Static_assert(sizeof(Dsize_t) == 2 * sizeof(size_t), "");
+typedef IF_X32(unsigned short) IF_X64(unsigned) Hsize_t;
+typedef IF_X32(unsigned long long) IF_X64(Uint128_t) Dsize_t;
+assert_wide(size);
+assert_narr(size);
+*/
 
-#define UINT128C(LO, HI) \
-    IF_GCC_LLVM((IF_X64((Uint128_t) (LO) | ((Uint128_t) (HI) << (bitsof(Uint128_t) >> 1))))) \
-    IF_MSVC_X32(((Uint128_t) { .v[0] = (LO), .v[1] = (HI) }))
-#define UINT128_LO(X) \
-    IF_GCC_LLVM((IF_X64((uint64_t) (X)))) \
-    IF_MSVC_X32(((X).v[0]))
-#define UINT128_HI(X) \
-    IF_GCC_LLVM(((uint64_t) ((X) >> (bitsof(Uint128_t) >> 1)))) \
-    IF_MSVC_X32(((X).v[1]))
-#define DSIZEC(LO, HI) \
-    IF_X64((UINT128C((LO), (HI)))) \
-    IF_X32(((Dsize_t) (LO) | (((Dsize_t) (HI)) << SIZE_BIT)))
-#define DSIZE_LO(X) \
-    IF_X64(((size_t) UINT128_LO((X)))) \
-    IF_X32(((size_t) (X)))
-#define DSIZE_HI(X) \
-    IF_X64(((size_t) UINT128_HI((X)))) \
-    IF_X32(((size_t) ((X) >> SIZE_BIT)))
+GPUSH GWRN(pedantic)
+typedef IF_GCC_LLVM(IF_X64(unsigned __int128)) IF_MSVC_X32(struct { unsigned long long v[2]; }) Uint128_t;
+GPOP
+typedef unsigned short Duchar_t;
+typedef unsigned char Hushrt_t;
+typedef unsigned Dushrt_t;
+typedef unsigned short Huint_t;
+typedef IF_GCC_LLVM(IF_X64(unsigned long)) IF_MSVC_X32(unsigned long long) Duint_t;
+typedef IF_GCC_LLVM(IF_X64(unsigned)) IF_MSVC_X32(unsigned short) Hulong_t;
+typedef IF_GCC_LLVM(IF_X64(Uint128_t)) IF_MSVC_X32(unsigned long long) Dulong_t;
+typedef IF_GCC_LLVM(IF_X64(unsigned long long)) IF_MSVC_X32(unsigned) Eulong_t;
+typedef unsigned Hullong_t;
+typedef Uint128_t Dullong_t;
+typedef unsigned long long HUint128_t;
+typedef IF_X32(unsigned short) IF_X64(unsigned) Hsize_t;
+typedef IF_X32(unsigned long long) IF_X64(Uint128_t) Dsize_t;
 
 // Rounding down/up to the nearest power of 2 for the inline usage 
 #define RP2_1(X, Y) ((X) | ((X) >> (Y)))
@@ -82,6 +118,48 @@ _Static_assert(sizeof(Dsize_t) == 2 * sizeof(size_t), "");
     unsigned: UINT_MAX, \
     unsigned long: ULONG_MAX, \
     unsigned long long: ULLONG_MAX))
+
+// Type of double width
+Duchar_t uchar_wide(unsigned char, unsigned char);
+Dushrt_t ushrt_wide(unsigned short, unsigned short);
+Duint_t uint_wide(unsigned, unsigned);
+Dulong_t ulong_wide(unsigned long, unsigned long);
+Dullong_t ullong_wide(unsigned long long, unsigned long long);
+
+#define wide(LO, HI) (_Generic((LO), \
+    unsigned char: uchar_wide, \
+    unsigned short: ushrt_wide, \
+    unsigned: uint_wide, \
+    unsigned long: ulong_wide, \
+    unsigned long long: ullong_wide)((LO), (HI)))
+
+// Lower part
+Hushrt_t ushrt_lo(unsigned short);
+Huint_t uint_lo(unsigned);
+Hulong_t ulong_lo(unsigned long);
+Hullong_t ullong_lo(unsigned long long);
+HUint128_t Uint128_lo(Uint128_t);
+
+#define lo(X) (_Generic((X), \
+    unsigned short: ushrt_lo, \
+    unsigned: uint_lo, \
+    unsigned long: ulong_lo, \
+    unsigned long long: ullong_lo, \
+    Uint128_t: Uint128_lo)((X)))
+
+// Higher part
+Hushrt_t ushrt_hi(unsigned short);
+Huint_t uint_hi(unsigned);
+Hulong_t ulong_hi(unsigned long);
+Hullong_t ullong_hi(unsigned long long);
+HUint128_t Uint128_hi(Uint128_t);
+
+#define hi(X) (_Generic((X), \
+    unsigned short: ushrt_hi, \
+    unsigned: uint_hi, \
+    unsigned long: ulong_hi, \
+    unsigned long long: ullong_hi, \
+    Uint128_t: Uint128_hi)((X)))
 
 // Add with input/output carry
 unsigned char uchar_add(unsigned char *, unsigned char, unsigned char);
@@ -117,13 +195,15 @@ unsigned short ushrt_mul(unsigned short *, unsigned short, unsigned short);
 unsigned uint_mul(unsigned *, unsigned, unsigned);
 unsigned long ulong_mul(unsigned long *, unsigned long, unsigned long);
 unsigned long long ullong_mul(unsigned long long *, unsigned long long, unsigned long long);
+IF_X64(Uint128_t Uint128_mul(Uint128_t *, Uint128_t, Uint128_t);)
 
 #define mul(P_HI, X, Y) (_Generic(*(P_HI), \
     unsigned char: uchar_mul, \
     unsigned short: ushrt_mul, \
     unsigned: uint_mul, \
     unsigned long: ulong_mul, \
-    unsigned long long: ullong_mul)((P_HI), (X), (Y)))
+    unsigned long long: ullong_mul \
+    IF_X64(, Uint128_t: Uint128_mul))((P_HI), (X), (Y)))
 
 // Multiply–accumulate
 unsigned char uchar_ma(unsigned char *, unsigned char, unsigned char, unsigned char);
