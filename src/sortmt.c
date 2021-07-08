@@ -80,7 +80,7 @@ void sort_mt_dispose(struct sort_mt *arg)
 struct sort_mt {
     void *arr;
     size_t cnt;
-    alignas(sizeof(Dsize_t)) volatile Dsize_t ran[];
+    alignas(Dsize_t) volatile Dsize_t ran[];
 };
 
 static unsigned sort_thread(void *Ind, void *Data, void *tls)
@@ -93,8 +93,8 @@ static unsigned sort_thread(void *Ind, void *Data, void *tls)
         // Warning! Acquire semantic is provided by 'Dsize_interlocked_compare_exchange' in task condition
         // This operation need not to be atomic
         Dsize_t ran = data->ran[ind - 1];
-        a = Dsize_lo(ran);
-        b = Dsize_hi(ran);
+        a = lo(ran);
+        b = hi(ran);
     }
     else
     {

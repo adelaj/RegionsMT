@@ -378,7 +378,7 @@ Dsize_t quick_sort_partition(void *restrict arr, size_t a, size_t b, size_t sz, 
         a += stride;
         b -= stride;
     } while (a <= b);
-    return Dsize_c(a, b);
+    return wide(a, b);
 }
 
 static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callback cmp, void *context, void *restrict swp, size_t stride, size_t lin_cutoff, lin_sort_callback lin_sort, size_t log_cutoff, sort_callback log_sort)
@@ -388,7 +388,7 @@ static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callb
     for (;;)
     {
         Dsize_t prt = quick_sort_partition(arr, a, b, sz, cmp, context, swp, stride);
-        size_t pa = Dsize_lo(prt), pb = Dsize_hi(prt);
+        size_t pa = lo(prt), pb = hi(prt);
         if (pb - a < lin_cutoff)
         {
             size_t tmp = pb - a + stride;
@@ -399,8 +399,8 @@ static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callb
                 lin_sort((char *) arr + pa, tmp, sz, cmp, context, swp, stride, tmp);
                 if (!frm--) break;
                 Dsize_t pop = stk[frm];
-                a = Dsize_lo(pop);
-                b = Dsize_hi(pop);
+                a = lo(pop);
+                b = hi(pop);
             }
             else a = pa;
         }
@@ -414,13 +414,13 @@ static void quick_sort_impl(void *restrict arr, size_t tot, size_t sz, cmp_callb
         {
             if (pb - a > b - pa)
             {
-                if (frm < log_cutoff) stk[frm++] = Dsize_c(a, pb);
+                if (frm < log_cutoff) stk[frm++] = wide(a, pb);
                 else log_sort((char *) arr + a, pb - a + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
                 a = pa;
             }
             else
             {
-                if (frm < log_cutoff) stk[frm++] = Dsize_c(pa, b);
+                if (frm < log_cutoff) stk[frm++] = wide(pa, b);
                 else log_sort((char *) arr + pa, b - pa + stride, sz, cmp, context, swp, stride, lin_cutoff, lin_sort);
                 b = pb;
             }
@@ -436,7 +436,7 @@ void quick_sort(void *restrict arr, size_t cnt, size_t sz, cmp_callback cmp, voi
         size_t tot = cnt * stride;
         if (cnt > QUICK_SORT_CUTOFF)
         {
-            size_t lin_cutoff = QUICK_SORT_CUTOFF * stride, log_cutoff = sub_sat(ulog2(cnt, 1), ulog2(QUICK_SORT_CUTOFF, 0) << 1);
+            size_t lin_cutoff = QUICK_SORT_CUTOFF * stride, log_cutoff = sub_sat(ulog2(cnt, 1), LOG2(QUICK_SORT_CUTOFF, 0) << 1);
 #       ifdef QUICK_SORT_CACHED
             quick_sort_impl(arr, tot, sz, cmp, context, swp, stride, lin_cutoff, insertion_sort_impl, log_cutoff, comb_sort_impl);
 #       else

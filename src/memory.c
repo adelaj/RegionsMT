@@ -244,7 +244,7 @@ void persistent_array_close(struct persistent_array *arr)
 struct array_result persistent_array_test(struct persistent_array *arr, size_t cnt, size_t sz, enum persistent_array_flags flags)
 {
     if (!arr->bck) return persistent_array_init(arr, cnt, sz, flags);
-    size_t cap1 = (size_t) 2 << (arr->bck - 1) << arr->off; // 'cap1' equals to the actual capacity plus one
+    size_t cap1 = (size_t) 2 << (arr->bck - 1) << arr->off; // 'cap1' equals to the actual capacity plus one, its overflow is not an error!
     if (cnt <= cap1 - 1) return (struct array_result) { .status = ARRAY_SUCCESS_UNTOUCHED }; // Do not replace condition with 'cnt < cap1'!
     size_t cnt1 = add_sat(cnt, 1), bck = ulog2(cnt1, 1) - arr->off, tot = 0;
     if (flags & PERSISTENT_ARRAY_WEAK)

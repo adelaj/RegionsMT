@@ -44,6 +44,10 @@
 #include <time.h>
 #include <immintrin.h>
 
+// Inspired by https://stackoverflow.com/questions/34796571/c-aligning-string-literals-for-a-specific-use-case
+#define ALIGNED_STR(AL, STR) \
+    (((struct { alignas(AL) char st[countof(STR)];}) { STR }).st)
+
 typedef IF_UNIX_APPLE(int) IF_WIN(errno_t) Errno_t;
 #define Alloca(SIZE) IF_UNIX_APPLE((alloca((SIZE)))) IF_WIN((_alloca((SIZE))))
 #define Aligned_alloca(SZ, ALIGN) ((void *) ((((uintptr_t) Alloca((SZ) + (ALIGN) - 1) + (ALIGN) - 1) / (ALIGN)) * (ALIGN)))
