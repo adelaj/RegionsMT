@@ -111,7 +111,7 @@
 #define DECL_MUL_WIDE(PREFIX) \
     PREFIX ## _t PREFIX ## _mul(PREFIX ## _t *p_hi, PREFIX ## _t x, PREFIX ## _t y) \
     { \
-        unsigned char car1 = 0, car2 = 0; /* Warning! 'car1' and 'car2' are never set simultaneously */ \
+        unsigned char car1 = 0, car2 = 0; \
         H ## PREFIX ## _t \
             xl = lo(x), xh = hi(x), \
             yl = lo(y), yh = hi(y), \
