@@ -118,7 +118,7 @@
             llh, lll = mul(&llh, xl, yl), hlh, lhh, hhh, \
             l = add(&car2, add(&car1, llh, mul(&lhh, xl, yh)), mul(&hlh, xh, yl)), \
             h = add(&car2, add(&car1, mul(&hhh, xh, yh), lhh), hlh); \
-        *p_hi = wide(h, hhh + car1 + car2); \
+        *p_hi = wide(h, hhh + car1 + car2); /* Note! At this line 'car1' and 'car2' are never set simultaneously */ \
         return wide(lll, l); \
     }
 
